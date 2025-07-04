@@ -9,6 +9,11 @@ module.exports = {
     "./node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    container: {
+      center: true,
+      padding: '2rem',
+      screens: { '2xl': '1400px' },
+    },
     extend: {
       fontFamily: {
         sans: ["var(--font-roboto)", "Inter", "ui-sans-serif", "system-ui"],
@@ -26,6 +31,58 @@ module.exports = {
           '0%': { transform: 'translateY(10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
+      },
+    },
+    extend: {
+      colors: {
+        medblue: { light: '#4A90E2', DEFAULT: '#0066CC', dark: '#004C99' },
+        medteal: '#20B2AA',
+        background: 'hsl(0, 0%, 100%)',
+        foreground: 'hsl(222.2, 84%, 4.9%)',
+        primary:  'hsl(210, 100%, 40%)',
+        secondary:'hsl(210, 40%, 96.1%)',
+        muted:     'hsl(210, 40%, 96.1%)',
+        border:    'hsl(214.3, 31.8%, 91.4%)',
+        gray: {
+          100: '#f5f5f5',
+          500: '#9ca3af',
+          600: '#6b7280',
+        },
+      },
+      fontFamily: {
+        sans:    ['Roboto', 'sans-serif'],
+        heading: ['"Open Sans"', 'sans-serif'],
+      },
+      spacing: {
+        4: '1rem',
+        6: '1.5rem',
+        8: '2rem',
+        20: '5rem',   // py-20 = 80px
+        32: '8rem',   // py-32 = 128px
+      },
+      maxWidth: {
+        '4xl': '56rem',  // 896px
+      },
+      borderRadius: {
+        sm: '4px',
+        md: '6px',
+        lg: '8px',
+      },
+      transitionDuration: {
+        300: '300ms',
+      },
+      keyframes: {
+        'fade-in': {
+          '0%': { opacity: '0' }, '100%': { opacity: '1' },
+        },
+        'slide-up': {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)',      opacity: '1' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 0.5s ease-out',
+        'slide-up': 'slide-up 0.5s ease-out',
       },
     },
   },

@@ -5,12 +5,25 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
 import en from "./locales/en.json";
-import es from "./locales/es.json";
+import pl from "./locales/pl.json";
 import ru from "./locales/ru.json";
+
+export const locales = ['en','ru','pl'] as const;
+export const defaultLocale = 'en';
+
+// ключи автоматом возьмутся из /locales/{lng}/common.json
+export const localeConfig = {
+  locales,
+  defaultLocale,
+  localeDetection: true,
+  pages: {
+    '*': ['common'],
+  },
+};
 
 const resources = {
   en: { translation: en },
-  es: { translation: es },
+  pl: { translation: pl },
   ru: { translation: ru },
 };
 

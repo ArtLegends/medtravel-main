@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 
 const languages = [
   { code: "en", name: "English", flag: "🇺🇸" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
+  { code: "pl", name: "Poland", flag: "🇵🇱" },
   { code: "ru", name: "Русский", flag: "🇷🇺" },
 ] as const;
 

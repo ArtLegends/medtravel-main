@@ -1,4 +1,12 @@
 /** @type {import('next').NextConfig} */
+
+// const { localeConfig } = require('./i18n');
+
+// module.exports = {
+//   i18n: localeConfig,
+//    ... остальные опции
+// }
+
 const nextConfig = {
     // Experimental optimizations for Next.js 15
     experimental: {
