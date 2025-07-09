@@ -1,13 +1,24 @@
 /** @type {import('next').NextConfig} */
 
-// const { localeConfig } = require('./i18n');
-
-// module.exports = {
-//   i18n: localeConfig,
-//    ... остальные опции
-// }
+// const { localeConfig } = require('./lib/i18n-server.ts')
+const path = require('path')
 
 const nextConfig = {
+    reactStrictMode: true,
+
+    // Локали
+    // i18n: {
+    //     locales: ['en', 'ru', 'pl'],
+    //     defaultLocale: 'en',
+    //     localeDetection: true,
+    // },
+
+    // Алиас @ → корень проекта
+    webpack(config) {
+        config.resolve.alias['@'] = path.resolve(__dirname)
+        return config
+    },
+
     // Experimental optimizations for Next.js 15
     experimental: {
         // Optimize package imports for better tree-shaking
@@ -109,6 +120,16 @@ const nextConfig = {
                         key: 'Content-Security-Policy',
                         value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
                     },
+                    // {
+                    //     key: 'Content-Security-Policy',
+                    //     value: [
+                    //         "default-src 'self'",
+                    //         "script-src 'self' https://va.vercel-scripts.com",
+                    //         "script-src-elem 'self' https://va.vercel-scripts.com",
+                    //         "object-src 'none'",
+                    //         "sandbox"
+                    //     ].join('; ')
+                    // }
                 ],
             },
             {

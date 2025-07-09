@@ -14,7 +14,8 @@ import { Providers } from "./providers";
 import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
+import Footer from "@/components/layout/Footer";
+import SearchBar from '@/components/SearchBar'
 
 // Optimize font loading
 const roboto = Roboto({
@@ -120,8 +121,8 @@ export default async function RootLayout({
               </div>
             </ThemeProvider>
           </SupabaseProvider>
-          <Analytics />
-          <SpeedInsights />
+          {/* <Analytics />
+          <SpeedInsights /> */}
         </Providers>
       </body>
     </html>
