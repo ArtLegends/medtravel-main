@@ -2,7 +2,8 @@
 import { createClient as createBrowserClient } from '@/lib/supabase/browserClient'
 import { createServerClient } from '@/lib/supabase/serverClient'
 import type Clinic from "@/components/ClinicCard"
-import { createClient } from "@/lib/supabase/browserClient"
+// import { createClient } from "@/lib/supabase/browserClient"
+import { createClient } from "./browserClient";
 // import type { Category } from '@/lib/supabase/types'
 
 export interface Category {
@@ -13,32 +14,30 @@ export interface Category {
 }
 
 export async function searchClinics(query: string): Promise<Clinic[]> {
-  const supabase = createClient()
+  const supabase = createClient();
   const { data, error } = await supabase
     .rpc("search_clinics", { q: query })
-    .order("rank", { ascending: false })
+    .order("rank", { ascending: false });
 
   if (error) {
-    console.error("searchClinics error", error)
-    return []
+    console.error("searchClinics error", error);
+    return [];
   }
-  return data as Clinic[] ?? []
+
+  return (data as Clinic[]) ?? [];
 }
 
 export interface Clinic {
-  id:        string
-  name:      string
-  slug:      string
-  country:   string
-  province?: string
-  city?:     string
-  district?: string
-  cover_url?: string | null
-  services:  string[]
-  description?: string
-  websites?:  string[]
-  phone?:     string
-  email?:     string
+  id: string;
+  name: string;
+  slug: string;
+  country: string;
+  province: string;
+  city: string;
+  district: string;
+  description: string | null;
+  cover_url?: string | null;
+  services: string[];
 }
 
 export async function getAllCategories(): Promise<Category[]> {
