@@ -3,32 +3,29 @@
 import { createServerClient } from '@/lib/supabase/serverClient'
 import ClinicDetail from '@/components/ClinicDetail'
 import type { Category } from '@/lib/supabase/requests'
-import type { ReactElement } from 'react'
 
 export const revalidate = 3600
 
-// описываем точную форму ваших route-параметров
-type RouteParams = {
-  category: string
-  country:  string
-  province: string
-  city:     string
-  district: string
-  clinic:   string
-}
-
-// тип пропсов страницы: params приходит как Promise<…>, searchParams можно оставить,
-// даже если не используется
 interface ClinicPageProps {
-  params: Promise<RouteParams>
-  searchParams: Record<string, string | string[]>
+  // В Next.js 15 динамические параметры приходят как Promise
+  params: Promise<{
+    category: string
+    country:  string
+    province: string
+    city:     string
+    district: string
+    clinic:   string
+  }>
+  // И searchParams тоже Promise, даже если ты их не используешь
+  searchParams: Promise<Record<string, string | string[]>>
 }
 
 export default async function ClinicPage({
   params,
-  searchParams, // можете опустить, если не используете
-}: ClinicPageProps): Promise<ReactElement> {
-  // сначала ждём реальные значения из params
+  // нужно обязательно указать, иначе тип PageProps не сойдётся
+  searchParams,
+}: ClinicPageProps) {
+  // Распаковываем реальные значения
   const {
     category,
     country,
@@ -37,6 +34,9 @@ export default async function ClinicPage({
     district,
     clinic: clinicSlug,
   } = await params
+
+  // Если вдруг понадобятся query-параметры:
+  // const qs = await searchParams
 
   const supabase = createServerClient()
 
