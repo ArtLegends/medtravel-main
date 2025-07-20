@@ -4,7 +4,14 @@ import ClinicDetail from '@/components/ClinicDetail'
 import type { Category } from '@/lib/supabase/requests'
 
 interface Props {
-  params: { clinic: string }
+   params: {
+     category: string;
+     country:  string;
+     province: string;
+     city:     string;
+     district: string;
+     clinic:   string;
+   };
 }
 
 export const revalidate = 3600
@@ -19,7 +26,7 @@ export default async function ClinicPage({ params }: Props) {
   id,
   name,
   slug,
-  description,
+  about,
   country,
   city,
   province,
