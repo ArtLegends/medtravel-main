@@ -155,9 +155,9 @@ export default function ReviewsSection() {
             </p>
 
             {/* Ссылка «Read More» */}
-            <a href="#" className="mt-4 text-blue-600 text-sm">
+            <p className="mt-4 text-blue-600 text-sm">
               Read More
-            </a>
+            </p>
           </div>
         ))}
       </div>

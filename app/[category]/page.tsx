@@ -5,42 +5,90 @@ import ClinicList from "@/components/ClinicList";
 // import { createServerClient } from "@/lib/supabase/serverClient";
 import { createServerClient } from "@/lib/supabase/serverClient";
 import type { Clinic } from "@/lib/supabase/requests";
+import CategoryContent from "@/components/CategoryContent";
 
 interface Props {
   params: { category: string };
 }
 
 export default async function CategoryPage({ params }: Props) {
-  const slug = params.category;
-  const cat = { name: slug[0].toUpperCase() + slug.slice(1).replace(/-/g, " ") };
+  // 1️⃣ Достаем slug из URL
+  const { category: slug } = params;
 
-  // Тестовые клиники
-  const clinicList: Clinic[] = [
-    {
-      id: "demo-1",
-      name: "Demo Clinic 1",
-      slug: "demo-clinic-1",
-      country: "Turkey",
-      province: "Istanbul",
-      city: "Istanbul",
-      district: "",
-      cover_url: null,
-      services: ["Service A", "Service B"],
-      description: "This is a demo clinic for testing purposes.",
-    },
-    {
-      id: "demo-2",
-      name: "Demo Clinic 2",
-      slug: "demo-clinic-2",
-      country: "Spain",
-      province: "Madrid",
-      city: "Madrid",
-      district: "",
-      cover_url: null,
-      services: ["Service X", "Service Y"],
-      description: "This is another demo clinic for testing purposes.",
-    },
-  ];
+  // 2️⃣ Отдаем имя категории (для Hero и заголовка)
+  const supabase = createServerClient();
+  const { data: cat, error: catErr } = await supabase
+    .from("categories")
+    .select("id, name")
+    .eq("slug", slug)
+    .single();
+
+  if (catErr || !cat) {
+    return (
+      <p className="container mx-auto py-20 text-center">
+        Category not found
+      </p>
+    );
+  }
+
+  // 3️⃣ Запрос всех клиник, привязанных к этой категории
+  const { data: rows, error: rowsErr } = await supabase
+    .from("clinic_categories")
+    .select(`
+      clinic:clinic_id (
+        id,
+        name,
+        slug,
+        about,
+        address,
+        country,
+        city,
+        province,
+        district
+      )
+    `)
+    .eq("category_id", cat.id);
+
+  if (rowsErr) {
+    console.error(rowsErr);
+    return (
+      <p className="container mx-auto py-20 text-center">
+        Error loading clinics
+      </p>
+    );
+  }
+
+  // 4️⃣ Приводим к нашему типу Clinic и ставим пустые услуги
+  function isClinic(obj: any): obj is Clinic {
+  return (
+    obj &&
+    typeof obj.id === "string" &&
+    typeof obj.name === "string" &&
+    typeof obj.slug === "string" &&
+    typeof obj.country === "string" &&
+    typeof obj.province === "string" &&
+    typeof obj.city === "string" &&
+    typeof obj.district === "string"
+  );
+}
+
+const clinicList: Clinic[] = Array.isArray(rows)
+  ? rows
+      .map((r) => r.clinic as Partial<Clinic>)
+      .filter((c) => c && !Array.isArray(c) && isClinic(c))
+      .map((c) => ({
+        id: c.id ?? "",
+        name: c.name ?? "",
+        slug: c.slug ?? "",
+        about: c.about ?? "",
+        // address: c.address ?? "",
+        country: c.country ?? "",
+        city: c.city ?? "",
+        province: c.province ?? "",
+        district: c.district ?? "",
+        services: [],
+      }))
+  : [];
 
   return (
     <>
@@ -55,11 +103,9 @@ export default async function CategoryPage({ params }: Props) {
       {/* Why choose us */}
       <WhyChooseUsCategory />
 
-      {/* Основной контент: описание + список + sidebar */}
+      {/* Контент + Сайдбар */}
       <section className="container mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Левое 3-колоночное */}
         <div className="lg:col-span-3 space-y-6">
-          {/* Подзаголовок и текст (как на втором скриншоте) */}
           <h2 className="text-3xl lg:text-4xl font-bold mb-2">
             Best Treatments Clinics in {cat.name}
           </h2>
@@ -69,49 +115,12 @@ export default async function CategoryPage({ params }: Props) {
             options and prices, and response times.
           </p>
 
-          {/* Список тестовых клиник */}
-          <ClinicList clinics={clinicList} />
+          <CategoryContent categoryId={cat.id} />
         </div>
 
-        {/* Боковая панель (фильтры / поиск) */}
         <aside className="lg:col-span-1 space-y-8">
-          {/* Пока можно вставить ваши компоненты SearchSection/SearchBar */}
-          <div className="bg-white p-4 rounded-lg shadow">
-            <input
-              type="text"
-              placeholder="Search locations"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 mb-4"
-            />
-            <h3 className="font-medium mb-2">Popular locations</h3>
-            <ul className="space-y-1 text-blue-600">
-              {["Germany", "Spain", "Mexico", "Turkey", "Poland"].map((c) => (
-                <li key={c} className="hover:underline cursor-pointer">
-                  {c}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <input
-              type="text"
-              placeholder="Search treatments"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 mb-4"
-            />
-            <h3 className="font-medium mb-2">Popular treatments</h3>
-            <ul className="space-y-1 text-blue-600 text-sm">
-              {[
-                "test service",
-                "Teeth Whitening",
-                "Dental Implant",
-                "Hair Transplant",
-              ].map((t) => (
-                <li key={t} className="hover:underline cursor-pointer">
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* здесь ваш SearchSection и прочее */}
+          {/* … */}
         </aside>
       </section>
     </>

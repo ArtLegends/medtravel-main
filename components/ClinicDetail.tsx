@@ -28,7 +28,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
         </div>
       )}
       <h1 className="text-4xl font-bold mt-8">{clinic.name}</h1>
-      <p className="mt-4 text-gray-600">{clinic.description}</p>
+      <p className="mt-4 text-gray-600">{clinic.about}</p>
 
       <section className="mt-8">
         <h2 className="text-2xl font-semibold">Категории</h2>
@@ -43,7 +43,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
 
           {/* Секция шапки с обложкой и названием */}
       <header className="flex flex-col md:flex-row items-center gap-8">
-        {clinic.cover_url && <img src={clinic.cover_url} className="w-full md:w-1/2 rounded-lg" />}
+        {clinic.cover_url && <img src={clinic.cover_url} alt={clinic.name} className="w-full md:w-1/2 rounded-lg" />}
         <div>
           <h1 className="text-4xl font-bold">{clinic.name}</h1>
           <p className="text-gray-500">{[clinic.city, clinic.province, clinic.country].filter(Boolean).join(', ')}</p>
@@ -53,7 +53,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
       {/* Описание */}
       <section>
         <h2 className="text-2xl font-semibold mb-4">Описание</h2>
-        <p>{clinic.description}</p>
+        <p>{clinic.about}</p>
       </section>
 
       {/* Категории */}

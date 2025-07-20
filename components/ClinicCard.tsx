@@ -38,7 +38,7 @@ export default function ClinicCard({ clinic }: Props) {
             {clinic.city}, {clinic.province}, {clinic.country}
           </p>
           <p className="text-gray-700 mb-4 line-clamp-3">
-            {clinic.description ?? "No description available."}
+            {clinic.about ?? "No description available."}
           </p>
           <a href={`/clinic/${clinic.slug}`} className="text-blue-600 hover:underline">
             Read more

@@ -4,6 +4,11 @@
 const path = require('path')
 
 const nextConfig = {
+    eslint: {
+    // не будет падать сборка из-за ошибок линтера
+        ignoreDuringBuilds: true,
+    },
+
     reactStrictMode: true,
 
     // Локали

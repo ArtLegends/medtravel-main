@@ -35,7 +35,7 @@ export interface Clinic {
   province: string;
   city: string;
   district: string;
-  description: string | null;
+  about: string | null;
   cover_url?: string | null;
   services: string[];
 }
