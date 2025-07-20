@@ -3,23 +3,41 @@
 import { createServerClient } from '@/lib/supabase/serverClient'
 import ClinicDetail from '@/components/ClinicDetail'
 import type { Category } from '@/lib/supabase/requests'
+import type { ReactElement } from 'react'
 
 export const revalidate = 3600
 
-// Объявляем интерфейс с обязательными полями params и searchParams
+// описываем точную форму ваших route-параметров
+type RouteParams = {
+  category: string
+  country:  string
+  province: string
+  city:     string
+  district: string
+  clinic:   string
+}
+
+// тип пропсов страницы: params приходит как Promise<…>, searchParams можно оставить,
+// даже если не используется
 interface ClinicPageProps {
-  params: {
-    category: string
-    country:  string
-    province: string
-    city:     string
-    district: string
-    clinic:   string
-  }
+  params: Promise<RouteParams>
   searchParams: Record<string, string | string[]>
 }
 
-export default async function ClinicPage({ params, searchParams }: ClinicPageProps) {
+export default async function ClinicPage({
+  params,
+  searchParams, // можете опустить, если не используете
+}: ClinicPageProps): Promise<ReactElement> {
+  // сначала ждём реальные значения из params
+  const {
+    category,
+    country,
+    province,
+    city,
+    district,
+    clinic: clinicSlug,
+  } = await params
+
   const supabase = createServerClient()
 
   // 1) Основные данные
@@ -40,9 +58,12 @@ export default async function ClinicPage({ params, searchParams }: ClinicPagePro
       phone,
       email
     `)
-    .eq('slug', params.clinic)
+    .eq('slug', clinicSlug)
     .single()
-  if (clinicErr || !clinic) return <p>Клиника не найдена</p>
+
+  if (clinicErr || !clinic) {
+    return <p>Клиника не найдена</p>
+  }
 
   // 2) Категории
   interface ClinicCategory { categories: Category[] }
