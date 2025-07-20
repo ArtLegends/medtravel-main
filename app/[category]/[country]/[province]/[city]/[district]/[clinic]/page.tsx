@@ -15,9 +15,11 @@ interface Props {
     district: string
     clinic:   string
   }
+  // Next.js всегда передаёт сюда searchParams, даже если мы их не используем
+  searchParams: Record<string, string | string[]>
 }
 
-export default async function ClinicPage({ params }: Props) {
+export default async function ClinicPage({ params, searchParams }: Props) {
   const supabase = createServerClient()
 
   // 1) Основные данные
