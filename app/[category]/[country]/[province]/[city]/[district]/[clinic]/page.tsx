@@ -1,16 +1,12 @@
-// app/[clinic]/page.tsx
-'use client'
+// app/[category]/[country]/[province]/[city]/[district]/[clinic]/page.tsx
 
 import { createServerClient } from '@/lib/supabase/serverClient'
-import ClinicDetail     from '@/components/ClinicDetail'
+import ClinicDetail from '@/components/ClinicDetail'
 import type { Category } from '@/lib/supabase/requests'
-// import type { PageProps } from 'next/types'          // ← импортируем PageProps у Next.js
 
 export const revalidate = 3600
 
-export default async function ClinicPage({
-  params,
-}: {
+interface Props {
   params: {
     category: string
     country:  string
@@ -19,27 +15,29 @@ export default async function ClinicPage({
     district: string
     clinic:   string
   }
-}) {
+}
+
+export default async function ClinicPage({ params }: Props) {
   const supabase = createServerClient()
 
   // 1) Основные данные
   const { data: clinic, error: clinicErr } = await supabase
     .from('clinics')
     .select(`
-  id,
-  name,
-  slug,
-  about,
-  country,
-  city,
-  province,
-  district,
-  cover_url,
-  services,
-  websites,
-  phone,
-  email
-`)
+      id,
+      name,
+      slug,
+      about,
+      country,
+      city,
+      province,
+      district,
+      cover_url,
+      services,
+      websites,
+      phone,
+      email
+    `)
     .eq('slug', params.clinic)
     .single()
   if (clinicErr || !clinic) return <p>Клиника не найдена</p>
