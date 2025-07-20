@@ -1,22 +1,25 @@
 // app/[clinic]/page.tsx
-import { createServerClient } from '@/lib/supabase/serverClient'
-import ClinicDetail from '@/components/ClinicDetail'
-import type { Category } from '@/lib/supabase/requests'
+'use client'
 
-interface Props {
-   params: {
-     category: string;
-     country:  string;
-     province: string;
-     city:     string;
-     district: string;
-     clinic:   string;
-   };
-}
+import { createServerClient } from '@/lib/supabase/serverClient'
+import ClinicDetail     from '@/components/ClinicDetail'
+import type { Category } from '@/lib/supabase/requests'
+// import type { PageProps } from 'next/types'          // ← импортируем PageProps у Next.js
 
 export const revalidate = 3600
 
-export default async function ClinicPage({ params }: Props) {
+export default async function ClinicPage({
+  params,
+}: {
+  params: {
+    category: string
+    country:  string
+    province: string
+    city:     string
+    district: string
+    clinic:   string
+  }
+}) {
   const supabase = createServerClient()
 
   // 1) Основные данные
