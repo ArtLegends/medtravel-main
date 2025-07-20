@@ -6,7 +6,8 @@ import type { Category } from '@/lib/supabase/requests'
 
 export const revalidate = 3600
 
-interface Props {
+// Объявляем интерфейс с обязательными полями params и searchParams
+interface ClinicPageProps {
   params: {
     category: string
     country:  string
@@ -15,11 +16,10 @@ interface Props {
     district: string
     clinic:   string
   }
-  // Next.js всегда передаёт сюда searchParams, даже если мы их не используем
   searchParams: Record<string, string | string[]>
 }
 
-export default async function ClinicPage({ params, searchParams }: Props) {
+export default async function ClinicPage({ params, searchParams }: ClinicPageProps) {
   const supabase = createServerClient()
 
   // 1) Основные данные
@@ -47,16 +47,12 @@ export default async function ClinicPage({ params, searchParams }: Props) {
   // 2) Категории
   interface ClinicCategory { categories: Category[] }
 
-  // не указываем дженерик в .from(), получаем data с типом any[]
   const { data: rawCcats } = await supabase
     .from('clinic_categories')
     .select('categories(id, name, slug)')
     .eq('clinic_id', clinic.id)
 
-  // приводим результат к нужной нам форме
   const ccats = (rawCcats ?? []) as ClinicCategory[]
-
-  // расплющиваем вложенные массивы в один
   const categories = ccats.flatMap(c => c.categories)
 
   // 3) Языки
