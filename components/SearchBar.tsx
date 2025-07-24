@@ -1,19 +1,22 @@
+// components/SearchBar.tsx
 'use client'
-// import { useState } from 'react'
-// import { searchClinics } from '@/lib/supabase/requests'
-// import ClinicCard from '@/components/ClinicCard'
 
 interface Props {
   value: string
   onChange: (value: string) => void
+  placeholder?: string
 }
 
-export default function SearchBar({ value, onChange }: Props) {
+export default function SearchBar({
+  value,
+  onChange,
+  placeholder = 'Search clinics...'
+}: Props) {
   return (
     <input
       type="search"
       className="w-full px-4 py-2 border rounded"
-      placeholder="Search clinics..."
+      placeholder={placeholder}
       value={value}
       onChange={e => onChange(e.target.value)}
     />

@@ -7,7 +7,7 @@ import { searchClinics } from "@/lib/supabase/requests"
 import ClinicCard from "./ClinicCard"
 import CategoryCard from "./CategoryCard"
 import type { Category } from "@/lib/supabase/requests"
-import type { Clinic } from "@/components/ClinicCard"
+import type { Clinic } from "@/lib/supabase/requests"
 import { useDebounce } from '@/hooks/useDebounce'
 
 interface Props {

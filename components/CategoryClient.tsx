@@ -1,21 +1,46 @@
 // components/CategoryClient.tsx
+// import React, { useState, useCallback } from 'react'
+// import CategoryFilters from './CategoryFilters'
+// import ClinicCard from './ClinicCard'
+// import { Clinic } from '@/lib/supabase/requests'
+// type FilterValues = {
+//   treatments: string[]
+//   countries: string[]
+// }
+
+// interface CategoryClientProps {
+//   clinics: Clinic[]
+// }
+
+// export default function CategoryClient({ clinics }: CategoryClientProps) {
+//   const [filters, setFilters] = useState<FilterValues>({
+//     treatments: [],
+//     countries: [],
+//   })
+
+//   const onFiltersChange = useCallback((newFilters: FilterValues) => {
+//     setFilters(newFilters)
+//   }, [])
+
+//   return (
+//     <>
+//       <CategoryFilters values={filters} onChange={onFiltersChange} />
+//       <div className="grid …">
+//         {clinics.map((c) => (
+//           <ClinicCard key={c.id} clinic={c} />
+//         ))}
+//       </div>
+//     </>
+//   )
+// }
+
+
 'use client'
 
-import { useState, useCallback } from 'react'
-import CategoryFilters, { FilterValues } from './CategoryFilters'
+import { useState, useMemo } from 'react'
+import CategoryFilters from './CategoryFilters'         // без { FilterValues }
 import ClinicCard from './ClinicCard'
-
-interface Clinic {
-  id: string
-  name: string
-  slug: string
-  country: string
-  province: string
-  city: string
-  district: string
-  cover_url: string | null
-  services: string[]
-}
+import type { Clinic } from '@/lib/supabase/requests'
 
 interface Props {
   cat: { id: number; name: string }
@@ -23,21 +48,32 @@ interface Props {
 }
 
 export default function CategoryClient({ cat, clinics }: Props) {
-  const [filtered, setFiltered] = useState(clinics)
+  // 1) локальные фильтры
+  const [selectedCountry, setCountry] = useState<string | null>(null)
+  const [selectedService, setService] = useState<string | null>(null)
 
-  const handleFilter = useCallback((values: FilterValues) => {
-    const { loc, svc } = values
-    setFiltered(clinics.filter(c =>
-      (loc.length  ? loc.includes(c.country || '') : true) &&
-      (svc.length  ? svc.every(s => c.services.includes(s)) : true)
-    ))
-  }, [clinics])
+  // 2) фильтрация
+  const filteredClinics = useMemo(() => 
+    clinics.filter(c =>
+      (!selectedCountry || c.country === selectedCountry) &&
+      (!selectedService || c.services.includes(selectedService))
+    )
+  , [clinics, selectedCountry, selectedService])
 
   return (
     <main className="container py-20 flex">
-      <CategoryFilters categoryId={cat.id} onFilter={handleFilter} />
+      {/* Передаём только то, что сейчас умеет CategoryFilters */}
+      <CategoryFilters
+        selectedCountry={selectedCountry}
+        onCountryChange={setCountry}
+        selectedService={selectedService}
+        onServiceChange={setService}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 ml-8">
-        {filtered.map(c => <ClinicCard key={c.id} clinic={c} />)}
+        {filteredClinics.map(c => (
+          <ClinicCard key={c.id} clinic={c} />
+        ))}
       </div>
     </main>
   )
