@@ -158,7 +158,8 @@ ProfileDropdown.displayName = "ProfileDropdown";
 export const Navbar = React.memo(() => {
   const { t } = useTranslation();
   const { supabase, session, role } = useSupabase() as SupabaseContextType;
-  const pathname = usePathname();
+  const rawPath = usePathname();
+  const pathname = rawPath ?? ''
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   // Мемоизируем навигационные элементы на основе роли
