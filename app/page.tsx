@@ -19,6 +19,9 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
+      <p className="text-center text-sm text-gray-500">
+        categories: {categories.length}
+      </p>
       <WhyChooseUs categories={categories} />
       {/* Если нужна поисковая секция — раскомментируй */}
       {/* <SearchSection categories={categories} /> */}

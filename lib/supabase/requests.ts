@@ -6,12 +6,13 @@ import type Clinic from "@/components/ClinicCard"
 import { createClient } from "./browserClient";
 // import type { Category } from '@/lib/supabase/types'
 
-export interface Category {
-  id:       number
-  name:     string
-  slug:     string
-  // cover_url: string | null
-}
+export type Category = {id: number; name: string; slug: string}
+
+// export interface Category {
+//   id:       number
+//   name:     string
+//   slug:     string
+// }
 
 export async function searchClinics(query: string): Promise<Clinic[]> {
   const supabase = createClient();
@@ -51,5 +52,5 @@ export async function getAllCategories(): Promise<Category[]> {
     console.error('getAllCategories error', error)
     return []
   }
-  return data!
+  return data ?? []
 }
