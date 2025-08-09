@@ -53,12 +53,15 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
 
     if (error) {
-      // row missing – create default USER
-      await supabase.from("profiles").insert({ id, role: "USER" }).single();
-      setRole("USER");
-    } else if (data) {
-      setRole((data as any)?.role ?? "USER");
+      console.error('profiles select error', error);
+      setRole("USER");          // безопасный фолбек
+      return;
     }
+    if (!data) {
+      setRole("USER");          // нет строки — считаем USER (триггер создаст позже)
+      return;
+    }
+    setRole((data as any)?.role ?? "USER");
   };
 
   // Мемоизируем контекстное значение чтобы избежать ненужных перерендеров

@@ -11,10 +11,9 @@ export const revalidate = 3600
 export default async function HomePage() {
   let categories: Category[] = []
   try {
-    categories = await getAllCategories()
+    categories = await getAllCategories()   // внутри — select id,name,slug order by name
   } catch (e) {
     console.error('getAllCategories()', e)
-    categories = []
   }
 
   return (
