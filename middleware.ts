@@ -1,110 +1,86 @@
-import type { NextRequest } from "next/server";
+// middleware.ts
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
-import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-
-// Cache for user roles to reduce database calls
-const roleCache = new Map<string, { role: string; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const roleCache = new Map<string, { role: string; ts: number }>()
+const TTL = 5 * 60 * 1000
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  const res = NextResponse.next()
+
+  // подключаем Supabase к middleware через cookies
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () =>
-          req.cookies.getAll().map((c) => ({ name: c.name, value: c.value })),
-        setAll: (cookies: { name: string; value: string; options?: any }[]) => {
-          cookies.forEach((cookie) => {
-            res.cookies.set(cookie.name, cookie.value, cookie.options);
-          });
-        },
+        getAll: () => req.cookies.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: cookies => cookies.forEach(c => res.cookies.set(c.name, c.value, c.options)),
       },
-    },
-  );
+    }
+  )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser()
+  const pathname = req.nextUrl.pathname
 
-  const pathname = req.nextUrl.pathname;
-  const isAuthRoute =
-    pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/auth')
+  const needAdmin   = pathname.startsWith('/admin')
+  const needCreator = pathname.startsWith('/labs')
 
-  // Role-based guard with caching
-  let userRole: string | null = null;
+  let role: string | null = null
 
-  if (user) {
-    const cacheKey = user.id;
-    const cached = roleCache.get(cacheKey);
-    const now = Date.now();
-
-    // Check cache first
-    if (cached && now - cached.timestamp < CACHE_TTL) {
-      userRole = cached.role;
-    } else {
-      // Fetch from database if not cached or expired
-      const { data } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      userRole = (data as any)?.role ?? "USER";
-
-      // Update cache
-      if (userRole) {
-        roleCache.set(cacheKey, { role: userRole, timestamp: now });
-      }
-
-      // Clean old cache entries periodically
-      if (roleCache.size > 1000) {
-        const entries = Array.from(roleCache.entries());
-
-        for (const [key, value] of entries) {
-          if (now - value.timestamp > CACHE_TTL) {
-            roleCache.delete(key);
-          }
+  try {
+    if (user) {
+      const cached = roleCache.get(user.id)
+      const now = Date.now()
+      if (cached && now - cached.ts < TTL) {
+        role = cached.role
+      } else {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+        if (!error) {
+          role = data?.role ?? 'USER'
+          roleCache.set(user.id, { role: role ?? 'USER', ts: now })
+        } else {
+          console.error('profiles SELECT error', error)
         }
       }
+      if (role) res.headers.set('x-user-role', role)
     }
 
-    // Set role in response headers for client-side access
-    if (userRole) {
-      res.headers.set("x-user-role", userRole);
+    // Доступ
+    if (!user && (needAdmin || needCreator || pathname === '/settings')) {
+      return NextResponse.redirect(new URL('/login', req.url))
     }
-  }
-
-  const needCreator = pathname.startsWith("/labs");
-  const needAdmin = pathname.startsWith("/admin");
-
-  if (user) {
-    if (needAdmin && !(userRole === "ADMIN" || userRole === "SUPER_ADMIN")) {
-      return NextResponse.redirect(new URL("/", req.url));
+    if (user) {
+      if (needAdmin && !(role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+        return NextResponse.redirect(new URL('/', req.url))
+      }
+      if (needCreator && role === 'USER') {
+        return NextResponse.redirect(new URL('/', req.url))
+      }
+      if (isAuthRoute) {
+        return NextResponse.redirect(new URL('/', req.url))
+      }
     }
-    if (needCreator && userRole === "USER") {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
+  } catch (e) {
+    console.error('middleware fatal', e)
+    // НИКОГДА не роняем публичные страницы
   }
 
-  if (!user && !isAuthRoute) {
-    const loginUrl = new URL("/login", req.url);
-
-    return NextResponse.redirect(loginUrl);
-  }
-
-  if (user && isAuthRoute) {
-    const homeUrl = new URL("/", req.url);
-
-    return NextResponse.redirect(homeUrl);
-  }
-
-  return res;
+  return res
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
-  // runtime: "experimental-edge", // Use experimental-edge runtime for Next.js 15
-};
+  matcher: [
+    '/admin/:path*',
+    '/labs/:path*',
+    '/settings',
+    '/login',
+    '/auth/:path*',
+  ],
+}
