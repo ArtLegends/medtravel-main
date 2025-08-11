@@ -19,7 +19,7 @@ export interface Clinic {
   province: string;
   city: string;
   district: string;
-  about: string | null;
+  description: string | null;
   cover_url?: string | null;
   services: string[];
 }
@@ -75,7 +75,7 @@ export interface Clinic {
   province: string;
   city: string;
   district: string;
-  about: string | null;
+  description: string | null;
   cover_url?: string | null;
   services: string[];
 }

@@ -96,9 +96,15 @@ export default async function ClinicPage({
     .eq("clinic_id", clinic.id)
     .order("created_at", { ascending: false })
 
+  // Преобразуем clinic к типу Clinic, сопоставляя about -> description
+  const clinicForDetail = {
+    ...clinic,
+    description: clinic.about,
+  }
+
   return (
     <ClinicDetail
-      clinic={clinic}
+      clinic={clinicForDetail}
       categories={categories}
       languages={langs?.map((l) => l.language) ?? []}
       accreditations={accs?.map((a) => a.accreditation) ?? []}

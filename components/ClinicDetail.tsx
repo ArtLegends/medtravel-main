@@ -28,7 +28,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
         </div>
       )}
       <h1 className="text-4xl font-bold mt-8">{clinic.name}</h1>
-      <p className="mt-4 text-gray-600">{clinic.about}</p>
+      <p className="mt-4 text-gray-600">{clinic.description}</p>
 
       <section className="mt-8">
         <h2 className="text-2xl font-semibold">Категории</h2>
@@ -53,7 +53,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
       {/* Описание */}
       <section>
         <h2 className="text-2xl font-semibold mb-4">Описание</h2>
-        <p>{clinic.about}</p>
+        <p>{clinic.description}</p>
       </section>
 
       {/* Категории */}
