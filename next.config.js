@@ -157,6 +157,24 @@ const nextConfig = {
             },
         ];
     },
+
+    async redirects() {
+    return [
+      {
+        source: '/:category/:country/:province?/:city?/:district?/:clinic',
+        destination: '/clinic/:clinic',
+        permanent: false,
+      },
+    ]
+  },
+
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'plus.unsplash.com' },
+      { protocol: 'https', hostname: 'encrypted-tbn0.gstatic.com' },
+    ],
+  }
 };
 
 module.exports = nextConfig;

@@ -59,12 +59,33 @@ export default function CategoryContent({ categoryId }: Props) {
 
   return (
     <div className="space-y-6">
-      <SearchBar value={search} onChange={setSearch} />
+      <SearchBar value={search} onChangeAction={setSearch} />
       <CategoryFilters
-        selectedCountry={country}
-        onCountryChange={setCountry}
-        selectedService={service}
-        onServiceChange={setService}
+        facets={undefined} // если у тебя есть локальная переменная с фасетами, иначе передай undefined
+        selected={{
+          country: country ?? undefined,
+          province: undefined,   // если у тебя есть состояние для province/city/district — подставь его
+          city: undefined,
+          district: undefined,
+          services: service ? [service] : [],
+          sort: "name_asc",
+        }}
+        onChangeAction={(chg) => {
+          // маппим пропсы нового API в твои useState
+          if ("country" in chg) setCountry(chg.country ?? null);
+          if ("province" in chg) {/* setProvince(chg.province ?? null); */ }
+          if ("city" in chg) {/* setCity(chg.city ?? null); */ }
+          if ("district" in chg) {/* setDistrict(chg.district ?? null); */ }
+          if ("services" in chg) setService((chg.services?.[0] ?? null));
+          if ("sort" in chg) { /* setSort(chg.sort) — если хранится в стейте */ }
+        }}
+        onResetAction={() => {
+          setCountry(null);
+          // setProvince?.(null); setCity?.(null); setDistrict?.(null);
+          setService(null);
+          setSearch("");
+          // при желании сбрось и сортировку/страницу
+        }}
       />
       {loading ? (
         <p className="text-center">Loading…</p>

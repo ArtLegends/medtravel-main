@@ -1,4 +1,5 @@
 // lib/supabase/serverClient.ts
+import "server-only";
 import { createClient as _createClient } from '@supabase/supabase-js'
 
 const url         = process.env.NEXT_PUBLIC_SUPABASE_URL!

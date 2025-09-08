@@ -1,22 +1,23 @@
 // components/CategoryCard.tsx
-import Link from 'next/link'
+'use client';
 
-interface Props {
-  category: {
-    id: number
-    name: string
-    slug: string
-  }
-}
+import Link from 'next/link';
+import type { Category } from '@/lib/supabase/requests';
+
+type Props = {
+  // нам в карточке нужны только эти поля
+  category: Pick<Category, 'id' | 'slug' | 'name'>;
+};
 
 export default function CategoryCard({ category }: Props) {
-   return (
-    <Link
-      href={`/${category.slug}`}
-      className="block overflow-hidden rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">
-      <div className="p-4">
-        <h2 className="text-xl font-semibold">{category.name}</h2>
-      </div>
+  if (!category) return null;
+
+  return (
+    <Link href={`/${category.slug}`} className="block">
+      <article className="rounded-xl border p-4 hover:shadow-md transition">
+        <h3 className="text-lg font-medium">{category.name}</h3>
+        {/* тут можно добавить описание/иконку */}
+      </article>
     </Link>
-  )
+  );
 }

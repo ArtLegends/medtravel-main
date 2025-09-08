@@ -35,7 +35,7 @@ export default function SearchSection({ categories }: Props) {
 
     return (
         <section className="container mx-auto py-20">
-            <SearchBar value={query} onChange={setQuery} />
+            <SearchBar value={query} onChangeAction={setQuery} />
 
             {query ? (
                 <div className="mt-8">
