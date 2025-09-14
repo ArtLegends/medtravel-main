@@ -1,3 +1,4 @@
+export const dynamic = 'force-static';
 // app/[category]/page.tsx
 import { notFound } from 'next/navigation'
 import CategoryClient from '@/components/CategoryClient'
