@@ -1,88 +1,55 @@
-export const dynamic = 'force-static';
 // app/[category]/page.tsx
-import { notFound } from 'next/navigation'
-import CategoryClient from '@/components/CategoryClient'
-import { createServerClient } from '@/lib/supabase/serverClient'
-import CategoryHero from "@/components/CategoryHero";
-import CategoryWhy from "@/components/CategoryWhy";
-import CategoryGrid from "@/components/CategoryGrid";
+import type { Metadata } from 'next'
 
-export const revalidate = 60
-// при необходимости можно принудительно отключить кэширование:
-// export const dynamic = 'force-dynamic'
+// ⛔ снимаем Edge во избежание несовместимостей
+export const runtime = 'nodejs'
+// если у тебя мок/статичные данные — оставь static; если Supabase/живые запросы — поставь 'force-dynamic'
+export const dynamic = 'force-static'
 
-// type Params = { params: { category: string } }
+type Params = { category: string }
 
-// export default async function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
-//   const { category } = await params;                     // <-- await params
-//   const slug = decodeURIComponent(category);
-//   const supabase = createServerClient()
+// ---------- безопасная загрузка данных ----------
+async function getClinicsByCategorySafe(category: string) {
+  // TODO: замени на свой реальный источник данных
+  // Например, если у тебя мок:
+  // const { clinicsByCategory } = await import('@/lib/mock/clinics')
+  // return clinicsByCategory(category)
 
-//   // 1) Категория по slug
-//   const { data: cat, error: catErr } = await supabase
-//     .from('categories')
-//     .select('id, name, slug')
-//     .eq('slug', slug)
-//     .maybeSingle()
+  // ВРЕМЕННО: проверим, что страница вообще живёт
+  return { category, clinics: [] as any[] }
+}
 
-//   if (catErr || !cat) {
-//     console.error('category load error', catErr)
-//     return notFound()
-//   }
+// ---------- SEO ----------
+export async function generateMetadata(
+  { params }: { params: Promise<Params> }
+): Promise<Metadata> {
+  const { category } = await params
+  return {
+    title: `MedTravel — ${category}`,
+    description: `Clinics for ${category} on MedTravel`,
+  }
+}
 
-//   // 2) Клиники через таблицу-связку clinic_categories
-//   const { data: rows, error: joinErr } = await supabase
-//     .from('clinic_categories')
-//     .select(`
-//       clinics (
-//         id,
-//         name,
-//         slug,
-//         country,
-//         province,
-//         city,
-//         district,
-//         cover_url
-//       )
-//     `)
-//     .eq('category_id', cat.id)
-
-//   if (joinErr) {
-//     console.error('clinic_categories join error', joinErr)
-//   }
-
-//   const clinics =
-//     (rows ?? [])
-//       .map((r: any) => r.clinics)
-//       .filter(Boolean)
-//       // наш ClinicCard ждёт services; подставим пустой массив, если его нет
-//       .map((c: any) => ({ ...c, services: Array.isArray(c.services) ? c.services : [] }))
-
-//   return <CategoryClient categorySlug={category} />;
-// }
-
-
-
-export default async function CategoryPage(
-  { params }: { params: Promise<{ category: string }> }
+// ---------- PAGE ----------
+export default async function Page(
+  { params }: { params: Promise<Params> }
 ) {
-  const { category } = await params;
-  const slug = decodeURIComponent(category);
+  try {
+    const { category } = await params
+    const data = await getClinicsByCategorySafe(category)
 
-  const supabase = createServerClient();
-  const { data: cat } = await supabase
-    .from("categories")
-    .select("id, name, slug")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (!cat) return notFound();
-
-  return (
-    <>
-      <CategoryHero title={`Best ${cat.name} Clinics in Popular Destinations`} />
-      <CategoryWhy />
-      <CategoryGrid categorySlug={slug} />
-    </>
-  );
+    // подставь свой компонент
+    return (
+      <main className="container mx-auto py-8">
+        <h1 className="text-2xl font-semibold capitalize">{category}</h1>
+        {/* твой контент с data.clinics */}
+        <p className="text-gray-500 mt-2">Category page OK (SSR succeeded)</p>
+      </main>
+    )
+  } catch (e) {
+    // это уйдёт в Vercel -> Deployments -> Logs
+    console.error('CATEGORY PAGE FATAL', e)
+    // Пробросим ошибку, чтобы отрендерился app/error.tsx
+    throw e
+  }
 }
