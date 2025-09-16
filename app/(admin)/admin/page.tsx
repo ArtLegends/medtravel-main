@@ -1,15 +1,15 @@
 import AdminTopbar from '@/components/admin/AdminTopbar';
 
-export default function Page() {
+export default function AdminHomePage() {
   return (
-    <>
-      <AdminTopbar title="Dashboard" subtitle="Overview" />
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+    <main className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">Admin Panel</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border bg-white p-4">Widget A</div>
         <div className="rounded-xl border bg-white p-4">Widget B</div>
         <div className="rounded-xl border bg-white p-4">Widget C</div>
       </div>
-    </>
+    </main>
   );
 }
 
