@@ -1,16 +1,15 @@
-'use client';
-export default function AdminTopbar({ title, subtitle }:{title:string; subtitle?:string}) {
+// components/admin/AdminTopbar.tsx
+type Props = {
+  title: string;
+  subtitle?: string;
+};
+
+export default function AdminTopbar({ title, subtitle }: Props) {
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        {subtitle ? <p className="text-sm text-gray-500">{subtitle}</p> : null}
-      </div>
-      <div className="flex gap-2">
-        <button className="px-3 py-2 rounded-md border bg-white">Refresh</button>
-        <button className="px-3 py-2 rounded-md border bg-white">Test DB</button>
-        <button className="px-3 py-2 rounded-md border bg-white">Export CSV</button>
-        <button className="px-3 py-2 rounded-md bg-rose-600 text-white">Delete All</button>
+    <div className="admin-topbar sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div className="px-6 py-5">
+        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+        {subtitle && <div className="admin-topbar-subtitle">{subtitle}</div>}
       </div>
     </div>
   );
