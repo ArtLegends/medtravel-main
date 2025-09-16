@@ -11,7 +11,7 @@ export async function middleware(req: NextRequest) {
 
   // ⚠️ временно делаем админку общедоступной
   if (req.nextUrl.pathname.startsWith('/admin')) {
-    return res;
+    return NextResponse.next();
   }
 
   const supabase = createServerClient(
