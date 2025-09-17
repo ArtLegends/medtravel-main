@@ -34,14 +34,14 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-slate-800">
       {/* Brand */}
       <div className="px-6 pt-6 pb-4">
         <div className="text-2xl font-extrabold">
-          <span className="text-teal-400">Med</span>Travel
+          <span className="text-teal-400">Med</span><span className="text-slate-300">Travel</span>
         </div>
         <div className="mt-1 text-xs text-slate-400">Admin Panel</div>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-800 px-3 py-2 text-xs text-slate-300">
+        <div className="mt-4 inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs bg-slate-600 text-slate-300">
           <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
           admin@medtravel.com
         </div>
