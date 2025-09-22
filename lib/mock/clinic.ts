@@ -1,4 +1,4 @@
-// lib/mock/clinic.ts
+// lib/mock/clinic.ts 
 export type ClinicMock = {
   slug: string;
   name: string;
@@ -7,12 +7,14 @@ export type ClinicMock = {
   district?: string;
   about: string;
   images: string[];
-  // дополнительные (опц.) поля для листингов
+  // для листингов
   rating?: number;          // 0..5
   fromPrice?: number;       // минимальная цена, для "From $..."
   tags?: string[];          // короткие теги (crowns, veneers и т.п.)
 
   payments?: string[];
+
+  // персонал
   staff?: Array<{
     name: string;
     position: string;
@@ -20,18 +22,40 @@ export type ClinicMock = {
     languages?: string[];
     specialisations?: string[];
     photo?: string;
+    bio?: string;
   }>;
+
+  // услуги
   services?: Array<{
     name: string;
     price?: string | number;
-    duration?: string;
+    description?: string;
   }>;
-  accreditations?: Array<{ title: string; country?: string; desc?: string }>;
+
+  // аккредитации — поддерживаем оба формата
+  accreditations?: Array<
+    | { title: string; country?: string; desc?: string }
+    | { name: string; logo_url?: string; description?: string }
+  >;
+
+  // часы работы
   hours?: Array<{ day: string; open?: string; close?: string }>;
+
+  // локация
   location?: {
     address: string;
     mapEmbedUrl?: string;
   };
+
+  // дополнительные сервисы (как в референсе)
+  additionalServices?: {
+    premises?: string[];
+    clinic_services?: string[];
+    travel_services?: string[];
+    languages_spoken?: string[];
+  };
+
+  // бейджи
   verifiedByMedtravel?: boolean;
   isOfficialPartner?: boolean;
 };
@@ -39,100 +63,131 @@ export type ClinicMock = {
 // ---------------- MOCK ----------------
 
 const MOCK_CLINICS: Record<string, ClinicMock> = {
-  'premium-aesthetic-istanbul': {
-    slug: 'premium-aesthetic-istanbul',
-    name: 'Premium Aesthetic Istanbul',
+  'dr-cagatay-ozyildirim': {
+    slug: 'dr-cagatay-ozyildirim',
+    name: 'Dr Çağatay Özyıldırım',
     country: 'Turkey',
     city: 'Istanbul',
-    district: 'Besiktas',
+    district: 'Şişli',
     about:
-      'State-of-the-art clinic in the heart of Istanbul. We provide cosmetic dentistry, implants, orthodontics, and more.',
+      'Dr Çağatay Özyıldırım Care is a dental clinic located in Istanbul, Turkey, offering a comprehensive range of dental services. The clinic provides treatments in general dentistry, cosmetic procedures, and restorative care. Services include routine cleanings, fillings, and preventive care, as well as cosmetic treatments such as teeth whitening, veneers, and orthodontic options like braces and Invisalign. For restorative needs, the clinic offers dental implants, dentures, and fixed prostheses. Advanced diagnostic tools, including 3D dental X-rays, are utilised to support accurate treatment planning.',
+
+    // геро-галерея (1 большой + до 4 превью)
     images: [
-      'https://images.unsplash.com/photo-1518131678677-a9b1e8e1f3bd?q=80&w=1200',
-      'https://images.unsplash.com/photo-1550831107-1553da8c8464?q=80&w=1200',
+      'https://pixsector.com/cache/517d8be6/av5c8336583e291842624.png',
+      
     ],
-    rating: 4.8,
-    fromPrice: 200,
-    tags: ['hair-transplant', 'dental-implants'],
+
+    // чтобы попадать в категорию /dentistry
+    tags: ['dentistry', 'dentists'],
+
+    // методы оплаты (для сайдбара)
     payments: ['Cash', 'VISA', 'Mastercard', 'Apple Pay', 'Google Pay'],
+
+    // услуги
     services: [
-      { name: 'Dental Implant', price: '$850', duration: '2-3 days' },
-      { name: 'Crown',         price: '$350', duration: '1 day'   },
-      { name: 'Veneer',        price: '$300', duration: '1-2 days'},
-      { name: 'Teeth Whitening', price: '$200', duration: '1 day' },
+      {
+        name: 'Bone Graft',
+        price: 300,
+        description:
+          'Bone grafts are important in dentistry for implant treatments because they help to create a strong and stable foundation for the implant.',
+      },
+      {
+        name: 'Dental Crowns',
+        price: 250,
+        description:
+          'Dental crowns are a common method used to repair and protect damaged teeth.',
+      },
+      {
+        name: 'Dental Bridges',
+        price: 500,
+        description:
+          'Dental bridges are a common method used to replace missing teeth in dentistry.',
+      },
     ],
+
+    // персонал (сопоставил с твоим форматом: Job Title → position, Languages → массив, Biography → bio)
     staff: [
       {
-        name: 'Dr. John Smith',
-        position: 'Consultant & Assistant Professor, Department of Plastic Surgery',
-        experienceYears: 8,
-        languages: ['English', 'Turkish'],
-        specialisations: ['Implantology', 'Oral Surgery'],
+        name: 'Mr Alexis Hernandez',
+        position: 'Chief Executive',
+        languages: ['English', 'Spanish'],
+        bio: 'He is in charge of daily operations and finances. He has spent his entire life in this dental office and is committed to the quality and prestige of maintaining it to its highest standards.',
+        photo: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39',
       },
       {
-        name: 'Dr. Sarah Johnson',
-        position: 'Assistant Professor, Department of Dental Surgery',
-        experienceYears: 10,
-        languages: ['English', 'Turkish', 'German'],
-        specialisations: ['Cosmetic Dentistry', 'Implantology'],
+        name: 'Mr Luis Padilla',
+        position: 'Administration Manager',
+        languages: ['English', 'Spanish'],
+        bio: 'Business Administration and Fianncing Marketing Career Highligts 9 Year Dental advisor. Patient coordiantor Clinic manager, in charge of daily operation, making sure everything is ready for Bussiness operations.',
+        photo: 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c',
       },
     ],
+
+    // аккредитации (новый формат с логотипами)
     accreditations: [
-      { title: 'Joint Commission International', country: 'US' },
-      { title: 'Turkish Medical Association', country: 'TR' },
+      {
+        name: 'TDB - Turkish Dental Association (Turkey)',
+        logo_url:
+          'https://cdn.whatclinic.com/thumbnails/f64f2175f6ac5bd4/turk_dishekimleri_birligi.png?width=89&height=45&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=b8a58951a71977ec23514e50e3edd9a48ed030a6',
+        description: '',
+      },
+      {
+        name: 'ESCD - European Society of Cosmetic Dentistry (International)',
+        logo_url:
+          'https://cdn.whatclinic.com/thumbnails/48cdc7977bef10e6/european_society_of_cosmetic_dentistry.png?width=89&height=45&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=92bf5f40ca3880fcd021b903b2dfaa63924a2aac',
+        description: '',
+      },
     ],
+
+    // график работы (как в примере)
     hours: [
-      { day: 'MONDAY', open: '09:00', close: '19:00' },
-      { day: 'TUESDAY', open: '09:00', close: '19:00' },
-      { day: 'WEDNESDAY', open: '09:00', close: '19:00' },
-      { day: 'THURSDAY', open: '09:00', close: '19:00' },
-      { day: 'FRIDAY', open: '09:00', close: '19:00' },
-      { day: 'SATURDAY', open: '09:00', close: '19:00' },
-      { day: 'SUNDAY' },
+      { day: 'MONDAY', open: '09:30', close: '20:00' },
+      { day: 'TUESDAY', open: '09:30', close: '20:00' },
+      { day: 'WEDNESDAY', open: '09:30', close: '20:00' },
+      { day: 'THURSDAY', open: '09:30', close: '20:00' },
+      { day: 'FRIDAY', open: '09:30', close: '20:00' },
+      { day: 'SATURDAY', open: '10:00', close: '17:00' },
+      { day: 'SUNDAY' }, // как в референсе — прочерк
     ],
+
     location: {
       address:
-        'Halaskargazi Caddesi No: 26-36 Nişantaşı Lotus Ofisleri B Blok No:5 Pangaltı, 34371 Şişli/İstanbul, Turkey',
+        'Harbiye, Mim Kemal Öke Cd. No:6, 34367, Şişli/İstanbul, 34250 Turkey',
       mapEmbedUrl:
-        'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3008.814797344833!2d28.987831!3d41.051179!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14cab7d42978bb9d%3A0x5e1b321d23860f73!2sClinic%20EGO!5e0!3m2!1sen!2s',
+        'https://www.google.com/maps?q=41.049758,28.990391&z=16&output=embed',
     },
+
+    // Additional Services (1:1 с макетом)
+    additionalServices: {
+      premises: [
+        'Parking',
+        'Accessible to disabled people',
+        'Public transport access',
+        'Wheelchair accessible toilet',
+        'Access without steps',
+        'Disabled parking',
+        'Patient bathroom',
+        'Wireless access',
+        'On-site pharmacy',
+      ],
+      clinic_services: ['Open weekends'],
+      travel_services: [
+        'International travel',
+        'Local travel',
+        'Local accommodation',
+        'Translation services',
+        'Local guide',
+        'Tours and vacation services',
+        'Pick up service from hotel',
+        'Pick up service from airport',
+      ],
+      // если нужны — добавь языки, иначе карточка просто не отрендерится
+      languages_spoken: [],
+    },
+
     verifiedByMedtravel: true,
     isOfficialPartner: true,
-  },
-
-  'ankara-dental-clinic': {
-    slug: 'ankara-dental-clinic',
-    name: 'Ankara Dental Clinic',
-    country: 'Turkey',
-    city: 'Ankara',
-    about: 'Modern clinic providing a full range of dental services.',
-    images: [
-      'https://images.unsplash.com/photo-1530023367847-a683933f4176?q=80&w=1200',
-    ],
-    rating: 4.6,
-    fromPrice: 180,
-    tags: ['crowns', 'veneers'],
-    services: [
-      { name: 'Crown',  price: '$320', duration: '1 day' },
-      { name: 'Veneer', price: '$280', duration: '1-2 days' },
-    ],
-  },
-
-  'medplast-warsaw': {
-    slug: 'medplast-warsaw',
-    name: 'MedPlast Warsaw',
-    country: 'Poland',
-    city: 'Warsaw',
-    about: 'Plastic surgery and dental procedures with European standards.',
-    images: [
-      'https://images.unsplash.com/photo-1526256262350-7da7584cf5eb?q=80&w=1200',
-    ],
-    rating: 4.7,
-    fromPrice: 160,
-    tags: ['plastic-surgery'],
-    services: [
-      { name: 'Crown', price: '$290', duration: '1 day' },
-    ],
   },
 };
 

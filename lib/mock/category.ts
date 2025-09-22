@@ -12,35 +12,15 @@ export type CategoryClinic = {
 
 export const CATEGORY_CLINICS: CategoryClinic[] = [
   {
-    slug: 'premium-aesthetic-istanbul',
-    name: 'Premium Aesthetic Istanbul',
+    slug: 'dr-cagatay-ozyildirim',
+    name: 'Dr Çağatay Özyıldırım',
     city: 'Istanbul',
     country: 'Turkey',
-    cover: 'https://images.unsplash.com/photo-1550336406-6f1cf9a28f67?q=80&w=1200',
+    cover: 'https://cdn.whatclinic.com//clinics/thumbnails/stockpictures/236910a5efa39582/23.jpg?width=400&height=400&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=8330f15bc95df732ac168471726b0839bfc4f522',
     priceFrom: 200,
     rating: 4.8,
-    categories: ['crowns', 'veneers', 'implants'],
-  },
-  {
-    slug: 'medical-magnus',
-    name: 'Medical Magnus',
-    city: 'Lodz',
-    country: 'Poland',
-    cover: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=1200',
-    priceFrom: 160,
-    rating: 4.6,
-    categories: ['crowns', 'plastic-surgery'],
-  },
-  {
-    slug: 'smile-pro-prague',
-    name: 'Smile Pro Prague',
-    city: 'Prague',
-    country: 'Czech Republic',
-    cover: 'https://images.unsplash.com/photo-1588771930292-4cbf57176f5f?q=80&w=1200',
-    priceFrom: 180,
-    rating: 4.7,
-    categories: ['veneers', 'whitening', 'crowns'],
-  },
+    categories: ['dentistry', 'dentists'],
+  }
 ];
 
 export function getClinicsByCategory(category: string): CategoryClinic[] {

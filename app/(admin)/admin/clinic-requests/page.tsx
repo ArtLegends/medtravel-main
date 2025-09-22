@@ -19,7 +19,7 @@ async function getRequests(): Promise<RequestRow[]> {
       id: 'req_1',
       name: 'John Doe',
       email: 'john@example.com',
-      clinic: 'Premium Aesthetic Istanbul',
+      clinic: 'Dr Çağatay Özyıldırım',
       createdAt: '2025-09-08 12:00',
       status: 'new',
     },

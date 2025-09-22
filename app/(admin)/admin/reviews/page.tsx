@@ -11,7 +11,7 @@ type Row = {
 
 async function getRows(): Promise<Row[]> {
   return [
-    { id: 'rv_1', clinic: 'Premium Aesthetic Istanbul', author: 'Sarah J.', rating: 5, createdAt: '2025-09-08 12:10', status: 'new' },
+    { id: 'rv_1', clinic: 'Dr Çağatay Özyıldırım', author: 'Sarah J.', rating: 5, createdAt: '2025-09-08 12:10', status: 'new' },
   ];
 }
 

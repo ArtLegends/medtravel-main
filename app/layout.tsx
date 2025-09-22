@@ -15,7 +15,8 @@ import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Navbar } from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import SearchBar from '@/components/SearchBar'
+import SearchBar from '@/components/SearchBar';
+import AppChrome from '@/components/layout/AppChrome';
 
 // Optimize font loading
 const roboto = Roboto({
@@ -106,24 +107,23 @@ export default async function RootLayout({
           href="https://fonts.gstatic.com"
           rel="preconnect"
         />
+        <style>{`:root{--site-header-h:64px}`}</style>
       </head>
       <body
         suppressHydrationWarning
         className={`${roboto.className} bg-background text-foreground antialiased`}
       >
-        <Providers>
-          <SupabaseProvider>
-            <ThemeProvider>
-              <div className="relative flex min-h-screen flex-col bg-background">
-                <Navbar />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-            </ThemeProvider>
-          </SupabaseProvider>
-          {/* <Analytics />
+        {/* <Providers> */}
+        <SupabaseProvider>
+          <ThemeProvider>
+            <div id="app-root" className="relative z-0 flex min-h-screen flex-col bg-background">
+              <AppChrome>{children}</AppChrome>
+            </div>
+          </ThemeProvider>
+        </SupabaseProvider>
+        {/* <Analytics />
           <SpeedInsights /> */}
-        </Providers>
+        {/* </Providers> */}
       </body>
     </html>
   );
