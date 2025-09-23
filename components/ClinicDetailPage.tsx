@@ -206,7 +206,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
             ) : (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {imgs.map(src => (
-                  <div key={src} className="aspect-[4/3] overflow-hidden rounded-lg">
+                  <div key={src} className="relative aspect-[4/3] overflow-hidden rounded-lg">
                     <Image
                       src={src}
                       alt="Clinic photo"
