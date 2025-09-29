@@ -70,15 +70,13 @@ export default function ClinicDetailPage({ clinic }: Props) {
       <HeroGallery name={clinic.name} images={imgs} />
 
       {/* ===== ФИКСИРОВАННЫЙ NAVBAR СЕКЦИЙ (под хедером сайта) ===== */}
-      <div className="fixed inset-x-0 top-[64px] z-[60]">
+      <div className="relative inset-x-0 pt-2 z-[60]">
         <div className="mx-auto max-w-6xl px-4">
           <div className="rounded-xl border bg-white/95 shadow-sm backdrop-blur pointer-events-auto">
             <SectionNav sections={sections} />
           </div>
         </div>
       </div>
-      {/* spacer под фиксированный navbar */}
-      <div className="h-[56px]" aria-hidden />
 
       {/* ===== GRID: MAIN + SIDEBAR (sidebar не sticky, прокручивается) ===== */}
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
