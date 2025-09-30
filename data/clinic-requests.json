@@ -1,0 +1,14 @@
+[
+  {
+    "id": "cr_mg6g2788",
+    "clinic": "test clinic",
+    "name": "test name test name",
+    "email": "test@gmail.com",
+    "phone": "+754954654328",
+    "address": "addres new test clinic",
+    "country": "Country",
+    "city": "City",
+    "status": "new",
+    "createdAt": "2025-09-30T10:58:21.081Z"
+  }
+]

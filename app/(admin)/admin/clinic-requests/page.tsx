@@ -1,8 +1,9 @@
 // app/(admin)/admin/clinic-requests/page.tsx
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 export const metadata = { title: 'Clinic Requests • Admin' };
 
-// Если данные пока не подключены — можно оставить пустой массив
 type RequestRow = {
   id: string;
   name: string;
@@ -10,20 +11,18 @@ type RequestRow = {
   clinic: string;
   createdAt: string;
   status: 'new' | 'processed' | 'rejected';
+  phone?: string | null;
 };
 
-// временный мок, чтобы страница была модульной и собиралась
 async function getRequests(): Promise<RequestRow[]> {
-  return [
-    {
-      id: 'req_1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      clinic: 'Dr Çağatay Özyıldırım',
-      createdAt: '2025-09-08 12:00',
-      status: 'new',
-    },
-  ];
+  const file = path.join(process.cwd(), 'data', 'clinic-requests.json');
+  try {
+    const raw = await fs.readFile(file, 'utf8');
+    const rows = JSON.parse(raw) as RequestRow[];
+    return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  } catch {
+    return [];
+  }
 }
 
 export default async function ClinicRequestsPage() {
@@ -50,10 +49,18 @@ export default async function ClinicRequestsPage() {
                 <td className="p-3">{r.name}</td>
                 <td className="p-3">{r.email}</td>
                 <td className="p-3">{r.clinic}</td>
-                <td className="p-3">{r.createdAt}</td>
+                <td className="p-3">{new Date(r.createdAt).toLocaleString()}</td>
                 <td className="p-3 capitalize">{r.status}</td>
               </tr>
             ))}
+
+            {rows.length === 0 && (
+              <tr>
+                <td className="p-6 text-center text-gray-500" colSpan={5}>
+                  No requests yet
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

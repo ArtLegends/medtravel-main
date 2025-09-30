@@ -1,21 +1,13 @@
-export const metadata = { title: 'Contacts • Admin' };
+// app/(admin)/admin/contacts/page.tsx
+import { getContacts } from "@/lib/mock/db";
 
-type Row = {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  createdAt: string;
-};
-
-async function getRows(): Promise<Row[]> {
-  return [
-    { id: 'ct_1', name: 'John Doe', email: 'john@example.com', phone: '+1 202 555 0182', createdAt: '2025-09-08 12:05' },
-  ];
-}
+export const metadata = { title: "Contacts • Admin" };
+// чтобы данные не кэшировались
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function ContactsPage() {
-  const rows = await getRows();
+  const rows = await getContacts();
 
   return (
     <div className="space-y-6">
@@ -32,14 +24,22 @@ export default async function ContactsPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="p-3">{r.name}</td>
-                <td className="p-3">{r.email}</td>
-                <td className="p-3">{r.phone ?? '—'}</td>
-                <td className="p-3">{r.createdAt}</td>
+            {rows.length === 0 ? (
+              <tr>
+                <td className="p-3 text-gray-500" colSpan={4}>
+                  No contacts yet
+                </td>
               </tr>
-            ))}
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="p-3">{`${r.firstName} ${r.lastName}`}</td>
+                  <td className="p-3">{r.email}</td>
+                  <td className="p-3">{r.phone || "—"}</td>
+                  <td className="p-3">{r.createdAt}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -27,7 +27,7 @@ export default function Footer() {
               </NextLink>
             </li>
             <li>
-              <NextLink href="/add-clinic" className="text-gray-700 hover:text-teal-500 transition">
+              <NextLink href="/new-clinic" className="text-gray-700 hover:text-teal-500 transition">
                 Add a clinic
               </NextLink>
             </li>
@@ -37,7 +37,7 @@ export default function Footer() {
               </NextLink>
             </li>
             <li>
-              <NextLink href="/contact" className="text-gray-700 hover:text-teal-500 transition">
+              <NextLink href="/contact-us" className="text-gray-700 hover:text-teal-500 transition">
                 Contact us
               </NextLink>
             </li>

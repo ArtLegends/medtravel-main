@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo } from 'react';
+import ConsultationModal from '@/components/clinic/ConsultationModal';
+import { useMemo, useState } from 'react';
 import SectionNav from '@/components/SectionNav';
 import type { ClinicMock } from '@/lib/mock/clinic';
 
@@ -34,6 +35,25 @@ export default function ClinicDetailPage({ clinic }: Props) {
   );
 
   const imgs = clinic.images ?? [];
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalService, setModalService] = useState<string | undefined>(undefined);
+
+  // массив названий услуг клиники (для селекта модалки)
+  const serviceNames = useMemo(
+    () => (clinic.services ?? []).map((s: any) => s.name).filter(Boolean),
+    [clinic.services]
+  );
+
+  // хелперы
+  function openModal(service?: string) {
+    setModalService(service);
+    setModalOpen(true);
+  }
+  function closeModal() {
+    setModalOpen(false);
+  }
+
 
   // Doctors: поддержка старого и нового форматов
   const doctors = useMemo(() => {
@@ -125,7 +145,9 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       <td className="p-3">{s.price ?? '—'}</td>
                       <td className="p-3">{s.description ?? s.duration ?? '—'}</td>
                       <td className="p-3">
-                        <button className="rounded-md bg-primary px-3 py-2 text-white">
+                        <button type="button"
+                          onClick={() => openModal(s.name)}
+                          className="rounded-md bg-primary px-3 py-2 text-white">
                           Request
                         </button>
                       </td>
@@ -171,7 +193,9 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       </div>
 
                       <div className="mt-3">
-                        <button className="rounded-md bg-primary px-3 py-2 text-white">
+                        <button type="button"
+                          onClick={() => openModal('Consultation')}
+                          className="rounded-md bg-primary px-3 py-2 text-white">
                           Request Appointment
                         </button>
                       </div>
@@ -296,11 +320,17 @@ export default function ClinicDetailPage({ clinic }: Props) {
         {/* ---------- SIDEBAR (НЕ sticky) ---------- */}
         <aside className="space-y-4">
           <div className="rounded-2xl border p-4">
-            <button className="w-full rounded-md bg-primary px-4 py-3 text-white">
-              Start Your Personalized Treatment Plan Today
-            </button>
-            <button className="mt-3 w-full rounded-md border px-4 py-3">
+            {/* ЗЕЛЁНАЯ кнопка: переход на форму */}
+            <a
+              href={`/clinic/${clinic.slug}/inquiry`}
+              className="block w-full rounded-md bg-emerald-600 px-4 py-3 text-center font-medium text-white hover:bg-emerald-700"
+            >
               Claim Your Free Quote
+            </a>
+
+            {/* синяя — оставляем как есть, если нужна отдельно */}
+            <button className="mt-3 w-full rounded-md bg-primary px-4 py-3 text-white">
+              Start Your Personalized Treatment Plan Today
             </button>
           </div>
 
@@ -318,6 +348,13 @@ export default function ClinicDetailPage({ clinic }: Props) {
           ) : null}
         </aside>
       </div>
+      <ConsultationModal
+        open={modalOpen}
+        onClose={closeModal}
+        services={serviceNames}
+        preselectedService={modalService}
+      />
+
     </div>
   );
 }
