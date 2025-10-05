@@ -1,3 +1,4 @@
+// app/new-clinic/NewClinicForm.tsx
 'use client';
 
 import { useState } from 'react';

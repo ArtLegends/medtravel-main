@@ -1,3 +1,4 @@
+// app/(creator)/layout.tsx
 import { Suspense } from "react";
 
 import { requireRole } from "@/lib/supabase/server";

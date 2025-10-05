@@ -1,3 +1,4 @@
+// app/clinic/[slug]/inquiry/ClinicInquiryForm.tsx
 'use client';
 
 import { useState } from "react";
@@ -9,14 +10,14 @@ type Props = {
 };
 
 export default function ClinicInquiryForm({ clinicSlug, clinicName, services }: Props) {
-  const [name, setName]         = useState("");
-  const [email, setEmail]       = useState("");
-  const [phone, setPhone]       = useState("");
-  const [message, setMessage]   = useState("");
-  const [service, setService]   = useState(services[0] ?? "");
-  const [loading, setLoading]   = useState(false);
-  const [ok, setOk]             = useState<null | string>(null);
-  const [err, setErr]           = useState<null | string>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [service, setService] = useState(services[0] ?? "");
+  const [loading, setLoading] = useState(false);
+  const [ok, setOk] = useState<null | string>(null);
+  const [err, setErr] = useState<null | string>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

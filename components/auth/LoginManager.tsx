@@ -1,3 +1,4 @@
+// components/auth/LoginManager.tsx
 'use client';
 
 import { useSearchParams } from 'next/navigation';
@@ -32,14 +33,6 @@ export default function LoginManager() {
       setLoading(false);
     }
   }
-
-  // если используешь OTP/email, можно так же пробрасывать redirectTo
-  // async function signInWithEmail(email: string) {
-  //   await supabase.auth.signInWithOtp({
-  //     email,
-  //     options: { emailRedirectTo: `${site}/auth/callback?next=${encodeURIComponent(next)}` },
-  //   });
-  // }
 
   return (
     <div className="flex flex-col gap-3">

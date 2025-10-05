@@ -1,4 +1,4 @@
-// Единый экспорт всех Supabase утилит
+// lib/supabase/index.ts
 export { createClient } from "./browserClient";
 export { getServerSupabase } from "./server";
 export { useSupabase, SupabaseProvider } from "./supabase-provider";

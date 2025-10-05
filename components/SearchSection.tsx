@@ -4,8 +4,8 @@
 import { useState, useEffect } from "react"
 import SearchBar from "./SearchBar"
 import { searchClinics } from "@/lib/supabase/requests"
-import ClinicCard from "./ClinicCard"
-import CategoryCard from "./CategoryCard"
+import ClinicCard from "./clinic/ClinicCard"
+import CategoryCard from "./category/CategoryCard"
 import type { Category } from "@/lib/supabase/requests"
 import type { Clinic } from "@/lib/supabase/requests"
 import { useDebounce } from '@/hooks/useDebounce'

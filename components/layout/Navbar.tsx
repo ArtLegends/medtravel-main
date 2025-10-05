@@ -1,3 +1,4 @@
+// components/layout/Navbar.tsx
 "use client";
 
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
@@ -38,9 +39,8 @@ const NavItem = React.memo(
     <NavbarItem isActive={active}>
       <NextLink
         prefetch
-        className={`font-medium transition-colors ${
-          active ? "text-primary" : "text-foreground hover:text-primary"
-        }`}
+        className={`font-medium transition-colors ${active ? "text-primary" : "text-foreground hover:text-primary"
+          }`}
         href={item.href}
       >
         {t(item.label)}
@@ -137,7 +137,7 @@ const ProfileDropdown = React.memo(
               <DropdownItem key="admin" as={NextLink} href="/admin">
                 {t("navbar.adminPanel")}
               </DropdownItem>
-            : null}
+              : null}
             <DropdownItem
               key="logout"
               color="danger"

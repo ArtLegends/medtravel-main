@@ -1,4 +1,4 @@
-// components/ClinicDetail.tsx
+// components/clinic/ClinicDetail.tsx
 'use client'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -24,7 +24,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
     <div className="container mx-auto py-20 space-y-12">
       {clinic.cover_url && (
         <div className="relative w-full h-64">
-          <Image src={clinic.cover_url} fill className="object-cover" alt={clinic.name}/>
+          <Image src={clinic.cover_url} fill className="object-cover" alt={clinic.name} />
         </div>
       )}
       <h1 className="text-4xl font-bold mt-8">{clinic.name}</h1>
@@ -33,7 +33,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
       <section className="mt-8">
         <h2 className="text-2xl font-semibold">Категории</h2>
         <div className="flex gap-4 mt-2">
-          {categories.map(c=> (
+          {categories.map(c => (
             <Link key={c.id} href={`/${c.slug}`} className="badge">
               {c.name}
             </Link>
@@ -41,7 +41,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
         </div>
       </section>
 
-          {/* Секция шапки с обложкой и названием */}
+      {/* Секция шапки с обложкой и названием */}
       <header className="flex flex-col md:flex-row items-center gap-8">
         {clinic.cover_url && <img src={clinic.cover_url} alt={clinic.name} className="w-full md:w-1/2 rounded-lg" />}
         <div>
@@ -107,7 +107,7 @@ export default function ClinicDetail({ clinic, categories, languages, accreditat
           )
         }
       </section>
-      
+
     </div>
   )
 }

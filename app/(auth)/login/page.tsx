@@ -1,3 +1,4 @@
+// app/(auth)/login/page.tsx
 import { Metadata } from "next";
 import { Suspense } from "react";
 

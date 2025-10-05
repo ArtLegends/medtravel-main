@@ -1,3 +1,4 @@
+// components/clinic/ClinicDetailPage.tsx
 'use client';
 
 import Image from 'next/image';

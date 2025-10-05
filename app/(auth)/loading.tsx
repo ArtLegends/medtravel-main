@@ -1,3 +1,4 @@
+// app/(auth)/loading.tsx
 import {
   Card,
   CardBody,

@@ -1,3 +1,4 @@
+// components/shared/ThemeSwitch.tsx
 "use client";
 
 import React, { useCallback } from "react";
@@ -27,7 +28,7 @@ export const ThemeSwitch = React.memo(() => {
           icon="solar:moon-linear"
           width={24}
         />
-      : <Icon className="text-default-500" icon="solar:sun-linear" width={24} />
+        : <Icon className="text-default-500" icon="solar:sun-linear" width={24} />
       }
     </Button>
   );

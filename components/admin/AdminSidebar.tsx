@@ -1,3 +1,4 @@
+// components/admin/AdminSidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -20,15 +21,15 @@ type Item = {
 };
 
 const NAV: Item[] = [
-  { label: "Dashboard",       href: "/admin",              icon: LayoutGrid },
-  { label: "Bookings",        href: "/admin/bookings",     icon: CalendarCheck2 },
+  { label: "Dashboard", href: "/admin", icon: LayoutGrid },
+  { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck2 },
   { label: "Clinic Requests", href: "/admin/clinic-requests", icon: Inbox },
-  { label: "All Clinics",     href: "/admin/clinics",      icon: Building2 },
-  { label: "Add New Clinic", href: "/admin/clinics/new",  icon: Building2 },
-  { label: "Contacts",        href: "/admin/contacts",     icon: Users },
-  { label: "Reviews",         href: "/admin/reviews",      icon: MessageSquareText },
-  { label: "Reports",         href: "/admin/reports",      icon: FileBarChart2 },
-  { label: "Clinic Inquiries",href: "/admin/clinic-inquiries",    icon: LifeBuoy },
+  { label: "All Clinics", href: "/admin/clinics", icon: Building2 },
+  { label: "Add New Clinic", href: "/admin/clinics/new", icon: Building2 },
+  { label: "Contacts", href: "/admin/contacts", icon: Users },
+  { label: "Reviews", href: "/admin/reviews", icon: MessageSquareText },
+  { label: "Reports", href: "/admin/reports", icon: FileBarChart2 },
+  { label: "Clinic Inquiries", href: "/admin/clinic-inquiries", icon: LifeBuoy },
 ];
 
 export default function AdminSidebar() {

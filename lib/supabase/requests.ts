@@ -1,7 +1,7 @@
 // lib/supabase/requests.ts
 // import { createClient as createBrowserClient } from '@/lib/supabase/browserClient'
 import { createServerClient } from '@/lib/supabase/serverClient'
-import type Clinic from "@/components/ClinicCard"
+import type Clinic from "@/components/clinic/ClinicCard"
 // import { createClient } from "@/lib/supabase/browserClient"
 import { createClient } from "./browserClient";
 // import type { Category } from '@/lib/supabase/types'
@@ -39,20 +39,6 @@ export async function getAllCategories(): Promise<Category[]> {
   return data ?? []
 }
 
-/**
- * Если нужно — оставьте client-функции отдельно в другом файле,
- * например lib/supabase/requests.client.ts, чтобы не смешивать окружения.
- * Ваш searchClinics сейчас использует browser-клиент — перенесите его туда.
- */
-
-// export type Category = {id: number; name: string; slug: string}
-
-// export interface Category {
-//   id:       number
-//   name:     string
-//   slug:     string
-// }
-
 export async function searchClinics(query: string): Promise<Clinic[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -79,17 +65,3 @@ export interface Clinic {
   cover_url?: string | null;
   services: string[];
 }
-
-// export async function getAllCategories(): Promise<Category[]> {
-//   const supabase = createServerClient()
-//   const { data, error } = await supabase
-//     .from('categories')
-//     .select('id, name, slug')
-//     .order('name', { ascending: true })
-
-//   if (error) {
-//     console.error('getAllCategories error', error)
-//     return []
-//   }
-//   return data ?? []
-// }

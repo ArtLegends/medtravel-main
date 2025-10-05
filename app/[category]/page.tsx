@@ -1,9 +1,9 @@
 // app/[category]/page.tsx
 import type { Metadata } from 'next'
 import { getClinicsByCategory } from '@/lib/mock/clinic'
-import CategoryHero from '@/components/CategoryHero'
-import CategoryWhy from '@/components/CategoryWhy'
-import CategoryGrid from '@/components/CategoryGrid'
+import CategoryHero from '@/components/category/CategoryHero'
+import CategoryWhy from '@/components/category/CategoryWhy'
+import CategoryGrid from '@/components/category/CategoryGrid'
 import { createServerClient } from '@/lib/supabase/serverClient'
 
 export const revalidate = 60

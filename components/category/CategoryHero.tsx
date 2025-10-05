@@ -1,3 +1,4 @@
+// components/category/CategoryHero.tsx
 "use client";
 
 export default function CategoryHero({

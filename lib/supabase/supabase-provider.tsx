@@ -1,3 +1,4 @@
+// lib/supabase/supabase-provider.tsx
 "use client";
 import type { Session } from "@supabase/supabase-js";
 

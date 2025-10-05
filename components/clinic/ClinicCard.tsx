@@ -1,4 +1,4 @@
-// components/ClinicCard.tsx
+// components/clinic/ClinicCard.tsx
 "use client";
 
 import React from "react";
@@ -7,19 +7,6 @@ import type { Clinic } from "@/lib/supabase/requests";
 interface Props {
   clinic: Clinic;
 }
-
-// interface Props {
-//   clinic: Clinic;
-//   id: string
-//   name: string
-//   slug: string
-//   country: string
-//   province: string
-//   city: string
-//   district: string
-//   cover_url?: string | null
-//   services: string[]
-// }
 
 export default function ClinicCard({ clinic }: Props) {
   return (
@@ -61,17 +48,3 @@ export default function ClinicCard({ clinic }: Props) {
     </div>
   );
 }
-
-
-
-// export interface Clinic {
-//   id: string
-//   name: string
-//   slug: string
-//   country: string
-//   province: string
-//   city: string
-//   district: string
-//   cover_url?: string | null
-//   services: string[]
-// }

@@ -1,3 +1,4 @@
+// lib/i18n-server.ts
 import { cache } from "react";
 
 // Supported locales

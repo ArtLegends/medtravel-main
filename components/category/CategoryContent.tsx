@@ -1,9 +1,10 @@
+// components/category/CategoryContent.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import SearchBar from "./SearchBar";
+import SearchBar from "../SearchBar";
 import CategoryFilters from "./CategoryFilters";
-import ClinicList from "./ClinicList";
+import ClinicList from "../clinic/ClinicList";
 // import { createBrowserClient } from "@/lib/supabase/browserClient";
 import { createClient } from "@/lib/supabase/browserClient";
 import type { Clinic } from "@/lib/supabase/requests";

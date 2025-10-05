@@ -8,22 +8,22 @@ const steps = [
   {
     icon: 'akar-icons:search',
     title: 'You Submit a Request',
-    text:  'We gather your preferences and needs to find the best match for your treatment.'
+    text: 'We gather your preferences and needs to find the best match for your treatment.'
   },
   {
     icon: 'akar-icons:check',
     title: 'We Reach Out to Clinics',
-    text:  'Once we have your request, we contact clinics and provide you with the top options based on pricing, specialist qualifications, and your specific needs.'
+    text: 'Once we have your request, we contact clinics and provide you with the top options based on pricing, specialist qualifications, and your specific needs.'
   },
   {
     icon: 'bi:calendar',
     title: 'We Plan Your Arrival Together',
-    text:  'After selecting a clinic, we assist in coordinating all organizational details for your trip.'
+    text: 'After selecting a clinic, we assist in coordinating all organizational details for your trip.'
   },
   {
     icon: 'akar-icons:chat',
     title: 'We Stay in Touch',
-    text:  'Once you arrive, we’re available 24/7 to provide any support you need, ensuring you stay focused on your treatment without any distractions.'
+    text: 'Once you arrive, we’re available 24/7 to provide any support you need, ensuring you stay focused on your treatment without any distractions.'
   },
 ]
 

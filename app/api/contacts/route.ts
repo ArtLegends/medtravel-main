@@ -11,9 +11,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const firstName = (body.firstName ?? "").trim();
-    const lastName  = (body.lastName ?? "").trim();
-    const email     = (body.email ?? "").trim();
-    const phone     = (body.phone ?? "").trim();
+    const lastName = (body.lastName ?? "").trim();
+    const email = (body.email ?? "").trim();
+    const phone = (body.phone ?? "").trim();
 
     if (!firstName || !lastName || !email) {
       return NextResponse.json(

@@ -1,8 +1,7 @@
+// app/(admin)/admin/clinics/new/page.tsx
 'use client';
 
 import React, { useMemo, useState } from 'react';
-
-// export const metadata = { title: 'Add New Clinic • Admin' };
 
 type TabKey = 'basic' | 'services' | 'gallery' | 'location' | 'doctors' | 'additional';
 
@@ -58,11 +57,10 @@ export default function AdminClinicNewPage() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 text-sm font-medium ${
-                tab === t.id
+              className={`px-4 py-2 text-sm font-medium ${tab === t.id
                   ? 'bg-white border-x border-t -mb-px rounded-t-md'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               {t.label}
             </button>
@@ -246,7 +244,7 @@ function Services({ onAdd, rows }: { onAdd: (row: any) => void; rows: any[] }) {
           <div>{r.name}</div>
           <div className="text-slate-500">{r.price ? `${r.price} ${r.currency}` : '—'}</div>
         </div>
-      )}/>
+      )} />
     </div>
   );
 }
@@ -285,7 +283,7 @@ function Gallery({ onAdd, rows }: { onAdd: (row: any) => void; rows: any[] }) {
 
       <EmptyOrList emptyText="No images added yet. Add images using the form above." rows={rows} render={(r) => (
         <div className="rounded border px-3 py-2 text-sm">{r.url}</div>
-      )}/>
+      )} />
     </div>
   );
 }
@@ -363,7 +361,7 @@ function Doctors({ onAdd, rows }: { onAdd: (row: any) => void; rows: any[] }) {
 
       <EmptyOrList emptyText="No doctors added yet. Add doctors using the form above." rows={rows} render={(r) => (
         <div className="rounded border px-3 py-2 text-sm">{r.name}{r.title ? ` — ${r.title}` : ''}</div>
-      )}/>
+      )} />
     </div>
   );
 }
@@ -373,8 +371,8 @@ function Additional({
   onAddHour, onAddPayment, onAddAcc,
   hours, payments, accs,
 }: {
-  onAddHour: (r:any)=>void; onAddPayment:(r:any)=>void; onAddAcc:(r:any)=>void;
-  hours:any[]; payments:any[]; accs:any[];
+  onAddHour: (r: any) => void; onAddPayment: (r: any) => void; onAddAcc: (r: any) => void;
+  hours: any[]; payments: any[]; accs: any[];
 }) {
   const [day, setDay] = useState('');
   const [time, setTime] = useState('');
@@ -391,23 +389,23 @@ function Additional({
         <div className="rounded-md border p-4">
           <Row>
             <Field label="Day">
-              <Input value={day} onChange={(e)=>setDay(e.target.value)} placeholder="e.g., Monday or Monday–Friday" />
+              <Input value={day} onChange={(e) => setDay(e.target.value)} placeholder="e.g., Monday or Monday–Friday" />
             </Field>
             <Field label="Hours">
-              <Input value={time} onChange={(e)=>setTime(e.target.value)} placeholder="e.g., 9:00 AM - 3:00 PM" />
+              <Input value={time} onChange={(e) => setTime(e.target.value)} placeholder="e.g., 9:00 AM - 3:00 PM" />
             </Field>
           </Row>
           <button
             type="button"
-            onClick={()=>{ if(!day.trim()) return; onAddHour({day,time}); setDay(''); setTime(''); }}
+            onClick={() => { if (!day.trim()) return; onAddHour({ day, time }); setDay(''); setTime(''); }}
             className="mt-3 rounded-md border bg-sky-50 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100"
           >
             + Add Hours
           </button>
         </div>
-        <EmptyOrList emptyText="No operating hours added yet." rows={hours} render={(r)=>(
+        <EmptyOrList emptyText="No operating hours added yet." rows={hours} render={(r) => (
           <div className="rounded border px-3 py-2 text-sm">{r.day} — {r.time || '—'}</div>
-        )}/>
+        )} />
       </div>
 
       {/* Payment Methods */}
@@ -415,19 +413,19 @@ function Additional({
         <h3 className="text-lg font-semibold">Payment Methods</h3>
         <div className="rounded-md border p-4">
           <Field label="Payment Method">
-            <Input value={pay} onChange={(e)=>setPay(e.target.value)} placeholder="e.g., Visa, Mastercard, Cash" />
+            <Input value={pay} onChange={(e) => setPay(e.target.value)} placeholder="e.g., Visa, Mastercard, Cash" />
           </Field>
           <button
             type="button"
-            onClick={()=>{ if(!pay.trim()) return; onAddPayment({pay}); setPay(''); }}
+            onClick={() => { if (!pay.trim()) return; onAddPayment({ pay }); setPay(''); }}
             className="mt-3 rounded-md border bg-sky-50 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100"
           >
             + Add Payment Method
           </button>
         </div>
-        <EmptyOrList emptyText="No payment methods added yet." rows={payments} render={(r)=>(
+        <EmptyOrList emptyText="No payment methods added yet." rows={payments} render={(r) => (
           <div className="rounded border px-3 py-2 text-sm">{r.pay}</div>
-        )}/>
+        )} />
       </div>
 
       {/* Accreditations */}
@@ -436,26 +434,26 @@ function Additional({
         <div className="rounded-md border p-4">
           <Row>
             <Field label="Accreditation Name*">
-              <Input value={accName} onChange={(e)=>setAccName(e.target.value)} placeholder="e.g., JCI Accredited" />
+              <Input value={accName} onChange={(e) => setAccName(e.target.value)} placeholder="e.g., JCI Accredited" />
             </Field>
             <Field label="Logo URL">
-              <Input value={accLogo} onChange={(e)=>setAccLogo(e.target.value)} placeholder="https://example.com/logo.png" />
+              <Input value={accLogo} onChange={(e) => setAccLogo(e.target.value)} placeholder="https://example.com/logo.png" />
             </Field>
           </Row>
           <Field label="Description">
-            <Textarea value={accDesc} onChange={(e)=>setAccDesc(e.target.value)} placeholder="Brief description of the accreditation" />
+            <Textarea value={accDesc} onChange={(e) => setAccDesc(e.target.value)} placeholder="Brief description of the accreditation" />
           </Field>
           <button
             type="button"
-            onClick={()=>{ if(!accName.trim()) return; onAddAcc({accName, accLogo, accDesc}); setAccName(''); setAccLogo(''); setAccDesc(''); }}
+            onClick={() => { if (!accName.trim()) return; onAddAcc({ accName, accLogo, accDesc }); setAccName(''); setAccLogo(''); setAccDesc(''); }}
             className="mt-3 rounded-md border bg-sky-50 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100"
           >
             + Add Accreditation
           </button>
         </div>
-        <EmptyOrList emptyText="No accreditations added yet." rows={accs} render={(r)=>(
+        <EmptyOrList emptyText="No accreditations added yet." rows={accs} render={(r) => (
           <div className="rounded border px-3 py-2 text-sm">{r.accName}</div>
-        )}/>
+        )} />
       </div>
     </div>
   );

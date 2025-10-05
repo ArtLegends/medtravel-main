@@ -1,3 +1,4 @@
+// app/api/admin/login/route.ts
 import { NextResponse } from 'next/server';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_COOKIE } from '@/lib/admin/auth';
 

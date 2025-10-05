@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import ClinicDetailPage from "@/components/ClinicDetailPage";
+import ClinicDetailPage from "@/components/clinic/ClinicDetailPage";
 import { getClinicBySlug } from "@/lib/mock/clinic";
 
 type Params = { slug: string };

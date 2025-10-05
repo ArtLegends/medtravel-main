@@ -16,7 +16,7 @@ type DbClinic = {
 };
 
 type DbImage = { url: string };
-type DbHour  = { day: string; open: string | null; close: string | null };
+type DbHour = { day: string; open: string | null; close: string | null };
 type DbClinicService = {
   service_id: string;
   price: number | string | null;
@@ -77,9 +77,9 @@ export async function getClinicViewBySlug(slug: string): Promise<ClinicView | nu
     supabase.from("clinic_services").select("service_id, price, currency, description, duration").eq("clinic_id", clinic.id) as any,
   ]);
 
-  if (imgsRes.error)  console.warn("clinic_images error", imgsRes.error);
-  if (hoursRes.error) console.warn("clinic_hours error",  hoursRes.error);
-  if (csRes.error)    console.warn("clinic_services error", csRes.error);
+  if (imgsRes.error) console.warn("clinic_images error", imgsRes.error);
+  if (hoursRes.error) console.warn("clinic_hours error", hoursRes.error);
+  if (csRes.error) console.warn("clinic_services error", csRes.error);
 
   const images: string[] = (imgsRes.data as DbImage[] | null)?.map(i => i.url).filter(Boolean) ?? [];
 

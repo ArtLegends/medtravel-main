@@ -1,3 +1,4 @@
+// components/category/CategoryWhy.tsx
 export default function CategoryWhy() {
   const items = [
     "We are medical tourism professionals",

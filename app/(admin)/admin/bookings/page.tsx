@@ -9,13 +9,13 @@ type Row = {
   id: string;
   name: string;
   phone: string;
-  contact_method: 'email'|'phone'|'whatsapp'|'telegram'|string;
+  contact_method: 'email' | 'phone' | 'whatsapp' | 'telegram' | string;
   service: string;
-  status: 'New'|'Processed'|'Rejected'|string;
+  status: 'New' | 'Processed' | 'Rejected' | string;
   created_at: string;
 };
 
-function statusColor(s: string): 'green'|'blue'|'red'|'gray' {
+function statusColor(s: string): 'green' | 'blue' | 'red' | 'gray' {
   if (s === 'Processed') return 'green';
   if (s === 'New') return 'blue';
   if (s === 'Rejected') return 'red';

@@ -1,3 +1,4 @@
+// app/(admin)/admin/reports/page.tsx
 export const metadata = { title: 'Reports • Admin' };
 
 type Row = {

@@ -1,3 +1,4 @@
+// components/shared/LanguageSwitcher.tsx
 "use client";
 
 import React, { useMemo, useCallback } from "react";

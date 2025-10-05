@@ -13,11 +13,11 @@ export async function POST(req: Request) {
 
     const clinic_slug = (body.clinic_slug ?? "").toString().trim();
     const clinic_name = (body.clinic_name ?? "").toString().trim();
-    const name        = (body.name ?? "").toString().trim();
-    const email       = (body.email ?? "").toString().trim();
-    const phone       = (body.phone ?? "").toString().trim();
-    const message     = (body.message ?? "").toString().trim();
-    const service     = (body.service ?? "").toString().trim();
+    const name = (body.name ?? "").toString().trim();
+    const email = (body.email ?? "").toString().trim();
+    const phone = (body.phone ?? "").toString().trim();
+    const message = (body.message ?? "").toString().trim();
+    const service = (body.service ?? "").toString().trim();
 
     if (!clinic_slug || !clinic_name || !name || !phone) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });

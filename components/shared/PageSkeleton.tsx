@@ -1,3 +1,4 @@
+// components/shared/PageSkeleton.tsx
 "use client";
 
 import React from "react";

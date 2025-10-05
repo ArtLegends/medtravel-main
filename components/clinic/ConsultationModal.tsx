@@ -1,3 +1,4 @@
+// components/clinic/ConsultationModal.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -18,7 +19,7 @@ export default function ConsultationModal({
   const dlgRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [contact, setContact] = useState<'email'|'phone'|'whatsapp'|'telegram'|''>('');
+  const [contact, setContact] = useState<'email' | 'phone' | 'whatsapp' | 'telegram' | ''>('');
   const [service, setService] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);

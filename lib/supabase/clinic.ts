@@ -39,8 +39,8 @@ export async function getClinicViewBySlug(slug: string): Promise<ClinicView | nu
   const supabase = createServerClient();
 
   const { data, error } = await supabase
-  .from('clinics')
-  .select(`
+    .from('clinics')
+    .select(`
     id, slug, name, country, city, district, about,
     address, map_embed_url,
     verified_by_medtravel, is_official_partner,
@@ -63,56 +63,56 @@ export async function getClinicViewBySlug(slug: string): Promise<ClinicView | nu
       accreditations ( name, description, logo_url )
     )
   `)
-  .eq('slug', slug)
-  .maybeSingle();
+    .eq('slug', slug)
+    .maybeSingle();
 
   if (error) {
-  console.error('getClinicViewBySlug error:', error);
-  return null;
-}
-if (!data) return null;
+    console.error('getClinicViewBySlug error:', error);
+    return null;
+  }
+  if (!data) return null;
 
-const images = (data.clinic_images ?? []).map((i: any) => i.url).filter(Boolean);
+  const images = (data.clinic_images ?? []).map((i: any) => i.url).filter(Boolean);
 
-const hours = (data.clinic_hours ?? []).map((h: any) => ({
-  day: h.day,
-  open: h.open ?? undefined,
-  close: h.close ?? undefined,
-}));
+  const hours = (data.clinic_hours ?? []).map((h: any) => ({
+    day: h.day,
+    open: h.open ?? undefined,
+    close: h.close ?? undefined,
+  }));
 
-const services = (data.clinic_services ?? [])
-  .map((cs: any) => ({
-    name: cs?.services?.name ?? '',
-    price: cs?.price ?? undefined,
-    description: cs?.description ?? undefined,
-  }))
-  .filter((s: any) => s.name);
+  const services = (data.clinic_services ?? [])
+    .map((cs: any) => ({
+      name: cs?.services?.name ?? '',
+      price: cs?.price ?? undefined,
+      description: cs?.description ?? undefined,
+    }))
+    .filter((s: any) => s.name);
 
-const staff = (data.doctors ?? []).map((d: any) => ({
-  name: d.name,
-  position: d.position,
-  bio: d.bio ?? undefined,
-  photo: d.photo ?? undefined,
-  languages: Array.isArray(d.languages)
-    ? d.languages
-    : (typeof d.languages === 'string'
+  const staff = (data.doctors ?? []).map((d: any) => ({
+    name: d.name,
+    position: d.position,
+    bio: d.bio ?? undefined,
+    photo: d.photo ?? undefined,
+    languages: Array.isArray(d.languages)
+      ? d.languages
+      : (typeof d.languages === 'string'
         ? d.languages.split(',').map((s: string) => s.trim()).filter(Boolean)
         : []),
-}));
+  }));
 
-const premises = (data.clinic_premises ?? [])
-  .map((p: any) => p?.premises?.name)
-  .filter(Boolean);
+  const premises = (data.clinic_premises ?? [])
+    .map((p: any) => p?.premises?.name)
+    .filter(Boolean);
 
-const travel = (data.clinic_travel_services ?? [])
-  .map((t: any) => t?.travel_services?.name)
-  .filter(Boolean);
+  const travel = (data.clinic_travel_services ?? [])
+    .map((t: any) => t?.travel_services?.name)
+    .filter(Boolean);
 
-const accreditations = (data.clinic_accreditations ?? []).map((x: any) => ({
-  title: x?.accreditations?.name ?? '',
-  desc: x?.accreditations?.description ?? x?.description ?? '',
-  logo_url: x?.accreditations?.logo_url ?? x?.logo_url ?? '',
-})).filter((a: any) => a.title);
+  const accreditations = (data.clinic_accreditations ?? []).map((x: any) => ({
+    title: x?.accreditations?.name ?? '',
+    desc: x?.accreditations?.description ?? x?.description ?? '',
+    logo_url: x?.accreditations?.logo_url ?? x?.logo_url ?? '',
+  })).filter((a: any) => a.title);
 
   const clinic: ClinicView = {
     slug: data.slug,

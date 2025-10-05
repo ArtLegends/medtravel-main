@@ -1,3 +1,4 @@
+// components/charts/DynamicChart.tsx
 "use client";
 
 import { Suspense, lazy } from "react";

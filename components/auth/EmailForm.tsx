@@ -1,3 +1,4 @@
+// components/auth/EmailForm.tsx
 "use client";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
