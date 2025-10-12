@@ -17,6 +17,8 @@ SEO и маркетинг:
 – Покрыть ключевые компоненты Cypress/jest
 – Проверить доступность (a11y) и оптимизировать Lighthouse -->
 
+<!-- npx supabase gen types typescript --project-id oymahnxwcajvaggbydim --schema public > lib/supabase/types.ts -->
+
 # MedTravel - Digital Platform
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.3.1-black)](https://nextjs.org/)

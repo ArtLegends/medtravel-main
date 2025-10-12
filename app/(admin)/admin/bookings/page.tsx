@@ -1,102 +1,146 @@
-// app/(admin)/admin/bookings/page.tsx
-import AdminTopbar from '@/components/admin/AdminTopbar';
-import DatePickerFake from '@/components/admin/DatePickerFake';
-import { Table, Th, Tr, Td } from '@/components/admin/Table';
-import Badge from '@/components/admin/Badge';
-import { createClient } from '@supabase/supabase-js';
+import BookingsTable, { type BookingRow } from '@/components/admin/bookings/BookingsTable'
+import BookingsToolbar from '@/components/admin/bookings/BookingsToolbar'
+import { supabaseServer } from '@/lib/supabase/server'
+import Link from 'next/link'
 
-type Row = {
-  id: string;
-  name: string;
-  phone: string;
-  contact_method: 'email' | 'phone' | 'whatsapp' | 'telegram' | string;
-  service: string;
-  status: 'New' | 'Processed' | 'Rejected' | string;
-  created_at: string;
-};
+export const dynamic = 'force-dynamic'
 
-function statusColor(s: string): 'green' | 'blue' | 'red' | 'gray' {
-  if (s === 'Processed') return 'green';
-  if (s === 'New') return 'blue';
-  if (s === 'Rejected') return 'red';
-  return 'gray';
+const PAGE_SIZE = 15
+
+function addDays(d: Date, days: number) {
+  const dd = new Date(d)
+  dd.setDate(dd.getDate() + days)
+  return dd
+}
+function toISODateOnly(d: Date) {
+  // 00:00 UTC — для gte/lt хватает ISO строки
+  return d.toISOString()
 }
 
-async function getRows(): Promise<Row[]> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY! // server-only
-  );
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(200);
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<{ start?: string; end?: string; page?: string }>
+}) {
+  const sp = (await searchParams) ?? {}
+  const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
 
-  if (error) {
-    console.error('Bookings fetch error:', error);
-    return [];
+  // Фильтры по датам (created_at). Конец — включительно.
+  const startParam = sp.start?.trim()
+  const endParam = sp.end?.trim()
+
+  let startISO: string | undefined
+  let endISOExclusive: string | undefined
+
+  if (startParam) {
+    const s = new Date(`${startParam}T00:00:00`)
+    if (!isNaN(s.getTime())) startISO = toISODateOnly(s)
   }
-  return (data ?? []) as Row[];
-}
+  if (endParam) {
+    const e = new Date(`${endParam}T00:00:00`)
+    if (!isNaN(e.getTime())) {
+      // делаем < (end + 1 день), чтобы «конец» был включительно
+      endISOExclusive = toISODateOnly(addDays(e, 1))
+    }
+  }
 
-export default async function Page() {
-  const rows = await getRows();
-  const count = rows.length;
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
+  const sb = supabaseServer
+  let query = sb
+    .from('bookings')
+    .select('id,name,phone,contact_method,service,status,created_at', { count: 'exact' })
+    .order('created_at', { ascending: false })
+
+  if (startISO) query = query.gte('created_at', startISO)
+  if (endISOExclusive) query = query.lt('created_at', endISOExclusive)
+
+  const { data, error, count } = await query.range(from, to)
+
+  const rows = (data ?? []) as unknown as BookingRow[]
+  const total = count ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  // удобная функция для сборки ссылок с сохранением фильтров
+  const mkHref = (p: number) => {
+    const params = new URLSearchParams()
+    if (startParam) params.set('start', startParam)
+    if (endParam) params.set('end', endParam)
+    params.set('page', String(p))
+    return `/admin/bookings?${params.toString()}`
+  }
 
   return (
-    <>
-      <AdminTopbar title="Bookings" subtitle="Manage booking requests from customers" />
-
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="text-sm font-medium">Start Date</div>
-        <DatePickerFake label="Pick a date" />
-        <div className="text-sm font-medium ml-2">End Date</div>
-        <DatePickerFake label="Pick a date" />
-        <button className="h-10 px-3 rounded-md border bg-white">Clear Filters</button>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Bookings</h1>
+        <p className="text-sm text-gray-500">Manage booking requests from customers</p>
       </div>
 
-      <div className="text-xs text-gray-500 mt-3 space-y-1">
-        <div>Bookings count: {count}</div>
-        <div>Loading state: Finished</div>
-        <div>Refresh count: 0</div>
-        <div>Date filter: None - None</div>
-        <div>Direct query: Supabase - Found: {count} bookings</div>
-      </div>
+      {/* Фильтры + Delete all */}
+      <BookingsToolbar start={startParam} end={endParam} />
 
-      <div className="mt-4">
-        <Table>
-          <thead>
-            <Tr>
-              <Th>Name</Th>
-              <Th>Phone</Th>
-              <Th>Contact Method</Th>
-              <Th>Service</Th>
-              <Th>Status</Th>
-              <Th>Created At</Th>
-              <Th>Actions</Th>
-            </Tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <Tr key={r.id}>
-                <Td>{r.name}</Td>
-                <Td>{r.phone}</Td>
-                <Td><span className="capitalize">{r.contact_method}</span></Td>
-                <Td>{r.service}</Td>
-                <Td><Badge color={statusColor(r.status)}>{r.status}</Badge></Td>
-                <Td>{new Date(r.created_at).toLocaleString()}</Td>
-                <Td>
-                  <div className="flex gap-2">
-                    <button className="rounded-md border bg-white px-3 py-1 text-sm">Status</button>
-                    <button className="rounded-md bg-rose-600 px-3 py-1 text-sm text-white">Delete</button>
-                  </div>
-                </Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-    </>
-  );
+      {error ? (
+        <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-700">
+          Failed to load: {error.message}
+        </div>
+      ) : (
+        <>
+          <BookingsTable rows={rows} />
+
+          {/* Пагинация */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm text-gray-500">
+              Total: {total} • Page {page} / {totalPages}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Link
+                aria-disabled={page <= 1}
+                className={`rounded-md border px-3 py-1.5 ${page <= 1 ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50'}`}
+                href={mkHref(Math.max(1, page - 1))}
+              >
+                Prev
+              </Link>
+
+              <div className="hidden sm:flex items-center gap-1">
+                {Array.from({ length: totalPages }).slice(0, 7).map((_, i) => {
+                  const p = i + 1
+                  return (
+                    <Link
+                      key={p}
+                      href={mkHref(p)}
+                      className={`rounded-md px-3 py-1.5 border ${p === page ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-50'}`}
+                    >
+                      {p}
+                    </Link>
+                  )
+                })}
+                {totalPages > 7 && (
+                  <>
+                    <span className="px-1">…</span>
+                    <Link
+                      href={mkHref(totalPages)}
+                      className={`rounded-md px-3 py-1.5 border ${page === totalPages ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-50'}`}
+                    >
+                      {totalPages}
+                    </Link>
+                  </>
+                )}
+              </div>
+
+              <Link
+                aria-disabled={page >= totalPages}
+                className={`rounded-md border px-3 py-1.5 ${page >= totalPages ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50'}`}
+                href={mkHref(Math.min(totalPages, page + 1))}
+              >
+                Next
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }

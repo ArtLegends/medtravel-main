@@ -1,40 +1,51 @@
-// app/api/clinic-inquiries/route.ts
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // server-only key
-);
+import { NextResponse } from 'next/server';
+import { supabaseServer } from '@/lib/supabase/server';
 
 export async function POST(req: Request) {
   try {
+    const sb = supabaseServer;
     const body = await req.json();
 
-    const clinic_slug = (body.clinic_slug ?? "").toString().trim();
-    const clinic_name = (body.clinic_name ?? "").toString().trim();
-    const name = (body.name ?? "").toString().trim();
-    const email = (body.email ?? "").toString().trim();
-    const phone = (body.phone ?? "").toString().trim();
-    const message = (body.message ?? "").toString().trim();
-    const service = (body.service ?? "").toString().trim();
+    const clinic_id: string = body?.clinic_id;
+    const name: string | null = body?.name ?? null;
+    const email: string | null = body?.email ?? null;
+    const phone: string | null = body?.phone ?? null;
+    const message: string | null = body?.message ?? null;
 
-    if (!clinic_slug || !clinic_name || !name || !phone) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!clinic_id || !name || !phone) {
+      return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("clinic_inquiries")
-      .insert({
-        clinic_slug, clinic_name, name, email, phone, message, service,
-        status: "new",
-      })
-      .select("*")
-      .single();
+    // убедимся, что клиника существует
+    const { data: clinic, error: cErr } = await sb
+      .from('clinics')
+      .select('id')
+      .eq('id', clinic_id)
+      .maybeSingle();
 
-    if (error) throw error;
-    return NextResponse.json({ ok: true, inquiry: data }, { status: 201 });
+    if (cErr || !clinic) {
+      return NextResponse.json({ ok: false, error: 'Clinic not found' }, { status: 404 });
+    }
+
+    // ВСТАВЛЯЕМ ТОЛЬКО СУЩЕСТВУЮЩИЕ КОЛОНКИ ТАБЛИЦЫ: id (auto), user_id (NULL), clinic_id, name, email, phone, message, created_at (default)
+    const { error: insErr } = await sb
+      .from('clinic_inquiries')
+      .insert({
+        clinic_id,
+        name,
+        email,
+        phone,
+        message,
+        // user_id: null  // если колонка существует и допускает NULL, можно явно указать
+      } as any);
+
+    if (insErr) {
+      console.error('clinic_inquiries INSERT error', insErr);
+      return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? "Server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: e?.message ?? 'Server error' }, { status: 500 });
   }
 }

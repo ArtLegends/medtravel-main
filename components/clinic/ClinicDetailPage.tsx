@@ -1,17 +1,17 @@
 // components/clinic/ClinicDetailPage.tsx
 'use client';
-
+import Link from 'next/link'
 import Image from 'next/image';
 import ConsultationModal from '@/components/clinic/ConsultationModal';
 import { useMemo, useState } from 'react';
 import SectionNav from '@/components/SectionNav';
-import type { ClinicMock } from '@/lib/mock/clinic';
+import type { Clinic } from '@/lib/db/clinics';
 
-type Props = { clinic: ClinicMock };
+type Props = { clinic: Clinic };
 
 // --- helpers ---
-function buildMapEmbed(address?: string) {
-  if (!address) return '';
+function buildMapEmbed(address?: string | null) {
+  if (!address) return null; // ← важно: не возвращаем пустую строку
   const q = encodeURIComponent(address);
   return `https://www.google.com/maps?q=${q}&output=embed`;
 }
@@ -35,7 +35,8 @@ export default function ClinicDetailPage({ clinic }: Props) {
     []
   );
 
-  const imgs = clinic.images ?? [];
+  // убираем пустые строки, чтобы <Image> не падал
+  const imgs = (clinic.images ?? []).filter(Boolean);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalService, setModalService] = useState<string | undefined>(undefined);
@@ -54,7 +55,6 @@ export default function ClinicDetailPage({ clinic }: Props) {
   function closeModal() {
     setModalOpen(false);
   }
-
 
   // Doctors: поддержка старого и нового форматов
   const doctors = useMemo(() => {
@@ -80,17 +80,27 @@ export default function ClinicDetailPage({ clinic }: Props) {
     const list: any[] = (clinic as any).accreditations ?? [];
     return list.map(a => ({
       name: a.name ?? a.title ?? '',
-      logo: a.logo_url ?? a.logo ?? '',
+      // было a.logo_url ?? a.logo — добавляем logoUrl
+      logo: a.logoUrl ?? a.logo_url ?? a.logo ?? '',
       meta: a.description ?? a.country ?? a.desc ?? '',
     }));
   }, [clinic]);
 
+
+  // ----- адрес и карта (без пустого src) -----
+  const address =
+    clinic.location?.address ||
+    [clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ') ||
+    null;
+
+  const mapSrc = clinic.location?.mapEmbedUrl ?? buildMapEmbed(address);
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10">
-      {/* ===== HERO (фиксированные высоты — не «залипает» на весь экран) ===== */}
+      {/* ===== HERO ===== */}
       <HeroGallery name={clinic.name} images={imgs} />
 
-      {/* ===== ФИКСИРОВАННЫЙ NAVBAR СЕКЦИЙ (под хедером сайта) ===== */}
+      {/* ===== NAVBAR СЕКЦИЙ ===== */}
       <div className="relative inset-x-0 pt-2 z-[60]">
         <div className="mx-auto max-w-6xl px-4">
           <div className="rounded-xl border bg-white/95 shadow-sm backdrop-blur pointer-events-auto">
@@ -99,7 +109,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
         </div>
       </div>
 
-      {/* ===== GRID: MAIN + SIDEBAR (sidebar не sticky, прокручивается) ===== */}
+      {/* ===== GRID ===== */}
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* ---------- MAIN ---------- */}
         <main className="min-w-0">
@@ -146,9 +156,11 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       <td className="p-3">{s.price ?? '—'}</td>
                       <td className="p-3">{s.description ?? s.duration ?? '—'}</td>
                       <td className="p-3">
-                        <button type="button"
+                        <button
+                          type="button"
                           onClick={() => openModal(s.name)}
-                          className="rounded-md bg-primary px-3 py-2 text-white">
+                          className="rounded-md bg-primary px-3 py-2 text-white"
+                        >
                           Request
                         </button>
                       </td>
@@ -159,7 +171,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
             </div>
           </section>
 
-          {/* Doctors — верстка как на референсе */}
+          {/* Doctors */}
           <section id="staff" className="space-y-4 pt-10">
             <h2 className="text-2xl font-semibold">Doctors</h2>
             {doctors.length === 0 ? (
@@ -194,9 +206,11 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       </div>
 
                       <div className="mt-3">
-                        <button type="button"
+                        <button
+                          type="button"
                           onClick={() => openModal('Consultation')}
-                          className="rounded-md bg-primary px-3 py-2 text-white">
+                          className="rounded-md bg-primary px-3 py-2 text-white"
+                        >
                           Request Appointment
                         </button>
                       </div>
@@ -293,43 +307,52 @@ export default function ClinicDetailPage({ clinic }: Props) {
           <section id="hours" className="space-y-4 pt-10">
             <h2 className="text-2xl font-semibold">Operation Hours</h2>
             <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {(clinic.hours ?? []).map((h: any) => (
-                <li key={h.day} className="rounded-md bg-gray-50 px-4 py-2">
-                  <span className="font-semibold uppercase">{h.day}:</span>{' '}
-                  {h.open && h.close ? `${h.open} - ${h.close}` : '—'}
-                </li>
-              ))}
+              {(clinic.hours ?? []).map((h: any, idx: number) => {
+                const isClosed = !h.open && !h.close; // день закрыт
+                return (
+                  <li key={h.day ?? idx} className="rounded-md bg-gray-50 px-4 py-2">
+                    <span className="font-semibold uppercase">
+                      {h.day ?? h.weekday ?? ''}:
+                    </span>{' '}
+                    {isClosed ? 'Closed' : `${h.open} - ${h.close}`}
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
           {/* Location */}
           <section id="location" className="space-y-3 pt-10">
             <h2 className="text-2xl font-semibold">Location</h2>
-            {clinic.location?.address && <div className="text-sm">{clinic.location.address}</div>}
-            <div className="overflow-hidden rounded-lg border">
-              <div className="aspect-[16/9]">
-                <iframe
-                  src={clinic.location?.mapEmbedUrl || buildMapEmbed(clinic.location?.address)}
-                  className="h-full w-full"
-                  loading="lazy"
-                />
+            {address && <div className="text-sm">{address}</div>}
+            {mapSrc ? (
+              <div className="overflow-hidden rounded-lg border">
+                <div className="aspect-[16/9]">
+                  <iframe
+                    src={mapSrc}
+                    className="h-full w-full"
+                    loading="lazy"
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-lg border p-4 text-sm text-gray-500">
+                Map is not available for this clinic.
+              </div>
+            )}
           </section>
         </main>
 
-        {/* ---------- SIDEBAR (НЕ sticky) ---------- */}
+        {/* ---------- SIDEBAR ---------- */}
         <aside className="space-y-4">
           <div className="rounded-2xl border p-4">
-            {/* ЗЕЛЁНАЯ кнопка: переход на форму */}
-            <a
+            <Link
               href={`/clinic/${clinic.slug}/inquiry`}
               className="block w-full rounded-md bg-emerald-600 px-4 py-3 text-center font-medium text-white hover:bg-emerald-700"
             >
               Claim Your Free Quote
-            </a>
+            </Link>
 
-            {/* синяя — оставляем как есть, если нужна отдельно */}
             <button className="mt-3 w-full rounded-md bg-primary px-4 py-3 text-white">
               Start Your Personalized Treatment Plan Today
             </button>
@@ -349,20 +372,20 @@ export default function ClinicDetailPage({ clinic }: Props) {
           ) : null}
         </aside>
       </div>
+
       <ConsultationModal
         open={modalOpen}
         onClose={closeModal}
         services={serviceNames}
         preselectedService={modalService}
       />
-
     </div>
   );
 }
 
 /* ---------- HERO GALLERY ---------- */
 function HeroGallery({ images, name }: { images: string[]; name: string }) {
-  const list = images.slice(0, 5);
+  const list = images.filter(Boolean).slice(0, 5);
   if (list.length === 0) return null;
 
   return (
@@ -383,7 +406,7 @@ function HeroGallery({ images, name }: { images: string[]; name: string }) {
 
       {/* right column - up to 2 thumbs */}
       <div className="col-span-12 grid gap-3 md:col-span-4">
-        {list.slice(1, 2 + 1).map((src) => (
+        {list.slice(1, 3).map((src) => (
           <div key={src} className="relative overflow-hidden rounded-2xl">
             <Image
               src={src}

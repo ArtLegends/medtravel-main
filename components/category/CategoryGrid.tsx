@@ -1,52 +1,42 @@
 // components/category/CategoryGrid.tsx
-"use client";
-
 import Link from "next/link";
-import { getClinicsByCategory, type ClinicMock } from "@/lib/mock/clinic";
+import { fetchClinicsByCategory } from "@/lib/db/clinics";
 
-export default function CategoryGrid({ categorySlug }: { categorySlug: string }) {
-  const items: ClinicMock[] = getClinicsByCategory(categorySlug);
+export default async function CategoryGrid({ categorySlug }: { categorySlug: string }) {
+  const list = await fetchClinicsByCategory(categorySlug, 24);
 
   return (
     <section className="bg-gray-50">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
         {/* Листинг */}
         <div className="space-y-4">
-          {items.length === 0 ? (
+          {list.length === 0 ? (
             <div className="rounded-2xl border bg-white p-10 text-center text-gray-600">
               No clinics found
             </div>
           ) : (
-            items.map((c) => {
-              // поддержка обоих полей
-              const chips = ((c as any).ctg ?? (c as any).tags ?? []) as string[];
+            list.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/clinic/${c.slug}`}
+                className="block rounded-2xl border bg-white p-5 transition hover:shadow-md"
+              >
+                <div className="text-lg font-semibold">{c.name}</div>
+                <div className="mt-1 text-sm text-gray-600">
+                  {[c.country, c.city].filter(Boolean).join(" • ")}
+                </div>
 
-              return (
-                <Link
-                  key={c.slug}
-                  href={`/clinic/${c.slug}`}
-                  className="block rounded-2xl border bg-white p-5 transition hover:shadow-md"
-                >
-                  <div className="text-lg font-semibold">{c.name}</div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    {[c.country, c.city].filter(Boolean).join(" • ")}
+                {!!c.tags?.length && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {c.tags.slice(0, 5).map((t) => (
+                      <span key={t} className="rounded-full bg-gray-100 px-3 py-1 text-xs">
+                        {t}
+                      </span>
+                    ))}
                   </div>
-
-                  {chips.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {chips.slice(0, 5).map((t: string) => (
-                        <span
-                          key={t}
-                          className="rounded-full bg-gray-100 px-3 py-1 text-xs"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </Link>
-              );
-            })
+                )}
+              </Link>
+            ))
           )}
         </div>
 
@@ -76,9 +66,7 @@ export default function CategoryGrid({ categorySlug }: { categorySlug: string })
                 <li key={t}>
                   <Link
                     className="text-blue-600 hover:underline"
-                    href={`/${categorySlug}?service=${encodeURIComponent(
-                      t.toLowerCase().replace(/\s+/g, "-")
-                    )}`}
+                    href={`/${categorySlug}?service=${encodeURIComponent(t.toLowerCase().replace(/\s+/g, "-"))}`}
                   >
                     {t}
                   </Link>

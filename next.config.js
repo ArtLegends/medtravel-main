@@ -5,7 +5,7 @@ const path = require('path')
 
 const nextConfig = {
     eslint: {
-    // не будет падать сборка из-за ошибок линтера
+        // не будет падать сборка из-за ошибок линтера
         ignoreDuringBuilds: true,
     },
 
@@ -159,28 +159,29 @@ const nextConfig = {
     },
 
     async redirects() {
-    return [
-      {
-        source: '/:category/:country/:province?/:city?/:district?/:clinic',
-        destination: '/clinic/:clinic',
-        permanent: false,
-      },
-    ]
-  },
+        return [
+            {
+                source:
+                    '/:category(dentistry|plastic-surgery|hair-transplant|crowns|veneers|dental-implants)/:country/:province?/:city?/:district?/:clinic',
+                destination: '/clinic/:clinic',
+                permanent: false,
+            },
+        ];
+    },
 
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'plus.unsplash.com' },
-      { protocol: 'https', hostname: 'encrypted-tbn0.gstatic.com' },
-      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
-      { protocol: 'https', hostname: 'cdn.whatclinic.com' },
-      { protocol: 'https', hostname: 'www.whatclinic.com' },
-      { protocol: 'https', hostname: 'whatclinic.com' },
-      { protocol: 'https', hostname: 'atlantis-dental.ru' },
-        { protocol: 'https', hostname: 'pixsector.com' },
-    ],
-  }
+    images: {
+        remotePatterns: [
+            { protocol: 'https', hostname: 'images.unsplash.com' },
+            { protocol: 'https', hostname: 'plus.unsplash.com' },
+            { protocol: 'https', hostname: 'encrypted-tbn0.gstatic.com' },
+            { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+            { protocol: 'https', hostname: 'cdn.whatclinic.com' },
+            { protocol: 'https', hostname: 'www.whatclinic.com' },
+            { protocol: 'https', hostname: 'whatclinic.com' },
+            { protocol: 'https', hostname: 'atlantis-dental.ru' },
+            { protocol: 'https', hostname: 'pixsector.com' },
+        ],
+    }
 };
 
 module.exports = nextConfig;

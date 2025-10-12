@@ -1,15 +1,9 @@
-// components/admin/Table.tsx
-export function Table({ children }: { children: React.ReactNode }) {
-  return <div className="overflow-hidden rounded-xl border bg-white">
-    <table className="w-full text-sm">{children}</table>
-  </div>;
-}
-export function Th({ children }: { children: React.ReactNode }) {
-  return <th className="bg-gray-50 text-left font-semibold p-3">{children}</th>;
-}
-export function Td({ children }: { children: React.ReactNode }) {
-  return <td className="p-3 border-t">{children}</td>;
-}
-export function Tr({ children }: { children: React.ReactNode }) {
-  return <tr className="hover:bg-gray-50 transition">{children}</tr>;
-}
+import * as React from 'react';
+
+export const Table = ({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
+  <table className={className ?? 'w-full text-sm'} {...props} />
+);
+
+export const Tr = (props: React.HTMLAttributes<HTMLTableRowElement>) => <tr {...props} />;
+export const Th = (props: React.ThHTMLAttributes<HTMLTableCellElement>) => <th {...props} />;
+export const Td = (props: React.TdHTMLAttributes<HTMLTableCellElement>) => <td {...props} />;

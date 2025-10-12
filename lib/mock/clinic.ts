@@ -43,7 +43,7 @@ export type ClinicMock = {
   >;
 
   // часы работы
-  hours?: Array<{ day: string; open?: string; close?: string }>;
+  hours?: Array<{ weekday: string; open?: string; close?: string }>;
 
   // локация
   location?: {
@@ -148,13 +148,13 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
 
     // график работы
     hours: [
-      { day: "MONDAY", open: "09:30", close: "20:00" },
-      { day: "TUESDAY", open: "09:30", close: "20:00" },
-      { day: "WEDNESDAY", open: "09:30", close: "20:00" },
-      { day: "THURSDAY", open: "09:30", close: "20:00" },
-      { day: "FRIDAY", open: "09:30", close: "20:00" },
-      { day: "SATURDAY", open: "10:00", close: "17:00" },
-      { day: "SUNDAY" }, // прочерк
+      { weekday: "MONDAY", open: "09:30", close: "20:00" },
+      { weekday: "TUESDAY", open: "09:30", close: "20:00" },
+      { weekday: "WEDNESDAY", open: "09:30", close: "20:00" },
+      { weekday: "THURSDAY", open: "09:30", close: "20:00" },
+      { weekday: "FRIDAY", open: "09:30", close: "20:00" },
+      { weekday: "SATURDAY", open: "10:00", close: "17:00" },
+      { weekday: "SUNDAY" }, // прочерк
     ],
 
     location: {
@@ -275,13 +275,13 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
 
     // график работы
     hours: [
-      { day: "MONDAY", open: "08:30", close: "23:45" },
-      { day: "TUESDAY", open: "08:30", close: "23:45" },
-      { day: "WEDNESDAY", open: "08:30", close: "23:45" },
-      { day: "THURSDAY", open: "08:30", close: "23:45" },
-      { day: "FRIDAY", open: "08:30", close: "23:45" },
-      { day: "SATURDAY", open: "08:30", close: "23:45" },
-      { day: "SUNDAY", open: "08:00", close: "23:45" },
+      { weekday: "MONDAY", open: "08:30", close: "23:45" },
+      { weekday: "TUESDAY", open: "08:30", close: "23:45" },
+      { weekday: "WEDNESDAY", open: "08:30", close: "23:45" },
+      { weekday: "THURSDAY", open: "08:30", close: "23:45" },
+      { weekday: "FRIDAY", open: "08:30", close: "23:45" },
+      { weekday: "SATURDAY", open: "08:30", close: "23:45" },
+      { weekday: "SUNDAY", open: "08:00", close: "23:45" },
     ],
 
     location: {
@@ -409,13 +409,13 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
 
     // график работы
     hours: [
-      { day: "MONDAY", open: "09:00", close: "19:00" },
-      { day: "TUESDAY", open: "09:00", close: "19:00" },
-      { day: "WEDNESDAY", open: "09:00", close: "19:00" },
-      { day: "THURSDAY", open: "09:00", close: "19:00" },
-      { day: "FRIDAY", open: "09:00", close: "19:00" },
-      { day: "SATURDAY", open: "09:00", close: "19:00" },
-      { day: "SUNDAY" },
+      { weekday: "MONDAY", open: "09:00", close: "19:00" },
+      { weekday: "TUESDAY", open: "09:00", close: "19:00" },
+      { weekday: "WEDNESDAY", open: "09:00", close: "19:00" },
+      { weekday: "THURSDAY", open: "09:00", close: "19:00" },
+      { weekday: "FRIDAY", open: "09:00", close: "19:00" },
+      { weekday: "SATURDAY", open: "09:00", close: "19:00" },
+      { weekday: "SUNDAY" },
     ],
 
     location: {
@@ -540,13 +540,13 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
 
     // график работы
     hours: [
-      { day: "MONDAY", open: "09:30", close: "19:00" },
-      { day: "TUESDAY", open: "09:30", close: "19:00" },
-      { day: "WEDNESDAY", open: "09:30", close: "19:00" },
-      { day: "THURSDAY", open: "09:30", close: "19:00" },
-      { day: "FRIDAY", open: "09:30", close: "19:00" },
-      { day: "SATURDAY", open: "11:00", close: "16:00" },
-      { day: "SUNDAY" },
+      { weekday: "MONDAY", open: "09:30", close: "19:00" },
+      { weekday: "TUESDAY", open: "09:30", close: "19:00" },
+      { weekday: "WEDNESDAY", open: "09:30", close: "19:00" },
+      { weekday: "THURSDAY", open: "09:30", close: "19:00" },
+      { weekday: "FRIDAY", open: "09:30", close: "19:00" },
+      { weekday: "SATURDAY", open: "11:00", close: "16:00" },
+      { weekday: "SUNDAY" },
     ],
 
     location: {
