@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image';
 import ConsultationModal from '@/components/clinic/ConsultationModal';
+import ReportModal from '@/components/clinic/ReportModal';
 import { useMemo, useState } from 'react';
 import SectionNav from '@/components/SectionNav';
 import type { Clinic } from '@/lib/db/clinics';
@@ -38,23 +39,17 @@ export default function ClinicDetailPage({ clinic }: Props) {
   // убираем пустые строки, чтобы <Image> не падал
   const imgs = (clinic.images ?? []).filter(Boolean);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalService, setModalService] = useState<string | undefined>(undefined);
+  const [open, setOpen] = useState(false)
+  const [clickedService, setClickedService] = useState<string>('')
 
-  // массив названий услуг клиники (для селекта модалки)
-  const serviceNames = useMemo(
-    () => (clinic.services ?? []).map((s: any) => s.name).filter(Boolean),
-    [clinic.services]
+  // из данных клиники получаем список названий услуг:
+  const servicesFromClinic = useMemo(
+    () =>
+      Array.from(
+        new Set((clinic?.services ?? []).map((s: any) => s?.name).filter(Boolean))
+      ),
+    [clinic?.services]
   );
-
-  // хелперы
-  function openModal(service?: string) {
-    setModalService(service);
-    setModalOpen(true);
-  }
-  function closeModal() {
-    setModalOpen(false);
-  }
 
   // Doctors: поддержка старого и нового форматов
   const doctors = useMemo(() => {
@@ -94,6 +89,8 @@ export default function ClinicDetailPage({ clinic }: Props) {
     null;
 
   const mapSrc = clinic.location?.mapEmbedUrl ?? buildMapEmbed(address);
+
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10">
@@ -157,12 +154,16 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       <td className="p-3">{s.description ?? s.duration ?? '—'}</td>
                       <td className="p-3">
                         <button
-                          type="button"
-                          onClick={() => openModal(s.name)}
-                          className="rounded-md bg-primary px-3 py-2 text-white"
+                          className="rounded-md bg-primary px-3 py-2 text-white" // твои стили
+                          onClick={() => {
+                            setClickedService(s.name)
+                            setOpen(true)
+                          }}
                         >
                           Request
                         </button>
+
+
                       </td>
                     </tr>
                   ))}
@@ -208,7 +209,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       <div className="mt-3">
                         <button
                           type="button"
-                          onClick={() => openModal('Consultation')}
+                          onClick={() => { setClickedService(''); setOpen(true) }}
                           className="rounded-md bg-primary px-3 py-2 text-white"
                         >
                           Request Appointment
@@ -341,6 +342,17 @@ export default function ClinicDetailPage({ clinic }: Props) {
               </div>
             )}
           </section>
+
+          {/* Reports */}
+          <div className="pt-4">
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-gray-50"
+            >
+              Report
+            </button>
+          </div>
         </main>
 
         {/* ---------- SIDEBAR ---------- */}
@@ -374,11 +386,19 @@ export default function ClinicDetailPage({ clinic }: Props) {
       </div>
 
       <ConsultationModal
-        open={modalOpen}
-        onClose={closeModal}
-        services={serviceNames}
-        preselectedService={modalService}
+        open={open}
+        onClose={() => setOpen(false)}
+        clinicId={clinic.id}                // uuid клиники
+        services={servicesFromClinic}       // список названий
+        preselectedService={clickedService}
       />
+
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        clinicId={clinic.id}
+      />
+
     </div>
   );
 }

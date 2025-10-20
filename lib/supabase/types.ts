@@ -38,81 +38,6 @@ export type Database = {
         }
         Relationships: []
       }
-      booking_requests: {
-        Row: {
-          clinic_id: string | null
-          contact_method: string
-          created_at: string
-          doctor_id: string | null
-          id: string
-          name: string
-          origin: string
-          phone: string
-          service_id: number | null
-          user_id: string
-        }
-        Insert: {
-          clinic_id?: string | null
-          contact_method: string
-          created_at?: string
-          doctor_id?: string | null
-          id?: string
-          name: string
-          origin: string
-          phone: string
-          service_id?: number | null
-          user_id: string
-        }
-        Update: {
-          clinic_id?: string | null
-          contact_method?: string
-          created_at?: string
-          doctor_id?: string | null
-          id?: string
-          name?: string
-          origin?: string
-          phone?: string
-          service_id?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "booking_requests_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_requests_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "mv_catalog_clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_requests_doctor_id_fkey"
-            columns: ["doctor_id"]
-            isOneToOne: false
-            referencedRelation: "doctors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_requests_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       bookings: {
         Row: {
           contact_method: string
@@ -504,6 +429,84 @@ export type Database = {
           },
         ]
       }
+      clinic_requests: {
+        Row: {
+          clinic_id: string | null
+          contact_method: string
+          created_at: string
+          doctor_id: string | null
+          id: string
+          name: string
+          origin: string
+          phone: string
+          service_id: number | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          contact_method: string
+          created_at?: string
+          doctor_id?: string | null
+          id?: string
+          name: string
+          origin: string
+          phone: string
+          service_id?: number | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          clinic_id?: string | null
+          contact_method?: string
+          created_at?: string
+          doctor_id?: string | null
+          id?: string
+          name?: string
+          origin?: string
+          phone?: string
+          service_id?: number | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinic_services: {
         Row: {
           clinic_id: string
@@ -769,7 +772,8 @@ export type Database = {
           last_name: string | null
           message: string | null
           phone: string | null
-          user_id: string
+          status: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -779,7 +783,8 @@ export type Database = {
           last_name?: string | null
           message?: string | null
           phone?: string | null
-          user_id: string
+          status?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -789,7 +794,8 @@ export type Database = {
           last_name?: string | null
           message?: string | null
           phone?: string | null
-          user_id?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -925,7 +931,8 @@ export type Database = {
           name: string | null
           phone: string | null
           relationship: string | null
-          user_id: string
+          status: string
+          user_id: string | null
         }
         Insert: {
           clinic_id: string
@@ -936,7 +943,8 @@ export type Database = {
           name?: string | null
           phone?: string | null
           relationship?: string | null
-          user_id: string
+          status?: string
+          user_id?: string | null
         }
         Update: {
           clinic_id?: string
@@ -947,7 +955,8 @@ export type Database = {
           name?: string | null
           phone?: string | null
           relationship?: string | null
-          user_id?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1174,6 +1183,52 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mv_clinic_requests: {
+        Row: {
+          clinic_id: string | null
+          clinic_name: string | null
+          clinic_slug: string | null
+          contact_method: string | null
+          created_at: string | null
+          doctor_id: string | null
+          id: string | null
+          name: string | null
+          origin: string | null
+          phone: string | null
+          service_id: number | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]

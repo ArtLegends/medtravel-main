@@ -3,48 +3,56 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+type UiContact = 'Email' | 'Phone' | 'WhatsApp' | 'Telegram';
+
+const CONTACT_OPTIONS: ReadonlyArray<UiContact> = [
+  'Email',
+  'Phone',
+  'WhatsApp',
+  'Telegram',
+];
+
 type Props = {
   open: boolean;
   onClose: () => void;
-  services: string[];          // список услуг клиники
-  preselectedService?: string; // предзадать услугу (например из таблицы)
+  clinicId: string;
+  services: string[];
+  preselectedService?: string;
 };
 
 export default function ConsultationModal({
   open,
   onClose,
+  clinicId,
   services,
   preselectedService,
 }: Props) {
   const dlgRef = useRef<HTMLDivElement>(null);
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [contact, setContact] = useState<'email' | 'phone' | 'whatsapp' | 'telegram' | ''>('');
+  const [contact, setContact] = useState<UiContact | ''>('');
   const [service, setService] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // нормализованный список услуг (уникальные + без пустых)
   const serviceOptions = useMemo(
     () => Array.from(new Set((services ?? []).filter(Boolean))),
     [services]
   );
 
-  // при открытии модалки — сбросить состояние + установить предвыбранную услугу
   useEffect(() => {
-    if (open) {
-      setError(null);
-      setDone(false);
-      setLoading(false);
-      setName('');
-      setPhone('');
-      setContact('');
-      setService(preselectedService ?? '');
-    }
+    if (!open) return;
+    setError(null);
+    setDone(false);
+    setLoading(false);
+    setName('');
+    setPhone('');
+    setContact('');
+    setService(preselectedService ?? '');
   }, [open, preselectedService]);
 
-  // закрытие по ESC/клику на фон
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -72,22 +80,26 @@ export default function ConsultationModal({
 
     try {
       setLoading(true);
-      const res = await fetch('/api/bookings', {
+      const res = await fetch('/api/clinic-requests', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          clinic_id: clinicId,
+          service,
+          doctor_id: null,
           name,
           phone,
-          contact_method: contact,
-          service,
+          // ВАЖНО: отправляем ровно как требует CHECK
+          contact_method: contact,          // 'Email' | 'Phone' | 'WhatsApp' | 'Telegram'
+          origin: 'service',                // допустимое значение по CHECK
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Request failed');
+      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Request failed');
 
       setDone(true);
     } catch (err: any) {
-      setError(err?.message || 'Something went wrong');
+      setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -103,7 +115,6 @@ export default function ConsultationModal({
         role="dialog"
         aria-modal="true"
       >
-        {/* header */}
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h3 className="text-center text-xl font-semibold md:text-2xl">
@@ -128,7 +139,6 @@ export default function ConsultationModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* name */}
             <div>
               <label className="mb-1 block text-sm font-medium">Your Name</label>
               <input
@@ -137,10 +147,10 @@ export default function ConsultationModal({
                 className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
               />
             </div>
 
-            {/* phone */}
             <div>
               <label className="mb-1 block text-sm font-medium">Phone Number</label>
               <input
@@ -149,51 +159,43 @@ export default function ConsultationModal({
                 className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                required
               />
             </div>
 
-            {/* contact method */}
             <div>
               <label className="mb-1 block text-sm font-medium">Preferred Contact Method</label>
               <div className="relative">
                 <select
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
                   value={contact}
-                  onChange={(e) => setContact(e.target.value as any)}
+                  onChange={(e) => setContact(e.target.value as UiContact | '')}
                 >
                   <option value="">Select the best way to contact you</option>
-                  <option value="email">Email</option>
-                  <option value="phone">Phone</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="telegram">Telegram</option>
-                </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none text-gray-400">▾</span>
-              </div>
-            </div>
-
-            {/* service */}
-            <div>
-              <label className="mb-1 block text-sm font-medium">Service Interested In</label>
-              <div className="relative">
-                <select
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
-                  value={service}
-                  onChange={(e) => setService(e.target.value)}
-                >
-                  <option value="">The service that interested you</option>
-                  {serviceOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
+                  {CONTACT_OPTIONS.map(v => (
+                    <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none text-gray-400">▾</span>
               </div>
             </div>
 
-            {error && (
-              <div className="rounded-md bg-rose-50 p-2 text-sm text-rose-700">{error}</div>
-            )}
+            <div>
+              <label className="mb-1 block text-sm font-medium">Service Interested In</label>
+              <select
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+                required
+              >
+                <option value="">The service that interested you</option>
+                {serviceOptions.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {error && <div className="rounded-md bg-rose-50 p-2 text-sm text-rose-700">{error}</div>}
 
             <button
               type="submit"

@@ -4,6 +4,7 @@ import CategoryHero from '@/components/category/CategoryHero'
 import CategoryWhy from '@/components/category/CategoryWhy'
 import CategoryGrid from '@/components/category/CategoryGrid'
 import { createServerClient } from '@/lib/supabase/serverClient'
+import { buildCategoryMetadata } from '@/lib/seo/meta'
 
 export const revalidate = 60
 
@@ -14,13 +15,35 @@ export async function generateMetadata(
   { params }: { params: Promise<Params> }
 ): Promise<Metadata> {
   const { category } = await params
-  const title = `${cap(category)} Clinics | MedTravel`
-  return {
-    title,
-    description: `Best ${category} clinics in popular destinations. Compare prices, read reviews and book a consultation.`,
-    alternates: { canonical: `/${category}` },
-    openGraph: { title, description: `Top ${category} clinics worldwide` },
-  }
+  const slug = decodeURIComponent(category).toLowerCase()
+
+  // Пытаемся достать мультиязычное имя категории (если есть колонки name_en/name_ru/name_pl)
+  let nameEn = cap(slug)
+  let nameRu = cap(slug)
+  let namePl = cap(slug)
+
+  try {
+    const supabase = createServerClient()
+    const { data: cat } = await supabase
+      .from('categories')
+      .select('name, name_ru, name_pl')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    if (cat?.name)   nameEn = cat.name
+    if (cat?.name_ru) nameRu = cat.name_ru
+    if (cat?.name_pl) namePl = cat.name_pl
+  } catch {}
+
+  // Локация — если есть у тебя «текущий фильтр», можно подставлять
+  const location = { country: 'Turkey', city: 'Istanbul', district: undefined } // <- пример, подставляй реальные данные
+
+  return buildCategoryMetadata(`/${slug}`, {
+    categoryLabelEn: nameEn,
+    categoryLabelRu: nameRu,
+    categoryLabelPl: namePl,
+    location,
+  })
 }
 
 export default async function Page(
@@ -29,7 +52,7 @@ export default async function Page(
   const { category } = await params
   const slug = decodeURIComponent(category).toLowerCase()
 
-  let titleName = cap(slug)
+  let titleName = cap(slug);
   try {
     const supabase = createServerClient()
     const { data: cat } = await supabase
@@ -42,7 +65,10 @@ export default async function Page(
 
   return (
     <>
-      <CategoryHero title={`Best ${titleName} Clinics in Popular Destinations`} />
+      <CategoryHero
+        title={`Best ${titleName} Clinics in Popular Destinations`}
+        categoryName={titleName}
+      />
       <CategoryWhy />
       <CategoryGrid categorySlug={slug} />
     </>

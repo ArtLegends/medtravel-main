@@ -27,17 +27,22 @@ export default function ContactFormSection() {
     setDone(null);
 
     try {
+      const payload = {
+        name,
+        phone,
+        contact_method: contact.toLowerCase(), // 'email' | 'phone' | 'whatsapp' | 'telegram'
+        service,
+      };
+
       const res = await fetch('/api/bookings', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          phone,
-          contact_method: contact.toLowerCase(),       // нормализуем под БД
-          service: service.toLowerCase().replace(/\s+/g, '-'),
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(await res.text());
+
+      const data = await res.json();
+      if (!res.ok || data?.error) throw new Error(data?.error || 'Failed');
+
       setDone('ok');
       setName(''); setPhone(''); setContact(''); setService('');
     } catch {

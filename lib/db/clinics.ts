@@ -13,6 +13,7 @@ export type ClinicListItem = {
 
 /** Полный объект клиники, который потребляет UI */
 export type Clinic = {
+  prices: never[]
   id: string
   slug: string
   name: string
@@ -183,31 +184,32 @@ function toClinic(row: DBClinic, parts: {
     undefined
 
   return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    about: row.about ?? undefined,
-    country: row.country ?? undefined,
-    city: row.city ?? undefined,
-    district: row.district ?? undefined,
+  id: row.id,
+  slug: row.slug,
+  name: row.name,
+  about: row.about ?? undefined,
+  country: row.country ?? undefined,
+  city: row.city ?? undefined,
+  district: row.district ?? undefined,
 
-    verifiedByMedtravel: !!row.verified_by_medtravel,
-    isOfficialPartner: (row.is_official_partner ?? row.official_partner) ?? false,
+  verifiedByMedtravel: !!row.verified_by_medtravel,
+  isOfficialPartner: (row.is_official_partner ?? row.official_partner) ?? false,
 
-    images,
-    services,
-    hours,
-    staff,
-    accreditations,
+  images,
+  services,
+  hours,
+  staff,
+  accreditations,
 
-    additionalServices: row.amenities ?? undefined,
+  additionalServices: row.amenities ?? undefined,
 
-    payments: [],
-    location: (address || row.map_embed_url) ? {
-      address,
-      mapEmbedUrl: row.map_embed_url ?? undefined
-    } : undefined
-  }
+  payments: [],
+  location: (address || row.map_embed_url) ? {
+    address,
+    mapEmbedUrl: row.map_embed_url ?? undefined
+  } : undefined,
+  prices: [],
+}
 }
 
 /* ================= ПУБЛИЧНЫЕ ФУНКЦИИ ================= */
