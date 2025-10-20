@@ -180,6 +180,7 @@ const nextConfig = {
             { protocol: 'https', hostname: 'whatclinic.com' },
             { protocol: 'https', hostname: 'atlantis-dental.ru' },
             { protocol: 'https', hostname: 'pixsector.com' },
+            { protocol: 'https', hostname: 'img.icons8.com' },
         ],
     }
 };

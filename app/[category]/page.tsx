@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import CategoryHero from '@/components/category/CategoryHero'
 import CategoryWhy from '@/components/category/CategoryWhy'
 import CategoryGrid from '@/components/category/CategoryGrid'
-import { createServerClient } from '@/lib/supabase/serverClient'
+import { createClient } from '@/lib/supabase/serverClient'
 import { buildCategoryMetadata } from '@/lib/seo/meta'
 
 export const revalidate = 60
@@ -23,7 +23,7 @@ export async function generateMetadata(
   let namePl = cap(slug)
 
   try {
-    const supabase = createServerClient()
+    const supabase = createClient()
     const { data: cat } = await supabase
       .from('categories')
       .select('name, name_ru, name_pl')
@@ -54,7 +54,7 @@ export default async function Page(
 
   let titleName = cap(slug);
   try {
-    const supabase = createServerClient()
+    const supabase = createClient()
     const { data: cat } = await supabase
       .from('categories')
       .select('name')

@@ -23,7 +23,7 @@ import {
 import NextLink from "next/link";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
@@ -32,6 +32,18 @@ import {
   getAccessibleNavItems,
   getAccessibleProfileMenuItems,
 } from "@/config/nav";
+
+// ------- безопасный helper для текста (без правок i18n) -------
+const tSafe = (t: any, key: string, fallback: string) => {
+  try {
+    const v = t(key);
+    if (!v || typeof v !== "string" || v.startsWith("navbar.")) return fallback;
+    return v;
+  } catch {
+    return fallback;
+  }
+};
+// ---------------------------------------------------------------
 
 // Мемоизированный компонент навигационного элемента
 const NavItem = React.memo(
@@ -43,12 +55,11 @@ const NavItem = React.memo(
           }`}
         href={item.href}
       >
-        {t(item.label)}
+        {tSafe(t, item.label, String(item.key ?? item.label))}
       </NextLink>
     </NavbarItem>
   )
 );
-
 NavItem.displayName = "NavItem";
 
 // Мемоизированный компонент мобильного элемента навигации
@@ -73,12 +84,11 @@ const MobileNavItem = React.memo(
         href={item.href}
         onPress={onClose}
       >
-        {t(item.label)}
+        {tSafe(t, item.label, String(item.key ?? item.label))}
       </Link>
     </NavbarMenuItem>
   )
 );
-
 MobileNavItem.displayName = "MobileNavItem";
 
 // Мемоизированный компонент профиля
@@ -88,18 +98,59 @@ const ProfileDropdown = React.memo(
     role,
     supabase,
     t,
-    profileMenuItems,
   }: {
     session: any;
     role: any;
     supabase: any;
     t: any;
-    profileMenuItems: any[];
   }) => {
+    const router = useRouter();
+
     const handleLogout = useCallback(async () => {
       await supabase.auth.signOut();
-      window.location.href = "/login";
-    }, [supabase]);
+      router.push("/login");
+      router.refresh();
+    }, [supabase, router]);
+
+    // Формируем список пунктов меню (только DropdownItem элементы)
+    const items: React.ReactElement[] = [];
+
+    // settings
+    items.push(
+      <DropdownItem
+        key="settings"
+        onPress={() => router.push("/settings")}
+        startContent={<Icon icon="solar:settings-linear" width={16} />}
+      >
+        {tSafe(t, "navbar.mySettings", "My settings")}
+      </DropdownItem>
+    );
+
+    // admin (условно добавляем)
+    const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
+    if (isAdmin) {
+      items.push(
+        <DropdownItem
+          key="admin"
+          onPress={() => router.push("/admin")}
+          startContent={<Icon icon="solar:shield-user-bold" width={16} />}
+        >
+          {tSafe(t, "navbar.adminPanel", "Admin panel")}
+        </DropdownItem>
+      );
+    }
+
+    // logout
+    items.push(
+      <DropdownItem
+        key="logout"
+        color="danger"
+        startContent={<Icon icon="solar:logout-linear" width={16} />}
+        onPress={handleLogout}
+      >
+        {tSafe(t, "navbar.logOut", "Log out")}
+      </DropdownItem>
+    );
 
     return (
       <NavbarItem className="px-2">
@@ -121,63 +172,79 @@ const ProfileDropdown = React.memo(
               </Badge>
             </Button>
           </DropdownTrigger>
+
           <DropdownMenu aria-label="Profile Actions" variant="flat">
             <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
               <p className="font-semibold text-small">
-                {t("navbar.signedInAs")}
+                {tSafe(t, "navbar.signedInAs", "Signed in as")}
               </p>
               <p className="font-medium text-tiny text-default-500">
                 {session?.user?.email ?? ""}
               </p>
             </DropdownItem>
-            <DropdownItem key="settings" as={NextLink} href="/settings">
-              {t("navbar.mySettings")}
+
+            <DropdownItem
+              key="settings"
+              onPress={() => router.push("/settings")}
+              startContent={<Icon icon="solar:settings-linear" width={16} />}
+            >
+              {tSafe(t, "navbar.mySettings", "My settings")}
             </DropdownItem>
-            {role === "ADMIN" || role === "SUPER_ADMIN" ?
-              <DropdownItem key="admin" as={NextLink} href="/admin">
-                {t("navbar.adminPanel")}
-              </DropdownItem>
-              : null}
+
+            {
+              // условный пункт админки: приводим к any, чтобы типы HeroUI не ругались
+              (role === "ADMIN" || role === "SUPER_ADMIN"
+                ? (
+                  <DropdownItem
+                    key="admin"
+                    onPress={() => router.push("/admin")}
+                    startContent={<Icon icon="solar:shield-user-bold" width={16} />}
+                  >
+                    {tSafe(t, "navbar.adminPanel", "Admin panel")}
+                  </DropdownItem>
+                )
+                : null) as any
+            }
+
             <DropdownItem
               key="logout"
               color="danger"
               startContent={<Icon icon="solar:logout-linear" width={16} />}
               onPress={handleLogout}
             >
-              {t("navbar.logOut")}
+              {tSafe(t, "navbar.logOut", "Log out")}
             </DropdownItem>
           </DropdownMenu>
+
         </Dropdown>
       </NavbarItem>
     );
   }
 );
-
 ProfileDropdown.displayName = "ProfileDropdown";
 
 export const Navbar = React.memo(() => {
   const { t } = useTranslation();
   const { supabase, session, role } = useSupabase() as SupabaseContextType;
   const rawPath = usePathname();
-  const pathname = rawPath ?? ''
+  const pathname = rawPath ?? "";
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   // Мемоизируем навигационные элементы на основе роли
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
 
-  // Мемоизируем элементы профильного меню
+  // (оставлено на будущее)
   const profileMenuItems = useMemo(
     () => getAccessibleProfileMenuItems(role),
     [role]
   );
 
-  // Мемоизируем проверку auth-страниц
+  // Упрощенный navbar для auth страниц
   const isAuth = useMemo(
     () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
     [pathname]
   );
 
-  // Упрощенный navbar для auth страниц
   if (isAuth) {
     return (
       <HeroUINavbar
@@ -249,7 +316,6 @@ export const Navbar = React.memo(() => {
 
         {/* Profile dropdown */}
         <ProfileDropdown
-          profileMenuItems={profileMenuItems}
           role={role}
           session={session}
           supabase={supabase}
@@ -277,5 +343,4 @@ export const Navbar = React.memo(() => {
     </HeroUINavbar>
   );
 });
-
 Navbar.displayName = "Navbar";

@@ -358,16 +358,16 @@ export default function ClinicDetailPage({ clinic }: Props) {
         {/* ---------- SIDEBAR ---------- */}
         <aside className="space-y-4">
           <div className="rounded-2xl border p-4">
+            <div className="mb-3 w-full rounded-md px-4 py-3 text-primary text-center font-semibold text-lg">
+              Start Your<br></br> Personalized Treatment Plan Today
+            </div>
+
             <Link
               href={`/clinic/${clinic.slug}/inquiry`}
               className="block w-full rounded-md bg-emerald-600 px-4 py-3 text-center font-medium text-white hover:bg-emerald-700"
             >
               Claim Your Free Quote
             </Link>
-
-            <button className="mt-3 w-full rounded-md bg-primary px-4 py-3 text-white">
-              Start Your Personalized Treatment Plan Today
-            </button>
           </div>
 
           {clinic.payments?.length ? (

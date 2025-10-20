@@ -1,23 +1,36 @@
 // app/auth/callback/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/serverClient'
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
-  const supabase = createServerClient()
+  const requestUrl = new URL(req.url);
+  const code = requestUrl.searchParams.get("code");
+  const next = requestUrl.searchParams.get("next") ?? "/";
 
-  const url = new URL(req.url)
-  const code = url.searchParams.get('code')
-  const next = url.searchParams.get('next') || '/admin'
+  const res = NextResponse.redirect(new URL(next, req.url));
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () =>
+          cookieStore.getAll().map((c: any) => ({ name: c.name, value: c.value })),
+        setAll: (all) => {
+          all.forEach((cookie) => {
+            res.cookies.set(cookie.name, cookie.value, cookie.options);
+          });
+        },
+      },
+    }
+  );
 
   if (code) {
-    // обмен кода на сессию
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error) {
-      // не роняем — просто на логин
-      // return NextResponse.redirect(new URL('/login', req.url))
-    }
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) return NextResponse.redirect(new URL("/login?error=oauth", req.url));
   }
 
-  // возвращаем туда, куда просили
-  return NextResponse.redirect(new URL(next, req.url))
+  return res;
 }

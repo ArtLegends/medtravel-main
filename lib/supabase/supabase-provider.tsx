@@ -12,7 +12,7 @@ import React, {
 
 import { createClient } from "@/lib/supabase/browserClient";
 
-export type UserRole = "USER" | "CREATOR" | "ADMIN" | "SUPER_ADMIN";
+export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
 
 export interface SupabaseContextType {
   supabase: ReturnType<typeof createClient>;
@@ -55,14 +55,14 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
     if (error) {
       console.error('profiles select error', error);
-      setRole("USER");          // безопасный фолбек
+      setRole("GUEST");          // безопасный фолбек
       return;
     }
     if (!data) {
-      setRole("USER");          // нет строки — считаем USER (триггер создаст позже)
+      setRole("GUEST");          // нет строки — считаем USER (триггер создаст позже)
       return;
     }
-    setRole((data as any)?.role ?? "USER");
+    setRole((data as any)?.role ?? "GUEST");
   };
 
   // Мемоизируем контекстное значение чтобы избежать ненужных перерендеров

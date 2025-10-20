@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import ClinicDetailPage from '@/components/clinic/ClinicDetailPage'
 import { fetchClinicBySlug } from '@/lib/db/clinics'
 import { buildCategoryMetadata, buildClinicMetadata } from '@/lib/seo/meta'
-import { createServerClient } from '@/lib/supabase/serverClient'
+import { createClient } from '@/lib/supabase/serverClient'
 
 type Params = { slug: string }
 
@@ -12,7 +12,7 @@ export async function generateMetadata(
   { params }: { params: Promise<Params> }
 ): Promise<Metadata> {
   const { slug } = await params
-  const sb = createServerClient()
+  const sb = createClient()
 
   const { data: clinic } = await sb
     .from('mv_catalog_clinics') // или твоя таблица/вью

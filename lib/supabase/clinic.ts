@@ -1,5 +1,5 @@
 // lib/supabase/clinic.ts
-import { createServerClient } from '@/lib/supabase/serverClient';
+import { createClient } from '@/lib/supabase/serverClient';
 
 export type ClinicView = {
   slug: string;
@@ -36,7 +36,7 @@ const norm = (v?: string | string[]) =>
   !v ? [] : Array.isArray(v) ? v : v.split(',').map(s => s.trim()).filter(Boolean);
 
 export async function getClinicViewBySlug(slug: string): Promise<ClinicView | null> {
-  const supabase = createServerClient();
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from('clinics')

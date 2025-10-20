@@ -1,108 +1,67 @@
 // config/nav.ts
-export type UserRole = "USER" | "CREATOR" | "ADMIN" | "SUPER_ADMIN";
+export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
 
 export interface NavItem {
   key: string;
-  label: string;
+  label: string;          // plain label or i18n key — сейчас можно обычный текст
   href: string;
-  icon: string;
+  icon?: string;
   description?: string;
-  minRole?: UserRole;
-  exactRole?: UserRole[];
+  minRole?: UserRole;     // минимальная роль для доступа
+  exactRole?: UserRole[]; // точные роли (если нужно)
 }
 
-// Иерархия ролей для проверки доступа
+// Простая иерархия доступа
 const roleHierarchy: Record<UserRole, number> = {
-  USER: 1,
-  CREATOR: 2,
+  GUEST: 0,
+  PATIENT: 1,
+  CUSTOMER: 1,
+  PARTNER: 2,
   ADMIN: 3,
-  SUPER_ADMIN: 4,
 };
 
-// Основная навигация по ролям
-export const navigationConfig: NavItem[] = [
-  // Доступно всем аутентифицированным пользователям
-  {
-    key: "discover",
-    label: "navbar.discover",
-    href: "/",
-    icon: "solar:compass-bold",
-    description: "Discover amazing content",
-    minRole: "USER",
-  },
-  {
-    key: "marketplace",
-    label: "navbar.marketplace",
-    href: "/marketplace",
-    icon: "solar:bag-4-bold",
-    description: "Buy and sell items",
-    minRole: "USER",
-  },
-  {
-    key: "inventory",
-    label: "navbar.inventory",
-    href: "/inventory",
-    icon: "solar:archive-bold",
-    description: "Manage your items",
-    minRole: "USER",
-  },
+/**
+ * ПУБЛИЧНОЕ МЕНЮ КАТАЛОГА
+ * Сейчас убираем всё от шаблона: discover/marketplace/inventory/labs/docs.
+ * Оставим пусто — верхнее меню не будет показываться.
+ * Когда понадобится, добавим, например: Categories, Clinics, About, Contact.
+ */
+export const navigationConfig: NavItem[] = [];
 
-  // Доступно только CREATOR+
-  {
-    key: "labs",
-    label: "navbar.labs",
-    href: "/labs",
-    icon: "solar:test-tube-bold",
-    description: "Experimental tools and features",
-    minRole: "CREATOR",
-  },
-
-  // Доступно всем
-  {
-    key: "docs",
-    label: "navbar.docs",
-    href: "/docs",
-    icon: "solar:book-bold",
-    description: "Documentation and guides",
-    minRole: "USER",
-  },
-];
-
-// Мобильное меню (может отличаться от основного)
+// Мобильное меню — то же самое
 export const mobileNavigationConfig: NavItem[] = navigationConfig;
 
-// Профильное меню
+/**
+ * ПРОФИЛЬНОЕ МЕНЮ
+ * - Settings (любой залогиненный)
+ * - Admin (только ADMIN)
+ */
 export const profileMenuConfig: NavItem[] = [
   {
     key: "settings",
-    label: "navbar.mySettings",
+    label: "My settings",
     href: "/settings",
-    icon: "solar:settings-linear",
-    minRole: "USER",
+    minRole: "PATIENT", // любой аутентифицированный
   },
   {
     key: "admin",
-    label: "navbar.adminPanel",
+    label: "Admin panel",
     href: "/admin",
-    icon: "solar:shield-user-bold",
     minRole: "ADMIN",
   },
 ];
 
-// Функции для проверки доступа
+// Доступ
 export function hasAccess(userRole: UserRole | null, item: NavItem): boolean {
-  if (!userRole) return false;
+  // Гость не имеет доступа к пунктам, требующим аутентификации
+  if (!userRole) return !item.minRole || item.minRole === "GUEST";
 
-  // Проверка точной роли
   if (item.exactRole) {
     return item.exactRole.includes(userRole);
   }
-
-  // Проверка минимальной роли
   if (item.minRole) {
     return roleHierarchy[userRole] >= roleHierarchy[item.minRole];
   }
-
   return true;
 }
 
@@ -122,30 +81,27 @@ export function getAccessibleProfileMenuItems(
   return profileMenuConfig.filter((item) => hasAccess(userRole, item));
 }
 
-// Проверка роли для маршрутов
+/**
+ * Проверка доступа к маршрутам (минимально)
+ * Публичные: главная и всё, что позже сюда добавим.
+ */
 export function canAccessRoute(
   userRole: UserRole | null,
   pathname: string
 ): boolean {
-  // Публичные маршруты
-  const publicRoutes = ["/", "/docs"];
-
+  const publicRoutes = ["/"]; // расширим при необходимости
   if (publicRoutes.includes(pathname)) return true;
 
-  // Проверка по навигационной конфигурации
   const matchingItem = navigationConfig.find(
     (item) => pathname.startsWith(item.href) && item.href !== "/"
   );
+  if (matchingItem) return hasAccess(userRole, matchingItem);
 
-  if (matchingItem) {
-    return hasAccess(userRole, matchingItem);
-  }
-
-  // По умолчанию требуется аутентификация
+  // По умолчанию — требуется аутентификация
   return userRole !== null;
 }
 
-// Получение группы маршрута для layout
+// Группа лэйаута (если используешь)
 export function getRouteGroup(pathname: string): string {
   if (
     pathname.startsWith("/login") ||
@@ -154,15 +110,6 @@ export function getRouteGroup(pathname: string): string {
   ) {
     return "(auth)";
   }
-
-  if (pathname.startsWith("/labs")) {
-    return "(creator)";
-  }
-
-  if (pathname.startsWith("/admin")) {
-    return "(admin)";
-  }
-
-  // Все остальные аутентифицированные маршруты
+  if (pathname.startsWith("/admin")) return "(admin)";
   return "(user)";
 }

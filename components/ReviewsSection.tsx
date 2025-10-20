@@ -23,7 +23,7 @@ const tabs = ['Recent', 'Popular', 'Featured'] as const
 const reviews: Review[] = [
   {
     id: 1,
-    avatar: '/avatars/claire.jpg',
+    avatar: 'https://plus.unsplash.com/premium_photo-1671656349218-5218444643d8?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YXZhdGFyfGVufDB8fDB8fHww&fm=jpg&q=60&w=3000',
     name: 'Claire Davis, US',
     location: 'Hair Transplant, Istanbul',
     rating: 5,
@@ -32,7 +32,7 @@ const reviews: Review[] = [
   },
   {
     id: 2,
-    avatar: '/avatars/sarah.jpg',
+    avatar: 'https://plus.unsplash.com/premium_photo-1690407617542-2f210cf20d7e?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&q=60&w=500',
     name: 'Sarah Thompson, UK',
     location: 'Dental Implants, Turkey',
     rating: 5,
@@ -41,7 +41,7 @@ const reviews: Review[] = [
   },
   {
     id: 3,
-    avatar: '/avatars/liam.jpg',
+    avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&q=60&w=500',
     name: 'Liam Brown, CA',
     location: 'Rhinoplasty, Turkey',
     rating: 5,
@@ -50,7 +50,7 @@ const reviews: Review[] = [
   },
   {
     id: 4,
-    avatar: '/avatars/emily.jpg',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&q=60&w=500',
     name: 'Emily Harris, US',
     location: 'Facelift, Istanbul',
     rating: 5,
@@ -59,7 +59,7 @@ const reviews: Review[] = [
   },
   {
     id: 5,
-    avatar: '/avatars/nathan.jpg',
+    avatar: 'https://images.unsplash.com/photo-1654110455429-cf322b40a906?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fGF2YXRhcnxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&q=60&w=500',
     name: 'Nathan White, AU',
     location: 'Tummy Tuck, Istanbul',
     rating: 5,
@@ -68,7 +68,7 @@ const reviews: Review[] = [
   },
   {
     id: 6,
-    avatar: '/avatars/emma.jpg',
+    avatar: 'https://plus.unsplash.com/premium_photo-1658527049634-15142565537a?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&q=60&w=500',
     name: 'Emma Johnson, US',
     location: 'Breast Augmentation, Turkey',
     rating: 5,
@@ -130,7 +130,7 @@ export default function ReviewsSection() {
               </div>
               {/* Логотип Google */}
               <Image
-                src="/icons/google-logo.png"
+                src="https://img.icons8.com/?size=512&id=17949&format=png"
                 alt="Google"
                 width={32}
                 height={32}

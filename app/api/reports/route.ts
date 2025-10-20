@@ -1,7 +1,7 @@
 // app/api/reports/route.ts
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { createServerClient } from "@/lib/supabase/serverClient";
+import { createClient } from "@/lib/supabase/serverClient";
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     }
 
     // авторизован ли пользователь?
-    const authSb = createServerClient();
+    const authSb = createClient();
     const { data: u } = await authSb.auth.getUser();
     const user_id = u?.user?.id ?? null; // анонимно -> null
 

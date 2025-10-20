@@ -1,9 +1,9 @@
 // lib/supabase/requests.ts
 // import { createClient as createBrowserClient } from '@/lib/supabase/browserClient'
-import { createServerClient } from '@/lib/supabase/serverClient'
+import { createClient } from '@/lib/supabase/serverClient'
 import type Clinic from "@/components/clinic/ClinicCard"
 // import { createClient } from "@/lib/supabase/browserClient"
-import { createClient } from "./browserClient";
+// import { createClient } from "./browserClient";
 // import type { Category } from '@/lib/supabase/types'
 import type { PostgrestSingleResponse } from '@supabase/supabase-js'
 import { getPublicClient } from '@/lib/supabase/publicClient'
