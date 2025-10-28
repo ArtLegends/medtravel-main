@@ -44,7 +44,7 @@ export default function NewClinicForm() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/clinic-requests', {
+      const res = await fetch('/api/new-clinic-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

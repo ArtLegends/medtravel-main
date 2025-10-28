@@ -261,6 +261,7 @@ export type Database = {
       clinic_images: {
         Row: {
           clinic_id: string
+          created_at: string | null
           id: string
           sort: number | null
           title: string | null
@@ -268,6 +269,7 @@ export type Database = {
         }
         Insert: {
           clinic_id: string
+          created_at?: string | null
           id?: string
           sort?: number | null
           title?: string | null
@@ -275,6 +277,7 @@ export type Database = {
         }
         Update: {
           clinic_id?: string
+          created_at?: string | null
           id?: string
           sort?: number | null
           title?: string | null
@@ -870,6 +873,54 @@ export type Database = {
         }
         Relationships: []
       }
+      new_clinic_requests: {
+        Row: {
+          address: string | null
+          city: string | null
+          clinic_name: string
+          contact_first_name: string
+          contact_last_name: string
+          country: string | null
+          created_at: string
+          email: string
+          id: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          clinic_name: string
+          contact_first_name: string
+          contact_last_name: string
+          country?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          clinic_name?: string
+          contact_first_name?: string
+          contact_last_name?: string
+          country?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       premises: {
         Row: {
           id: number
@@ -902,7 +953,7 @@ export type Database = {
           date_of_birth?: string | null
           email: string
           first_name?: string | null
-          id?: string
+          id: string
           last_name?: string | null
           locale?: string
           phone?: string | null
@@ -995,6 +1046,10 @@ export type Database = {
           rating_staff: number
           rating_support: number
           review: string | null
+          reviewer_email: string | null
+          reviewer_name: string | null
+          reviewer_phone: string | null
+          status: string
           user_id: string
         }
         Insert: {
@@ -1009,6 +1064,10 @@ export type Database = {
           rating_staff: number
           rating_support: number
           review?: string | null
+          reviewer_email?: string | null
+          reviewer_name?: string | null
+          reviewer_phone?: string | null
+          status?: string
           user_id: string
         }
         Update: {
@@ -1023,6 +1082,10 @@ export type Database = {
           rating_staff?: number
           rating_support?: number
           review?: string | null
+          reviewer_email?: string | null
+          reviewer_name?: string | null
+          reviewer_phone?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: [
@@ -1433,6 +1496,24 @@ export type Database = {
       raise_exception: {
         Args: { msg: string }
         Returns: undefined
+      }
+      search_clinics_v1: {
+        Args: { limit_count?: number; q: string }
+        Returns: {
+          category: string
+          clinic_id: string
+          clinic_name: string
+          clinic_slug: string
+          image_url: string
+        }[]
+      }
+      unaccent: {
+        Args: { "": string }
+        Returns: string
+      }
+      unaccent_init: {
+        Args: { "": unknown }
+        Returns: unknown
       }
     }
     Enums: {

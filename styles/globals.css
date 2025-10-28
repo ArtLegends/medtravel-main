@@ -5,3 +5,51 @@
 /* скрыть полосы прокрутки */
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* === Theme tokens (light/dark) === */
+:root {
+  /* базовые цвета светлой темы */
+  --background: 255 255 255;         /* #ffffff */
+  --foreground: 17 24 39;            /* #111827 */
+  --muted: 107 114 128;              /* #6b7280 */
+  --content1: 248 250 252;           /* карточки/бордеры */
+  --divider: 229 231 235;            /* бордеры */
+}
+
+.dark {
+  /* базовые цвета тёмной темы */
+  --background: 12 12 14;            /* почти чёрный */
+  --foreground: 229 231 235;         /* почти белый */
+  --muted: 156 163 175;              /* серый светлее */
+  --content1: 23 23 26;              /* поверхности/карточки */
+  --divider: 38 38 42;               /* бордеры */
+}
+
+/* утилки на основе токенов (Tailwind уже есть — подхватим классами) */
+body {
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+}
+
+/* если используешь классы bg-background / text-foreground из Tailwind —
+   добавим простые кастомные классы на всякий случай */
+.bg-background { background-color: rgb(var(--background)) !important; }
+.text-foreground { color: rgb(var(--foreground)) !important; }
+.text-muted-foreground { color: rgb(var(--muted)) !important; }
+
+.border-divider { border-color: rgb(var(--divider)) !important; }
+.bg-content1 { background-color: rgb(var(--content1)) !important; }
+
+/* карточки/меню/дропдауны (приглушить фон в тёмной теме) */
+.dark .heroui-card,
+.dark .heroui-dropdown,
+.dark .heroui-popover,
+.dark .heroui-modal {
+  background-color: rgb(var(--content1)) !important;
+  color: rgb(var(--foreground)) !important;
+  border-color: rgb(var(--divider)) !important;
+}
+
+/* мелкие правки ссылок/плейсхолдеров в тёмной теме */
+.dark ::placeholder { color: rgb(156 163 175 / 0.7); }
+a { color: inherit; }

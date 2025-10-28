@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
+import { clinicPath } from '@/lib/clinic-url'
 
 import { fetchClinicBySlug } from '@/lib/db/clinics';
 import ClinicInquiryForm from '@/components/clinic/ClinicInquiryForm';
@@ -12,14 +13,21 @@ type Params = { slug: string };
 export async function generateMetadata(
   { params }: { params: Promise<Params> }
 ): Promise<Metadata> {
-  const { slug } = await params;
-  const clinic = await fetchClinicBySlug(slug);
-  const title = clinic ? `Contact ${clinic.name}` : 'Contact clinic';
-  return {
-    title,
-    alternates: { canonical: `/clinic/${slug}/inquiry` },
-    openGraph: { title }
-  };
+  const { slug } = await params
+  const clinic = await fetchClinicBySlug(slug) // убедись, что вытягивает country, province, city, district, slug
+
+  const title = clinic ? `Contact ${clinic.name}` : 'Contact clinic'
+  const canonical = clinic
+    ? `${clinicPath({
+        slug: clinic.slug,
+        country: clinic.country,
+        province: clinic.province,   // опц.
+        city: clinic.city,
+        district: clinic.district,   // опц.
+      })}/inquiry`
+    : `/clinic/${slug}/inquiry` // фолбэк, если локации нет
+
+  return { title, alternates: { canonical }, openGraph: { title } }
 }
 
 export default async function Page({ params }: { params: Promise<Params> }) {

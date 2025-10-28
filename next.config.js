@@ -158,6 +158,23 @@ const nextConfig = {
         ];
     },
 
+    async rewrites() {
+        return [
+            { source: '/:country/:province?/:city?/:district?/:slug/review',  destination: '/clinic/:slug/review'  },
+            { source: '/:country/:province?/:city?/:district?/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+
+            { source: '/:country/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+            { source: '/:country/:province/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+            { source: '/:country/:province/:city/:district/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+
+            // детальная страница
+            { source: '/:country/:city/:slug', destination: '/clinic/:slug' },
+            { source: '/:country/:province/:city/:slug', destination: '/clinic/:slug' },
+            { source: '/:country/:province/:city/:district/:slug', destination: '/clinic/:slug' },
+
+        ];
+    },
+
     async redirects() {
         return [
             {
@@ -181,6 +198,8 @@ const nextConfig = {
             { protocol: 'https', hostname: 'atlantis-dental.ru' },
             { protocol: 'https', hostname: 'pixsector.com' },
             { protocol: 'https', hostname: 'img.icons8.com' },
+            { protocol: "https", hostname: "*.supabase.co" },
+            { protocol: "https", hostname: "*.supabase.in" },
         ],
     }
 };

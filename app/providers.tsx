@@ -5,7 +5,7 @@ import { HeroUIProvider } from "@heroui/react";
 import { I18nextProvider } from "react-i18next";
 
 import { SupabaseProvider } from "../lib/supabase/supabase-provider";
-import { ThemeProvider } from "../components/ThemeProvider";
+import ThemeProvider from "../components/ThemeProvider";
 import i18n from "../i18n";
 
 // Loading fallback for i18n

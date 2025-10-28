@@ -2,6 +2,7 @@ import { heroui } from "@heroui/react";
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -11,82 +12,76 @@ module.exports = {
   theme: {
     container: {
       center: true,
-      padding: '2rem',
-      screens: { '2xl': '1400px' },
+      padding: "2rem",
+      screens: { "2xl": "1400px" },
     },
     extend: {
+      /* === Маппинг цветов на CSS-переменные с альфой === */
+      colors: {
+        background: "rgb(var(--background) / <alpha-value>)",
+        foreground: "rgb(var(--foreground) / <alpha-value>)",
+        "muted-foreground": "rgb(var(--muted) / <alpha-value>)",
+        content1: "rgb(var(--content1) / <alpha-value>)",
+        divider: "rgb(var(--divider) / <alpha-value>)",
+
+        /* твои брендовые/утилитарные — оставил без изменений */
+        medblue: { light: "#4A90E2", DEFAULT: "#0066CC", dark: "#004C99" },
+        medteal: "#20B2AA",
+        primary: "hsl(210, 100%, 40%)",
+        secondary: "hsl(210, 40%, 96.1%)",
+        muted: "hsl(210, 40%, 96.1%)",
+        border: "hsl(214.3, 31.8%, 91.4%)",
+        gray: {
+          100: "#f5f5f5",
+          500: "#9ca3af",
+          600: "#6b7280",
+        },
+      },
+      borderColor: {
+        divider: "rgb(var(--divider) / <alpha-value>)",
+      },
+
+      /* типографика/шрифты */
       fontFamily: {
         sans: ["var(--font-roboto)", "Inter", "ui-sans-serif", "system-ui"],
+        heading: ['"Open Sans"', "sans-serif"],
       },
-      animation: {
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'slide-up': 'slideUp 0.3s ease-out',
-      },
-      keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
-      },
-    },
-    extend: {
-      colors: {
-        medblue: { light: '#4A90E2', DEFAULT: '#0066CC', dark: '#004C99' },
-        medteal: '#20B2AA',
-        background: 'hsl(0, 0%, 100%)',
-        foreground: 'hsl(222.2, 84%, 4.9%)',
-        primary:  'hsl(210, 100%, 40%)',
-        secondary:'hsl(210, 40%, 96.1%)',
-        muted:     'hsl(210, 40%, 96.1%)',
-        border:    'hsl(214.3, 31.8%, 91.4%)',
-        gray: {
-          100: '#f5f5f5',
-          500: '#9ca3af',
-          600: '#6b7280',
-        },
-      },
-      fontFamily: {
-        sans:    ['Roboto', 'sans-serif'],
-        heading: ['"Open Sans"', 'sans-serif'],
-      },
+
+      /* размеры/радиусы и т.п. */
       spacing: {
-        4: '1rem',
-        6: '1.5rem',
-        8: '2rem',
-        20: '5rem',   // py-20 = 80px
-        32: '8rem',   // py-32 = 128px
+        4: "1rem",
+        6: "1.5rem",
+        8: "2rem",
+        20: "5rem",
+        32: "8rem",
       },
       maxWidth: {
-        '4xl': '56rem',  // 896px
+        "4xl": "56rem",
       },
       borderRadius: {
-        sm: '4px',
-        md: '6px',
-        lg: '8px',
+        sm: "4px",
+        md: "6px",
+        lg: "8px",
       },
       transitionDuration: {
-        300: '300ms',
+        300: "300ms",
       },
+
+      /* анимации */
       keyframes: {
-        'fade-in': {
-          '0%': { opacity: '0' }, '100%': { opacity: '1' },
-        },
-        'slide-up': {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)',      opacity: '1' },
+        fadeIn: { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
+        slideUp: {
+          "0%": { transform: "translateY(10px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
         },
       },
       animation: {
-        'fade-in': 'fade-in 0.5s ease-out',
-        'slide-up': 'slide-up 0.5s ease-out',
+        "fade-in": "fadeIn 0.5s ease-in-out",
+        "slide-up": "slideUp 0.3s ease-out",
       },
     },
   },
-  darkMode: "class",
+
   plugins: [
     heroui({
       prefix: "heroui",
@@ -96,16 +91,8 @@ module.exports = {
       layout: {
         dividerWeight: "1px",
         disabledOpacity: 0.5,
-        radius: {
-          small: "6px",
-          medium: "8px",
-          large: "12px",
-        },
-        borderWidth: {
-          small: "1px",
-          medium: "2px",
-          large: "3px",
-        },
+        radius: { small: "6px", medium: "8px", large: "12px" },
+        borderWidth: { small: "1px", medium: "2px", large: "3px" },
       },
       themes: {
         light: {
@@ -121,6 +108,7 @@ module.exports = {
             },
           },
           colors: {
+            /* HeroUI палитра как у тебя */
             background: "#FFFFFF",
             foreground: "#11181C",
             card: "#FFFFFF",
@@ -210,22 +198,10 @@ module.exports = {
               DEFAULT: "#71717a",
               foreground: "#FFFFFF",
             },
-            content1: {
-              DEFAULT: "#FFFFFF",
-              foreground: "#11181C",
-            },
-            content2: {
-              DEFAULT: "#f4f4f5",
-              foreground: "#11181C",
-            },
-            content3: {
-              DEFAULT: "#e4e4e7",
-              foreground: "#11181C",
-            },
-            content4: {
-              DEFAULT: "#d4d4d8",
-              foreground: "#11181C",
-            },
+            content1: { DEFAULT: "#FFFFFF", foreground: "#11181C" },
+            content2: { DEFAULT: "#f4f4f5", foreground: "#11181C" },
+            content3: { DEFAULT: "#e4e4e7", foreground: "#11181C" },
+            content4: { DEFAULT: "#d4d4d8", foreground: "#11181C" },
             focus: "#3b82f6",
             overlay: "#000000",
             divider: "#e4e4e7",
@@ -333,22 +309,10 @@ module.exports = {
               DEFAULT: "#a1a1aa",
               foreground: "#0d1117",
             },
-            content1: {
-              DEFAULT: "#161b22",
-              foreground: "#e6edf3",
-            },
-            content2: {
-              DEFAULT: "#21262d",
-              foreground: "#e6edf3",
-            },
-            content3: {
-              DEFAULT: "#30363d",
-              foreground: "#e6edf3",
-            },
-            content4: {
-              DEFAULT: "#484f58",
-              foreground: "#e6edf3",
-            },
+            content1: { DEFAULT: "#161b22", foreground: "#e6edf3" },
+            content2: { DEFAULT: "#21262d", foreground: "#e6edf3" },
+            content3: { DEFAULT: "#30363d", foreground: "#e6edf3" },
+            content4: { DEFAULT: "#484f58", foreground: "#e6edf3" },
             focus: "#60a5fa",
             overlay: "#000000",
             divider: "#30363d",
@@ -357,21 +321,22 @@ module.exports = {
       },
     }),
   ],
+
   future: {
     removeDeprecatedGapUtilities: true,
     purgeLayersByDefault: true,
   },
   safelist: [
-    'text-primary',
-    'text-foreground',
-    'bg-content1',
-    'bg-content2',
-    'animate-pulse',
-    'animate-fade-in',
-    'animate-slide-up',
-    'sm:flex',
-    'lg:hidden',
-    'md:block',
+    "text-primary",
+    "text-foreground",
+    "bg-content1",
+    "bg-content2",
+    "animate-pulse",
+    "animate-fade-in",
+    "animate-slide-up",
+    "sm:flex",
+    "lg:hidden",
+    "md:block",
   ],
   corePlugins: {
     float: false,

@@ -1,39 +1,32 @@
 // lib/supabase/serverClient.ts
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient as createSSRClient } from "@supabase/ssr";
+import { env } from "@/config/env";
 
-export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+/**
+ * Next 15: cookies() стал async → его надо await-ить.
+ * В обычных API/route handlers мы читаем cookie (getAll), а setAll оставляем no-op,
+ * чтобы не пытаться модифицировать cookie вне /auth/callback.
+ */
+export async function createServerClient() {
+  const cookieStore = await cookies();
 
-  return createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        // @ts-ignore next/headers returns async cookies in Next 15 — но нам подходит
-        const store = (typeof cookies === "function" ? cookies() : cookies) as any;
-        return store.getAll().map((c: any) => ({ name: c.name, value: c.value }));
+  const supabase = createSSRClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore
+            .getAll()
+            .map((c: any) => ({ name: c.name, value: c.value }));
+        },
+        setAll() {
+          // no-op. Мы не записываем cookie тут (это делаем в /auth/callback)
+        },
       },
-      setAll(all) {
-        // noop — ставим в конкретном route (/auth/callback)
-      },
-    },
-  });
+    }
+  );
+
+  return supabase;
 }
-
-
-
-
-
-
-
-
-// lib/supabase/serverClient.ts
-// import "server-only";
-// import { createClient as _createClient } from '@supabase/supabase-js'
-
-// const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-// const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// export function createServerClient() {
-//   return _createClient(url, serviceKey)
-// }

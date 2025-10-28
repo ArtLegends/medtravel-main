@@ -21,21 +21,21 @@ export async function middleware(req: NextRequest) {
   const user = data.user;
 
   const { pathname, searchParams } = req.nextUrl;
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  // const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
   const isAdmin = pathname.startsWith("/admin");
 
   // если уже вошёл и идёт на /login — отправим на next или домой
-  if (isAuthRoute && user) {
-    const next = searchParams.get("next") || "/";
-    return NextResponse.redirect(new URL(next, req.url));
-  }
+  // if (isAuthRoute && user) {
+  //   const next = searchParams.get("next") || "/";
+  //   return NextResponse.redirect(new URL(next, req.url));
+  // }
 
   // простая защита /admin: если не авторизован — на /login?next=<path>
-  if (isAdmin && !user) {
-    const login = new URL("/login", req.url);
-    login.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
-    return NextResponse.redirect(login);
-  }
+  // if (isAdmin && !user) {
+  //   const login = new URL("/login", req.url);
+  //   login.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
+  //   return NextResponse.redirect(login);
+  // }
 
   return res;
 }

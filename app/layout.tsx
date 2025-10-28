@@ -1,24 +1,15 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
-
 import { Roboto } from "next/font/google";
 import { headers } from "next/headers";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
-import "../styles/globals.css";
-import { detectLocale } from "../lib/i18n-server";
-
-import { Providers } from "./providers";
-
+import "@/styles/globals.css";
+import { detectLocale } from "@/lib/i18n-server";
 import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
-import { ThemeProvider } from "@/components/ThemeProvider";
-import { Navbar } from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import SearchBar from '@/components/SearchBar';
-import AppChrome from '@/components/layout/AppChrome';
+import ThemeRoot from "@/components/ThemeRoot";
+import AppChrome from "@/components/layout/AppChrome";
 
-// Optimize font loading
+// Font
 const roboto = Roboto({
   subsets: ["latin", "cyrillic"],
   display: "swap",
@@ -29,11 +20,18 @@ const roboto = Roboto({
 
 export const metadata: Metadata = {
   title: {
-    default: "MedTravel - Digital Platform",
+    default: "MedTravel — Medical Tourism Platform",
     template: "%s | MedTravel",
   },
-  description: "MedTravel - Your digital platform for creativity and commerce",
-  keywords: ["marketplace", "digital", "platform", "creativity"],
+  description:
+    "MedTravel connects patients with verified clinics worldwide. Compare treatments and book a consultation safely.",
+  keywords: [
+    "medical tourism",
+    "clinics",
+    "treatments",
+    "healthcare abroad",
+    "medtravel",
+  ],
   authors: [{ name: "MedTravel Team" }],
   creator: "MedTravel",
   publisher: "MedTravel",
@@ -53,23 +51,21 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://medtravel.me",
     siteName: "MedTravel",
-    title: "MedTravel - Digital Platform",
-    description: "Your digital platform for creativity and commerce",
+    title: "MedTravel — Medical Tourism Platform",
+    description:
+      "Find the best clinics and treatments abroad. Request a free consultation.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "MedTravel - Digital Platform",
-    description: "Your digital platform for creativity and commerce",
+    title: "MedTravel — Medical Tourism Platform",
+    description:
+      "Find the best clinics and treatments abroad. Request a free consultation.",
     creator: "@medtravel",
   },
   metadataBase: new URL("https://medtravel.me"),
   alternates: {
     canonical: "/",
-    languages: {
-      "en-US": "/en",
-      "es-ES": "/es",
-      "ru-RU": "/ru",
-    },
+    languages: { "en-US": "/en", "ru-RU": "/ru" },
   },
 };
 
@@ -79,8 +75,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#D4D4D8" },
-    { media: "(prefers-color-scheme: dark)", color: "#27272A" },
+    { media: "(prefers-color-scheme: light)", color: "#F4F4F5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C0C0E" },
   ],
 };
 
@@ -89,7 +85,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Detect locale from headers for SSR
   const headersList = await headers();
   const acceptLanguage = headersList.get("accept-language");
   const locale = detectLocale(acceptLanguage || undefined);
@@ -97,33 +92,22 @@ export default async function RootLayout({
   return (
     <html suppressHydrationWarning className={roboto.variable} lang={locale}>
       <head>
-        {/* DNS prefetch for external resources */}
         <link href="//fonts.googleapis.com" rel="dns-prefetch" />
-        <link href="//vercel.live" rel="dns-prefetch" />
         <link href="//api.supabase.co" rel="dns-prefetch" />
-        {/* Preconnect to critical domains */}
-        <link
-          crossOrigin=""
-          href="https://fonts.gstatic.com"
-          rel="preconnect"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <style>{`:root{--site-header-h:64px}`}</style>
       </head>
       <body
         suppressHydrationWarning
         className={`${roboto.className} bg-background text-foreground antialiased`}
       >
-        {/* <Providers> */}
         <SupabaseProvider>
-          <ThemeProvider>
-            <div id="app-root" className="relative z-0 flex min-h-screen flex-col bg-background">
+          <ThemeRoot>
+            <div id="app-root" className="relative z-0 flex min-h-screen flex-col">
               <AppChrome>{children}</AppChrome>
             </div>
-          </ThemeProvider>
+          </ThemeRoot>
         </SupabaseProvider>
-        {/* <Analytics />
-          <SpeedInsights /> */}
-        {/* </Providers> */}
       </body>
     </html>
   );

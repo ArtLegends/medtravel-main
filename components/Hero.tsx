@@ -26,7 +26,7 @@ export default function Hero() {
         <div className="w-full max-w-xl mt-8">
           <SearchBar
             value={query}
-            onChangeAction={setQuery}   // <-- было onChange
+            onChangeAction={setQuery}
             placeholder="Search for treatments, specialists, or clinics"
           />
         </div>

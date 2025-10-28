@@ -19,6 +19,7 @@ export type Clinic = {
   name: string
   about?: string
   country?: string
+  province?: string
   city?: string
   district?: string
 

@@ -3,6 +3,7 @@
 
 import React from "react";
 import type { Clinic } from "@/lib/supabase/requests";
+import { clinicPath } from '@/lib/clinic-url'
 
 interface Props {
   clinic: Clinic;
@@ -27,7 +28,13 @@ export default function ClinicCard({ clinic }: Props) {
           <p className="text-gray-700 mb-4 line-clamp-3">
             {clinic.description ?? "No description available."}
           </p>
-          <a href={`/clinic/${clinic.slug}`} className="text-blue-600 hover:underline">
+          <a href={clinicPath({
+            slug: clinic.slug,
+            country: clinic.country,
+            province: clinic.province,
+            city: clinic.city,
+            district: clinic.district,
+          })} className="text-blue-600 hover:underline">
             Read more
           </a>
         </div>

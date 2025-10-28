@@ -1,17 +1,18 @@
-// components/shared/ThemeSwitch.tsx
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 import { Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useTheme } from "next-themes";
 
 export const ThemeSwitch = React.memo(() => {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === "light" ? "dark" : "light");
-  }, [theme, setTheme]);
+  React.useEffect(() => setMounted(true), []);
+
+  const current = (theme === "system" ? resolvedTheme : theme) || "light";
+  const isLight = current === "light";
 
   return (
     <Button
@@ -20,18 +21,16 @@ export const ThemeSwitch = React.memo(() => {
       className="min-w-unit-0"
       size="sm"
       variant="ghost"
-      onPress={toggleTheme}
+      onPress={() => setTheme(isLight ? "dark" : "light")}
     >
-      {theme === "light" ?
-        <Icon
-          className="text-default-500"
-          icon="solar:moon-linear"
-          width={24}
-        />
-        : <Icon className="text-default-500" icon="solar:sun-linear" width={24} />
-      }
+      {mounted ? (
+        isLight ? (
+          <Icon className="text-default-500" icon="solar:moon-linear" width={24} />
+        ) : (
+          <Icon className="text-default-500" icon="solar:sun-linear" width={24} />
+        )
+      ) : null}
     </Button>
   );
 });
-
 ThemeSwitch.displayName = "ThemeSwitch";

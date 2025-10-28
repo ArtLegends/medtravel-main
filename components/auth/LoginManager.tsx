@@ -14,7 +14,11 @@ export default function LoginManager() {
 
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "";
+
+  function getOrigin() {
+    // в браузере – всегда текущий origin; на сервере компонент не рендерится
+    return typeof window !== "undefined" ? window.location.origin : "";
+  }
 
   async function signInWithGoogle() {
     setLoading(true);
@@ -22,9 +26,13 @@ export default function LoginManager() {
       await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${site}/auth/callback?next=${encodeURIComponent(next)}`,
+          // абсолютный URL на текущий origin + проброс next
+          redirectTo: `${getOrigin()}/auth/callback?next=${encodeURIComponent(
+            next
+          )}`,
         },
       });
+      // дальше управление уйдёт в Google → /auth/callback
     } finally {
       setLoading(false);
     }

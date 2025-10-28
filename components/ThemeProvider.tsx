@@ -1,15 +1,37 @@
 // components/ThemeProvider.tsx
 "use client";
 
-import type { ThemeProviderProps } from "next-themes";
+import * as React from "react";
+import {
+  ThemeProvider as NextThemesProvider,
+  type ThemeProviderProps as NextThemesProviderProps,
+} from "next-themes";
 
-import dynamic from "next/dynamic";
+/**
+ * Обёртка над next-themes с дефолтами для проекта.
+ * Пропсы можно переопределять при использовании.
+ */
+export type ThemeProviderProps = Omit<NextThemesProviderProps, "children"> & {
+  children: React.ReactNode;
+};
 
-const NextThemesProvider = dynamic(
-  () => import("next-themes").then((m) => m.ThemeProvider),
-  { ssr: false }
-);
-
-export function ThemeProvider(props: ThemeProviderProps) {
-  return <NextThemesProvider {...props} />;
+export default function ThemeProvider({
+  children,
+  ...rest
+}: ThemeProviderProps) {
+  return (
+    <NextThemesProvider
+      // дефолты проекта
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      storageKey="medtravel-theme"
+      themes={["light", "dark"]}
+      // позволяют переопределить при необходимости
+      {...rest}
+    >
+      {children}
+    </NextThemesProvider>
+  );
 }

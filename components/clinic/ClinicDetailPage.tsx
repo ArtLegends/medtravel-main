@@ -4,11 +4,17 @@ import Link from 'next/link'
 import Image from 'next/image';
 import ConsultationModal from '@/components/clinic/ConsultationModal';
 import ReportModal from '@/components/clinic/ReportModal';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import SectionNav from '@/components/SectionNav';
 import type { Clinic } from '@/lib/db/clinics';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/browserClient';
+import { clinicPath } from '@/lib/clinic-url'
+import { clinicHref } from '@/lib/clinic-url';
 
 type Props = { clinic: Clinic };
+
+type ReviewRow = { id: string; review: string | null; rating_overall: number | null; created_at: string | null };
 
 // --- helpers ---
 function buildMapEmbed(address?: string | null) {
@@ -23,6 +29,14 @@ function normLangs(val?: string | string[]) {
 }
 
 export default function ClinicDetailPage({ clinic }: Props) {
+  const base = clinicPath({
+    slug: clinic.slug,
+    country: clinic.country,
+    province: clinic.province,
+    city: clinic.city,
+    district: clinic.district,
+  }) || `/clinic/${clinic.slug}`
+
   const sections = useMemo(
     () => [
       { id: 'about', label: 'About the clinic' },
@@ -91,6 +105,24 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const mapSrc = clinic.location?.mapEmbedUrl ?? buildMapEmbed(address);
 
   const [reportOpen, setReportOpen] = useState(false);
+
+  const [reviews, setReviews] = useState<ReviewRow[]>([]);
+  const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('reviews')
+        .select('id, review, rating_overall, created_at')
+        .eq('clinic_id', clinic.id)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (!cancelled) setReviews(data ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [supabase, clinic.id]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10">
@@ -353,6 +385,38 @@ export default function ClinicDetailPage({ clinic }: Props) {
               Report
             </button>
           </div>
+
+          {/* ====== Reviews (preview) ====== */}
+          <section id="reviews" className="pt-10">
+            <h2 className="text-2xl font-semibold mb-3">Reviews</h2>
+
+            {reviews.length === 0 ? (
+              <div className="rounded-xl border p-6 text-sm text-gray-500">No reviews yet.</div>
+            ) : (
+              <ul className="grid gap-4 md:grid-cols-2">
+                {reviews.map(r => (
+                  <li key={r.id} className="rounded-xl border p-4 bg-white">
+                    <div className="flex items-center gap-2 text-amber-500 mb-2">
+                      <Stars value={r.rating_overall ?? 0} />
+                      <span className="text-xs text-gray-500">
+                        {r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 line-clamp-5">{r.review || '—'}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-4">
+              <Link
+                href={clinicHref(clinic, 'review')}
+                className="inline-flex rounded-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
+              >
+                Write a Review
+              </Link>
+            </div>
+          </section>
         </main>
 
         {/* ---------- SIDEBAR ---------- */}
@@ -363,7 +427,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
             </div>
 
             <Link
-              href={`/clinic/${clinic.slug}/inquiry`}
+              href={clinicHref(clinic, 'inquiry')}
               className="block w-full rounded-md bg-emerald-600 px-4 py-3 text-center font-medium text-white hover:bg-emerald-700"
             >
               Claim Your Free Quote
@@ -470,6 +534,23 @@ function CardList({ title, items }: { title: string; items: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function Stars({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(10, Math.round(value)));
+  return (
+    <div className="flex items-center" aria-label={`Rating ${v} out of 10`}>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <svg
+          key={i}
+          className={`h-4 w-4 ${i < v ? 'fill-amber-500' : 'fill-gray-200'}`}
+          viewBox="0 0 20 20"
+        >
+          <path d="M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 14.9 4.7 17.6l1-5.8L1.5 7.7l5.9-.9L10 1.5z" />
+        </svg>
+      ))}
     </div>
   );
 }

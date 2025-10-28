@@ -7,6 +7,7 @@ import {
   deleteClinicInquiryAction,
   deleteAllClinicInquiriesAction,
 } from '@/app/(admin)/admin/clinic-inquiries/actions';
+import { clinicHref } from '@/lib/clinic-url';
 
 export type Row = {
   id: string;
@@ -18,6 +19,10 @@ export type Row = {
   phone: string | null;
   message: string | null;
   status: string | null;
+  clinic_country?: string | null
+  clinic_province?: string | null
+  clinic_city?: string | null
+  clinic_district?: string | null
 };
 
 type Props = {
@@ -186,53 +191,72 @@ export default function ClinicInquiriesTable(props: Props) {
           </tr>
         </thead>
         <tbody>
-          {state.map(r => (
-            <tr key={r.id} className="border-t">
-              <td className="px-4 py-2">{new Date(r.created_at).toLocaleString()}</td>
-              <td className="px-4 py-2">
-                <a className="text-primary hover:underline" href={`/clinic/${r.clinic_slug}`} target="_blank">
-                  {r.clinic_name}
-                </a>
-              </td>
-              <td className="px-4 py-2">{r.name ?? '—'}</td>
-              <td className="px-4 py-2">
-                <div className="space-y-0.5">
-                  {r.phone ?? '—'}
-                  {r.email ? <div className="text-xs text-gray-500">{r.email}</div> : null}
-                </div>
-              </td>
-              <td className="px-4 py-2">{r.message ?? '—'}</td>
-              <td className="px-4 py-2">
-                <select
-                  className="rounded-md border px-2 py-1"
-                  defaultValue={r.status ?? 'New'}
-                  onChange={(e) => onStatus(r.id, e.target.value)}
-                  disabled={isPending}
-                >
-                  <option>New</option>
-                  <option>In review</option>
-                  <option>Contacted</option>
-                  <option>Scheduled</option>
-                  <option>Done</option>
-                  <option>Rejected</option>
-                </select>
-              </td>
-              <td className="px-4 py-2 text-right">
-                <button
-                  className="rounded-md bg-rose-600 px-3 py-1.5 text-white hover:bg-rose-700 disabled:opacity-50"
-                  onClick={() => onDelete(r.id)}
-                  disabled={isPending}
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
+          {state.map(r => {
+            const href = clinicHref({
+              slug: r.clinic_slug,
+              country: r.clinic_country ?? undefined,
+              province: r.clinic_province ?? undefined,
+              city: r.clinic_city ?? undefined,
+              district: r.clinic_district ?? undefined,
+            });
+
+            return (
+              <tr key={r.id} className="border-t">
+                <td className="px-4 py-2">{new Date(r.created_at).toLocaleString()}</td>
+                <td className="px-4 py-2">
+                  <a
+                    className="text-primary hover:underline"
+                    href={clinicHref({
+                      slug: r.clinic_slug,
+                      country: r.clinic_country ?? undefined,
+                      province: r.clinic_province ?? undefined,
+                      city: r.clinic_city ?? undefined,
+                      district: r.clinic_district ?? undefined,
+                    })}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {r.clinic_name}
+                  </a>
+                </td>
+                <td className="px-4 py-2">{r.name ?? '—'}</td>
+                <td className="px-4 py-2">
+                  <div className="space-y-0.5">
+                    {r.phone ?? '—'}
+                    {r.email ? <div className="text-xs text-gray-500">{r.email}</div> : null}
+                  </div>
+                </td>
+                <td className="px-4 py-2">{r.message ?? '—'}</td>
+                <td className="px-4 py-2">
+                  <select
+                    className="rounded-md border px-2 py-1"
+                    defaultValue={r.status ?? 'New'}
+                    onChange={(e) => onStatus(r.id, e.target.value)}
+                    disabled={isPending}
+                  >
+                    <option>New</option>
+                    <option>In review</option>
+                    <option>Contacted</option>
+                    <option>Scheduled</option>
+                    <option>Done</option>
+                    <option>Rejected</option>
+                  </select>
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    className="rounded-md bg-rose-600 px-3 py-1.5 text-white hover:bg-rose-700 disabled:opacity-50"
+                    onClick={() => onDelete(r.id)}
+                    disabled={isPending}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
           {state.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                No inquiries yet
-              </td>
+              <td colSpan={7} className="px-4 py-10 text-center text-gray-500">No inquiries yet</td>
             </tr>
           )}
         </tbody>

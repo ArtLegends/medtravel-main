@@ -1,6 +1,6 @@
 // lib/supabase/requests.ts
 // import { createClient as createBrowserClient } from '@/lib/supabase/browserClient'
-import { createClient } from '@/lib/supabase/serverClient'
+import { createServerClient } from '@/lib/supabase/serverClient'
 import type Clinic from "@/components/clinic/ClinicCard"
 // import { createClient } from "@/lib/supabase/browserClient"
 // import { createClient } from "./browserClient";
@@ -40,8 +40,8 @@ export async function getAllCategories(): Promise<Category[]> {
 }
 
 export async function searchClinics(query: string): Promise<Clinic[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
+  const supabase = createServerClient();
+  const { data, error } = await (await supabase)
     .rpc("search_clinics", { q: query })
     .order("rank", { ascending: false });
 
