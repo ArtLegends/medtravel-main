@@ -6,13 +6,16 @@ import { createServerClient } from "@/lib/supabase/serverClient";
 import ContactFormSection from "@/components/ContactFormSection";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// ── meta
-export const metadata: Metadata = {
-  title: "Blog",
-  description:
-    "Research-based articles about treatment abroad: costs, clinics, outcomes, and practical checklists for patients.",
-  alternates: { canonical: "/blog" },
-};
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ q?: string }>})
+: Promise<Metadata> {
+  const sp = await searchParams;
+  const hasQuery = !!sp?.q?.trim();
+
+  return {
+    robots: hasQuery ? { index: false, follow: true } : { index: true, follow: true },
+    alternates: hasQuery ? { canonical: "/blog" } : {},
+  };
+}
 
 // ── types
 type Category = { id: string; slug: string; name: string };
