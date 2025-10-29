@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 // const { localeConfig } = require('./lib/i18n-server.ts')
-import { resolve } from 'path';
+const path = require('path')
 
 const nextConfig = {
     eslint: {
@@ -20,7 +20,7 @@ const nextConfig = {
 
     // Алиас @ → корень проекта
     webpack(config) {
-        config.resolve.alias['@'] = resolve(__dirname)
+        config.resolve.alias['@'] = path.resolve(__dirname)
         return config
     },
 
@@ -204,4 +204,4 @@ const nextConfig = {
     }
 };
 
-export default nextConfig;
+module.exports = nextConfig;
