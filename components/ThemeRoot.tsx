@@ -12,8 +12,8 @@ export default function ThemeRoot({ children }: { children: React.ReactNode }) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      defaultTheme="light"
+      enableSystem={false}
       disableTransitionOnChange
       storageKey="medtravel-theme"
       themes={["light", "dark"]}

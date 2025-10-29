@@ -23,8 +23,8 @@ export default function ThemeProvider({
     <NextThemesProvider
       // дефолты проекта
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      defaultTheme="light"
+      enableSystem={false}
       disableTransitionOnChange
       storageKey="medtravel-theme"
       themes={["light", "dark"]}

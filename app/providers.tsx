@@ -18,7 +18,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const heroUIConfig = useMemo(() => ({ locale: "en" }), []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem={true}>
+    <ThemeProvider>
       <HeroUIProvider {...heroUIConfig}>
         <SupabaseProvider>
           <Suspense fallback={<I18nFallback>{children}</I18nFallback>}>

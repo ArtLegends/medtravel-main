@@ -2,11 +2,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browserClient";
-import CategoryFilters from "./CategoryFilters";
-import { clinicPath } from '@/lib/clinic-url'
+// import CategoryFilters from "./CategoryFilters"; // ❌ не используем в этой версии
+import { clinicPath } from "@/lib/clinic-url";
 
 type CatalogItem = {
   id: string;
@@ -41,7 +41,9 @@ function parseServicesParam(sp: URLSearchParams): string[] {
   const raw = sp.get("service");
   if (!raw) return [];
   const multi = sp.getAll("service").flatMap((v) => v.split(","));
-  const arr = (multi.length ? multi : raw.split(",")).map((s) => s.trim()).filter(Boolean);
+  const arr = (multi.length ? multi : raw.split(","))
+    .map((s) => s.trim())
+    .filter(Boolean);
   return Array.from(new Set(arr));
 }
 
@@ -74,7 +76,14 @@ function useUrlState() {
       }
     });
     // при изменении фильтров — сбрасываем страницу
-    if ("country" in patch || "province" in patch || "city" in patch || "district" in patch || "service" in patch || "sort" in patch) {
+    if (
+      "country" in patch ||
+      "province" in patch ||
+      "city" in patch ||
+      "district" in patch ||
+      "service" in patch ||
+      "sort" in patch
+    ) {
       next.delete("page");
     }
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
@@ -83,18 +92,68 @@ function useUrlState() {
   const setPage = (page: number) => setParams({ page: String(page) });
   const resetAll = () => router.replace(pathname ?? "/", { scroll: false });
 
-  return { ...state, setParams, setPage, resetAll };
+  const buildHref = (patch: Record<string, string | undefined>) => {
+    const next = new URLSearchParams(searchParams?.toString() ?? "");
+    Object.entries(patch).forEach(([k, v]) => {
+      if (!v) next.delete(k);
+      else next.set(k, v);
+    });
+    next.delete("page");
+    return `${pathname}?${next.toString()}`;
+  };
+
+  return {
+    ...state,
+    setParams,
+    setPage,
+    resetAll,
+    buildHref,
+    pathname,
+    searchParams,
+    router,
+  };
 }
 
-export default function CategoryGridClient({ categorySlug }: { categorySlug: string }) {
+export default function CategoryGridClient({
+  categorySlug,
+}: {
+  categorySlug: string;
+}) {
   const supabase = useMemo(() => createClient(), []);
-  const { page, sort, country, province, city, district, services, setParams, setPage, resetAll } = useUrlState();
+  const {
+    page,
+    sort,
+    country,
+    province,
+    city,
+    district,
+    services,
+    setParams,
+    setPage,
+    resetAll,
+    buildHref,
+    router,
+  } = useUrlState();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [facets, setFacets] = useState<Facets>({});
+
+  // КЭШ «первого» набора фасетов (без фильтров) — база для «Popular …»
+  const initialFacetsRef = useRef<Facets | null>(null);
+  const hasAnyFilter = !!(
+    country ||
+    province ||
+    city ||
+    district ||
+    services.length
+  );
+
+  // Локальные поиски в сайдбаре
+  const [locationQuery, setLocationQuery] = useState("");
+  const [treatmentQuery, setTreatmentQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -122,41 +181,83 @@ export default function CategoryGridClient({ categorySlug }: { categorySlug: str
         setLoading(false);
         return;
       }
-      const row = Array.isArray(data) ? (data[0] as RpcRow | undefined) : (data as RpcRow | undefined);
+      const row = Array.isArray(data)
+        ? (data[0] as RpcRow | undefined)
+        : (data as RpcRow | undefined);
       setItems(row?.items ?? []);
       setTotal(Number(row?.total_count ?? 0));
       setFacets(row?.facets ?? {});
+      // сохраняем «базовые» фасеты (только когда фильтров нет)
+      if (!hasAnyFilter && row?.facets && !initialFacetsRef.current) {
+        initialFacetsRef.current = row.facets;
+      }
       setLoading(false);
     }
     run();
-    return () => { cancelled = true; };
-  }, [supabase, categorySlug, page, sort, country, province, city, district, services]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    supabase,
+    categorySlug,
+    page,
+    sort,
+    country,
+    province,
+    city,
+    district,
+    services,
+    hasAnyFilter,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // удобные «популярные» списки (если есть фасеты — используем их, иначе фолбэк как раньше)
-  const popularCities = (facets.cities && facets.cities.slice(0, 5)) || ["Istanbul", "Ankara", "Antalya", "Warsaw", "Krakow"];
-  const popularServices = (facets.services && facets.services.slice(0, 5)) || [
-    "Hair Transplant",
-    "Dental Implants",
-    "Veneers",
-    "Rhinoplasty",
-    "Crowns",
-  ];
+  // База для популярных — либо закэшированные «первичные», либо текущие фасеты
+  const baseFacets = initialFacetsRef.current ?? facets;
+
+  const popularCitiesAll = (baseFacets.cities ?? []).filter(Boolean) as string[];
+  const popularServicesAll = (baseFacets.services ?? []).filter(
+    Boolean
+  ) as string[];
+
+  // Клиентская фильтрация по инпутам сайдбара + лимит 5
+  const popularCities = popularCitiesAll
+    .filter((c) => c.toLowerCase().includes(locationQuery.toLowerCase()))
+    .slice(0, 5);
+
+  const popularServices = popularServicesAll
+    .filter((s) => s.toLowerCase().includes(treatmentQuery.toLowerCase()))
+    .slice(0, 5);
+
+  // Тоггл ссылок для services в сайдбаре (множественный выбор)
+  const toggleServiceHref = (slug: string) => {
+    const set = new Set(services);
+    set.has(slug) ? set.delete(slug) : set.add(slug);
+    const v = Array.from(set).join(",");
+    return buildHref({ service: v || undefined });
+  };
 
   return (
     <section className="bg-gray-50">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
-        {/* Листинг слева — сохраняем как на первом скрине */}
+        {/* Листинг слева */}
         <div className="space-y-4">
+          {/* Скелетон/список */}
           {loading && items.length === 0 ? (
             Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-36 animate-pulse rounded-2xl border bg-white" />
+              <div
+                key={i}
+                className="h-36 animate-pulse rounded-2xl border bg-white"
+              />
             ))
           ) : error ? (
-            <div className="rounded-2xl border bg-white p-6 text-red-600">Error: {error}</div>
+            <div className="rounded-2xl border bg-white p-6 text-red-600">
+              Error: {error}
+            </div>
           ) : items.length === 0 ? (
-            <div className="rounded-2xl border bg-white p-10 text-center text-gray-600">No clinics found</div>
+            <div className="rounded-2xl border bg-white p-10 text-center text-gray-600">
+              No clinics found
+            </div>
           ) : (
             items.map((c) => (
               <Link
@@ -177,7 +278,10 @@ export default function CategoryGridClient({ categorySlug }: { categorySlug: str
                 {c.service_slugs?.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {c.service_slugs.slice(0, 5).map((t) => (
-                      <span key={t} className="rounded-full bg-gray-100 px-3 py-1 text-xs">
+                      <span
+                        key={t}
+                        className="rounded-full bg-gray-100 px-3 py-1 text-xs"
+                      >
                         {t}
                       </span>
                     ))}
@@ -187,7 +291,7 @@ export default function CategoryGridClient({ categorySlug }: { categorySlug: str
             ))
           )}
 
-          {/* Пагинация снизу под списком */}
+          {/* Пагинация */}
           <div className="mt-4 flex items-center justify-center gap-2">
             <button
               className="rounded-full border px-3 py-1 disabled:opacity-50"
@@ -209,41 +313,71 @@ export default function CategoryGridClient({ categorySlug }: { categorySlug: str
           </div>
         </div>
 
-        {/* Сайдбар справа — здесь живые фильтры + «популярные» списки (как на первом скрине) */}
+        {/* Сайдбар справа — «популярные» всегда из baseFacets, не исчезают */}
         <aside className="space-y-6">
-
           <div className="rounded-2xl border bg-white p-5">
-            <div className="mb-3 text-sm font-semibold">Search locations</div>
-            <input className="w-full rounded-xl border px-3 py-2" placeholder="Search locations" />
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-semibold">Search locations</div>
+              <button
+                type="button"
+                className="text-xs text-red-600 hover:underline"
+                onClick={() => resetAll()}
+                title="Reset all filters"
+              >
+                Reset filters
+              </button>
+            </div>
+            <input
+              className="w-full rounded-xl border px-3 py-2"
+              placeholder="Type to filter locations"
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+            />
             <h3 className="mt-4 text-lg font-semibold">Popular locations</h3>
             <ul className="mt-2 space-y-2">
               {popularCities.map((l) => (
                 <li key={l}>
-                  <Link className="text-blue-600 hover:underline" href={`/${categorySlug}?city=${encodeURIComponent(l)}`}>
+                  <Link
+                    className="text-blue-600 hover:underline"
+                    href={buildHref({ city: l })}
+                  >
                     {l}
                   </Link>
                 </li>
               ))}
+              {popularCities.length === 0 && (
+                <li className="text-sm text-gray-500">No matches.</li>
+              )}
             </ul>
           </div>
 
           <div className="rounded-2xl border bg-white p-5">
             <div className="mb-3 text-sm font-semibold">Search treatments</div>
-            <input className="w-full rounded-xl border px-3 py-2" placeholder="Search treatments" />
+            <input
+              className="w-full rounded-xl border px-3 py-2"
+              placeholder="Type to filter treatments"
+              value={treatmentQuery}
+              onChange={(e) => setTreatmentQuery(e.target.value)}
+            />
             <h3 className="mt-4 text-lg font-semibold">Popular treatments</h3>
             <ul className="mt-2 space-y-2">
-              {popularServices.map((t) => (
-                <li key={t}>
-                  <Link
-                    className="text-blue-600 hover:underline"
-                    href={`/${categorySlug}?service=${encodeURIComponent(
-                      t.toLowerCase().replace(/\s+/g, "-")
-                    )}`}
-                  >
-                    {t}
-                  </Link>
-                </li>
-              ))}
+              {popularServices.map((t) => {
+                const slug = t.toLowerCase().replace(/\s+/g, "-");
+                return (
+                  <li key={t}>
+                    <Link
+                      className="text-blue-600 hover:underline"
+                      href={toggleServiceHref(slug)}
+                      title="Toggle treatment filter"
+                    >
+                      {t}
+                    </Link>
+                  </li>
+                );
+                })}
+              {popularServices.length === 0 && (
+                <li className="text-sm text-gray-500">No matches.</li>
+              )}
             </ul>
           </div>
         </aside>

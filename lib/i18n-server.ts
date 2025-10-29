@@ -1,65 +1,75 @@
 // lib/i18n-server.ts
 import { cache } from "react";
 
-// Supported locales
-export const locales = ["en", "es", "ru"] as const;
+// Поддерживаемые локали
+export const locales = ["en", "ru", "pl"] as const;
 export type Locale = (typeof locales)[number];
 
-// Cache translations to avoid repeated file reads
+// Вложенный словарь: значение — строка или ещё один словарь
+interface NestedDict {
+  [key: string]: string | NestedDict;
+}
+
+// Утилита: сплющиваем NestedDict в плоский Record<string,string> с dot.notation
+function flattenDict(
+  obj: NestedDict,
+  prefix = "",
+  out: Record<string, string> = {}
+): Record<string, string> {
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === "object") {
+      flattenDict(v as NestedDict, key, out);
+    } else {
+      out[key] = String(v ?? "");
+    }
+  }
+  return out;
+}
+
+// Кэшируем чтение JSON, сплющиваем и возвращаем плоский словарь
 const getTranslations = cache(
   async (locale: Locale): Promise<Record<string, string>> => {
     try {
-      const translations = await import(`../locales/${locale}.json`);
-
-      return translations.default;
+      const mod = await import(`../locales/${locale}.json`);
+      return flattenDict(mod.default as NestedDict);
     } catch (error) {
       console.warn(`Failed to load translations for locale: ${locale}`, error);
-      // Fallback to English
-      const fallback = await import(`../locales/en.json`);
-
-      return fallback.default;
+      const mod = await import(`../locales/en.json`);
+      return flattenDict(mod.default as NestedDict);
     }
-  },
+  }
 );
 
-// Get translation function for server components
+// Для server components: t(key) с dot.notation + доступ к словарю
 export async function getServerTranslations(locale: Locale = "en") {
   const translations = await getTranslations(locale);
 
   return {
     t: (key: string, fallback?: string): string => {
-      const value = translations[key];
-
-      if (value) return value;
-
-      console.warn(`Translation missing for key: ${key} in locale: ${locale}`);
-
-      return fallback || key;
+      const val = translations[key];
+      if (val !== undefined && val !== null && val !== "") return val;
+      // необязательная подсветка пропусков
+      // console.warn(`i18n: missing key "${key}" for locale "${locale}"`);
+      return fallback ?? key;
     },
     translations,
   };
 }
 
-// Detect locale from headers (for server components)
+// Определение локали из Accept-Language
 export function detectLocale(acceptLanguage?: string): Locale {
   if (!acceptLanguage) return "en";
-
-  const preferredLocales = acceptLanguage
+  const preferred = acceptLanguage
     .split(",")
-    .map((lang) => lang.split(";")[0].trim().toLowerCase());
+    .map((s) => s.split(";")[0].trim().toLowerCase());
 
-  for (const preferred of preferredLocales) {
-    if (locales.includes(preferred as Locale)) {
-      return preferred as Locale;
-    }
-
-    // Check for language without country code (e.g., "en" from "en-US")
-    const langCode = preferred.split("-")[0];
-
-    if (locales.includes(langCode as Locale)) {
-      return langCode as Locale;
-    }
+  for (const p of preferred) {
+    // точное совпадение
+    if (locales.includes(p as Locale)) return p as Locale;
+    // en-US -> en
+    const base = p.split("-")[0];
+    if (locales.includes(base as Locale)) return base as Locale;
   }
-
-  return "en"; // Default fallback
+  return "en";
 }
