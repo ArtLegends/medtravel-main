@@ -109,6 +109,21 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const supabase = useMemo(() => createClient(), []);
 
+  // показывать весь список или только первые 5
+  const [showAllServices, setShowAllServices] = useState(false);
+  const [showAllDoctors, setShowAllDoctors] = useState(false);
+
+  // вью-массивы
+  const allServices = (clinic.services ?? []) as any[];
+  const visibleServices = showAllServices ? allServices : allServices.slice(0, 5);
+
+  // есть ли вообще цены/описания среди услуг
+  const hasPrice = allServices.some(s => String(s?.price ?? '').trim() !== '');
+  const hasDesc = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
+
+  const allDoctors = doctors; // уже рассчитан useMemo выше
+  const visibleDoctors = showAllDoctors ? allDoctors : allDoctors.slice(0, 5);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -173,35 +188,44 @@ export default function ClinicDetailPage({ clinic }: Props) {
                 <thead className="bg-gray-50 text-left text-sm">
                   <tr>
                     <th className="p-3">Procedure</th>
-                    <th className="p-3">Price</th>
-                    <th className="p-3">Description</th>
+                    {hasPrice && <th className="p-3">Price</th>}
+                    {hasDesc && <th className="p-3">Description</th>}
                     <th className="p-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y text-sm">
-                  {(clinic.services ?? []).map((s: any) => (
-                    <tr key={s.name}>
-                      <td className="p-3">{s.name}</td>
-                      <td className="p-3">{s.price ?? '—'}</td>
-                      <td className="p-3">{s.description ?? s.duration ?? '—'}</td>
-                      <td className="p-3">
-                        <button
-                          className="rounded-md bg-primary px-3 py-2 text-white" // твои стили
-                          onClick={() => {
-                            setClickedService(s.name)
-                            setOpen(true)
-                          }}
-                        >
-                          Request
-                        </button>
-
-
-                      </td>
-                    </tr>
-                  ))}
+                  {visibleServices.map((s: any) => {
+                    const desc = s?.description ?? s?.duration ?? '';
+                    return (
+                      <tr key={s.name}>
+                        <td className="p-3">{s.name}</td>
+                        {hasPrice && <td className="p-3">{s.price ?? '—'}</td>}
+                        {hasDesc && <td className="p-3">{desc || '—'}</td>}
+                        <td className="p-3">
+                          <button
+                            className="rounded-md bg-primary px-3 py-2 text-white"
+                            onClick={() => { setClickedService(s.name); setOpen(true); }}
+                          >
+                            Request
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+            {allServices.length > 5 && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAllServices(v => !v)}
+                  className="text-sm px-3 py-2 rounded-md border hover:bg-gray-50"
+                >
+                  {showAllServices ? 'Show less' : `View all (${allServices.length})`}
+                </button>
+              </div>
+            )}
           </section>
 
           {/* Doctors */}
@@ -211,7 +235,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
               <div className="rounded-xl border p-6 text-sm text-gray-500">No staff listed</div>
             ) : (
               <div className="space-y-4">
-                {doctors.map((d, idx) => (
+                {visibleDoctors.map((d, idx) => (
                   <article
                     key={`${d.name}-${idx}`}
                     className="grid gap-4 rounded-xl border p-4 sm:grid-cols-[1fr_180px]"
@@ -264,6 +288,17 @@ export default function ClinicDetailPage({ clinic }: Props) {
                     </div>
                   </article>
                 ))}
+                {allDoctors.length > 5 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllDoctors(v => !v)}
+                      className="text-sm px-3 py-2 rounded-md border hover:bg-gray-50"
+                    >
+                      {showAllDoctors ? 'Show less' : `View all (${allDoctors.length})`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </section>

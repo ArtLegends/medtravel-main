@@ -1,70 +1,62 @@
-export const metadata = { title: 'Customer • Settings' };
+"use client";
 
-export default function SettingsPage() {
+import { useState } from "react";
+
+export default function CustomerSettingsPage() {
+  const [tab, setTab] = useState<"general"|"security">("general");
+
   return (
     <div className="space-y-6">
-      <header>
-        <div className="text-sm text-gray-500">Customer Panel</div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
-      </header>
+      <h1 className="text-2xl font-bold">Settings</h1>
 
-      {/* Tabs-мокап */}
-      <div className="rounded-lg border bg-gray-50 p-2">
-        <div className="grid grid-cols-2 gap-2">
-          <button className="rounded-md bg-white px-3 py-2 text-left text-sm">
-            ⚙ General Settings
+      <div className="rounded-xl border bg-white">
+        <div className="flex">
+          <button
+            onClick={() => setTab("general")}
+            className={`w-1/2 px-4 py-2 border-b ${tab==="general" ? "font-semibold bg-gray-50" : "text-gray-600"}`}
+          >
+            General Settings
           </button>
-          <button className="rounded-md bg-white px-3 py-2 text-left text-sm">
-            🔒 Security
-          </button>
-        </div>
-      </div>
-
-      {/* Security card */}
-      <div className="rounded-xl border bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold">Change Password</h2>
-        <p className="mb-6 text-sm text-gray-600">
-          Update your account password for security
-        </p>
-
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">
-              Current Password
-            </label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              placeholder="Enter current password"
-              type="password"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">
-              New Password
-            </label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              placeholder="Enter new password (min 8 characters)"
-              type="password"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">
-              Confirm New Password
-            </label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              placeholder="Confirm new password"
-              type="password"
-            />
-          </div>
-
-          <button className="mt-2 rounded-md bg-blue-600 px-4 py-2 text-white">
-            Change Password
+          <button
+            onClick={() => setTab("security")}
+            className={`w-1/2 px-4 py-2 border-b ${tab==="security" ? "font-semibold bg-gray-50" : "text-gray-600"}`}
+          >
+            Security
           </button>
         </div>
+
+        {tab === "general" && (
+          <div className="p-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm text-gray-600">Main email</label>
+              <input className="mt-1 w-full border rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Additional email <span className="text-gray-400">(optional)</span></label>
+              <input className="mt-1 w-full border rounded-md px-3 py-2" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-sm text-gray-600">Time zone</label>
+              <input className="mt-1 w-full border rounded-md px-3 py-2" />
+            </div>
+          </div>
+        )}
+
+        {tab === "security" && (
+          <div className="p-6 grid grid-cols-1 gap-4">
+            <div>
+              <label className="text-sm text-gray-600">New password</label>
+              <input type="password" className="mt-1 w-full border rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Confirm password</label>
+              <input type="password" className="mt-1 w-full border rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <button className="rounded-md bg-gray-900 text-white px-4 py-2">Update password</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,2093 +1,947 @@
-<!-- Сделать страницу клиники (/clinic/[slug]):
-– Hero + подробный контент
-– Прайс-лист (таблица услуг/цен)
-– Форма сбора контактов / заказа калькуляции
-– Кнопки «Назад к списку» и «Позвонить в клинику»
-
-Статические страницы каталога:
-– /treatments (список всех категорий-услуг)
-– /locations (список стран/городов)
-– Ссылки-картинки, ведущие на /treatments/[slug] и /locations/[slug]
-
-SEO и маркетинг:
-– Обновить metadata, Open Graph, Twitter Cards
-– Добавить фавиконки и микроразметку JSON-LD
-
-Рефактор и тесты:
-– Покрыть ключевые компоненты Cypress/jest
-– Проверить доступность (a11y) и оптимизировать Lighthouse -->
-
-<!-- npx supabase gen types typescript --project-id oymahnxwcajvaggbydim --schema public > lib/supabase/types.ts -->
-
-# MedTravel - Digital Platform
-
-[![Next.js](https://img.shields.io/badge/Next.js-15.3.1-black)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-18.3.1-blue)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6.3-blue)](https://www.typescriptlang.org/)
-[![HeroUI](https://img.shields.io/badge/HeroUI-2.7.10-purple)](https://heroui.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Latest-green)](https://supabase.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4.16-cyan)](https://tailwindcss.com/)
-
-MedTravel - современная цифровая платформа для креаторов и коллекционеров, построенная на Next.js 15 с полной поддержкой SSR, многоуровневой системой ролей, интернационализацией и оптимизацией производительности.
-
-## 🌟 Особенности
-
-- **🚀 Modern Stack**: Next.js 15, React 18, TypeScript 5.6
-- **🎨 Beautiful UI**: HeroUI 2.7 с кастомной темой
-- **🔐 Advanced Auth**: Supabase Auth с ролевой системой
-- **🌍 i18n**: Поддержка EN/ES/RU языков
-- **📱 Responsive**: Адаптивный дизайн для всех устройств
-- **⚡ Performance**: SSR, кэширование, оптимизация бандла
-- **🛡️ Security**: RLS, CSRF защита, безопасные headers
-- **♿ Accessibility**: WCAG 2.1 совместимость
-
-## 📋 Содержание
-
-1. [Технологический Стек](#-технологический-стек)
-2. [Архитектура](#-архитектура)
-3. [Структура Проекта](#-структура-проекта)
-4. [Роутинг и Layout](#-роутинг-и-layout)
-5. [Система Ролей](#-система-ролей)
-6. [UI/UX Компоненты](#-uiux-компоненты)
-7. [Server-Side Logic](#-server-side-logic)
-8. [Клиентская Логика](#-клиентская-логика)
-9. [Интернационализация](#-интернационализация)
-10. [Стили и Темы](#-стили-и-темы)
-11. [Производительность](#-производительность)
-12. [Безопасность](#-безопасность)
-13. [Разработка](#-разработка)
-14. [Развертывание](#-развертывание)
-
-## 🛠 Технологический Стек
-
-### Frontend Core
-
-```json
-{
-  "next": "15.3.1", // React фреймворк с SSR/SSG
-  "react": "18.3.1", // UI библиотека
-  "react-dom": "18.3.1", // DOM рендерер
-  "typescript": "5.6.3" // Типизация
-}
-```
-
-### UI Framework & Styling
-
-```json
-{
-  "@heroui/react": "2.7.10", // UI компоненты
-  "tailwindcss": "3.4.16", // CSS фреймворк
-  "tailwind-merge": "3.3.1", // Условные классы
-  "tailwind-variants": "0.3.0", // Варианты компонентов
-  "clsx": "2.1.1", // Утилита для классов
-  "framer-motion": "11.13.1" // Анимации
-}
-```
-
-### Backend & Database
-
-```json
-{
-  "@supabase/ssr": "0.6.1", // Supabase SSR
-  "@supabase/supabase-js": "2.49.10", // Supabase клиент
-  "ws": "8.18.2" // WebSocket поддержка
-}
-```
-
-### Internationalization
-
-```json
-{
-  "i18next": "23.8.1", // Ядро i18n
-  "react-i18next": "14.1.2", // React интеграция
-  "i18next-browser-languagedetector": "7.0.1", // Автодетект языка
-  "intl-messageformat": "10.7.16" // Форматирование сообщений
-}
-```
-
-### Forms & Validation
-
-```json
-{
-  "react-hook-form": "7.49.1", // Формы
-  "@hookform/resolvers": "3.3.4", // Резолверы валидации
-  "zod": "3.22.4" // Schema валидация
-}
-```
-
-### Development Tools
-
-```json
-{
-  "@iconify/react": "6.0.0", // Иконки
-  "@vercel/analytics": "1.5.0", // Аналитика
-  "@vercel/speed-insights": "1.2.0", // Метрики скорости
-  "eslint": "9.25.1", // Линтер
-  "prettier": "3.5.3" // Форматтер
-}
-```
-
-## 🏗 Архитектура
-
-### Общая Архитектура
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Browser (Client)                         │
-├─────────────────────────────────────────────────────────────┤
-│  React Components │ HeroUI │ Framer Motion │ i18next        │
-├─────────────────────────────────────────────────────────────┤
-│                    Next.js 15 (SSR/SSG)                     │
-├─────────────────────────────────────────────────────────────┤
-│  Middleware │ API Routes │ Server Components │ Auth Guards  │
-├─────────────────────────────────────────────────────────────┤
-│                    Supabase (Backend)                       │
-├─────────────────────────────────────────────────────────────┤
-│  PostgreSQL │ Auth Service │ RLS │ Real-time │ Storage      │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Layout Архитектура
-
-```
-app/layout.tsx (Root)
-├── Providers (HeroUI, Supabase, Theme, i18n)
-├── Navbar (Global, всегда отображается)
-├── Main Content (меняется в зависимости от роута)
-│   ├── (auth)/ - Анонимные пользователи
-│   ├── (user)/ - Аутентифицированные пользователи
-│   ├── (creator)/ - Роль CREATOR+
-│   └── (admin)/ - Роль ADMIN+
-└── Footer (Global, всегда отображается)
-```
-
-### Component Архитектура
-
-```
-components/
-├── auth/           # Аутентификация
-├── layout/         # Layout компоненты (Navbar, Footer)
-├── shared/         # Переиспользуемые компоненты
-├── charts/         # Графики и чарты
-└── ThemeProvider.tsx # Провайдер темы
-```
-
-## 📁 Структура Проекта
-
-```
-frontend/
-├── 📁 app/                     # Next.js App Router
-│   ├── 📁 (admin)/            # Route Group: Админка
-│   │   ├── 📁 admin/
-│   │   │   └── 📄 page.tsx    # /admin - админ панель
-│   │   ├── 📄 layout.tsx      # Layout для админов (требует ADMIN+)
-│   │   └── 📄 loading.tsx     # Loading UI для админки
-│   ├── 📁 (auth)/             # Route Group: Аутентификация
-│   │   ├── 📁 login/
-│   │   │   └── 📄 page.tsx    # /login - страница входа
-│   │   ├── 📄 layout.tsx      # Layout для неавторизованных
-│   │   └── 📄 loading.tsx     # Loading UI для auth
-│   ├── 📁 (creator)/          # Route Group: Креаторы
-│   │   ├── 📁 labs/
-│   │   │   └── 📄 page.tsx    # /labs - экспериментальные функции
-│   │   ├── 📄 layout.tsx      # Layout для креаторов (требует CREATOR+)
-│   │   └── 📄 loading.tsx     # Loading UI для креаторов
-│   ├── 📁 (user)/             # Route Group: Пользователи
-│   │   ├── 📁 docs/
-│   │   │   └── 📄 page.tsx    # /docs - документация
-│   │   ├── 📁 inventory/
-│   │   │   └── 📄 page.tsx    # /inventory - инвентарь
-│   │   ├── 📁 marketplace/
-│   │   │   └── 📄 page.tsx    # /marketplace - маркетплейс
-│   │   ├── 📁 settings/
-│   │   │   └── 📄 page.tsx    # /settings - настройки
-│   │   ├── 📄 page.tsx        # / - главная страница
-│   │   ├── 📄 layout.tsx      # Layout для пользователей (требует аутентификации)
-│   │   └── 📄 loading.tsx     # Loading UI для пользователей
-│   ├── 📁 auth/               # API аутентификации
-│   │   └── 📁 callback/
-│   │       └── 📄 route.ts    # OAuth callback handler
-│   ├── 📄 error.tsx           # Global error boundary
-│   ├── 📄 layout.tsx          # Root layout (глобальные провайдеры)
-│   └── 📄 providers.tsx       # Клиентские провайдеры
-├── 📁 components/             # React компоненты
-│   ├── 📁 auth/              # Компоненты аутентификации
-│   │   ├── 📄 EmailForm.tsx   # Форма ввода email
-│   │   ├── 📄 LoginManager.tsx # Менеджер состояний логина
-│   │   └── 📄 OtpForm.tsx     # Форма ввода OTP кода
-│   ├── 📁 charts/            # Компоненты графиков
-│   │   └── 📄 DynamicChart.tsx # Динамические чарты
-│   ├── 📁 layout/            # Layout компоненты
-│   │   ├── 📄 Footer.tsx      # Глобальный футер
-│   │   └── 📄 Navbar.tsx      # Глобальная навигация
-│   ├── 📁 shared/            # Переиспользуемые компоненты
-│   │   ├── 📄 HeroUIComponents.tsx # HeroUI утилиты
-│   │   ├── 📄 LanguageSwitcher.tsx # Переключатель языка
-│   │   ├── 📄 PageSkeleton.tsx     # Skeleton загрузка
-│   │   ├── 📄 PageTransition.tsx   # Анимации переходов
-│   │   └── 📄 ThemeSwitch.tsx      # Переключатель темы
-│   └── 📄 ThemeProvider.tsx   # Провайдер темы
-├── 📁 config/                # Конфигурационные файлы
-│   ├── 📄 env.ts             # Переменные окружения
-│   ├── 📄 fonts.ts           # Конфигурация шрифтов
-│   ├── 📄 nav.ts             # Конфигурация навигации и ролей
-│   └── 📄 site.ts            # Общие настройки сайта
-├── 📁 lib/                   # Утилиты и библиотеки
-│   ├── 📁 supabase/         # Supabase интеграция
-│   │   ├── 📄 browserClient.ts    # Клиентский Supabase клиент
-│   │   ├── 📄 index.ts            # Единый экспорт
-│   │   ├── 📄 server.ts           # Серверный Supabase клиент + auth guards
-│   │   ├── 📄 supabase-provider.tsx # React контекст провайдер
-│   │   └── 📄 types.ts            # TypeScript типы БД
-│   └── 📄 i18n-server.ts     # Серверная i18n утилита
-├── 📁 locales/               # Файлы переводов
-│   ├── 📄 en.json            # Английский
-│   ├── 📄 es.json            # Испанский
-│   └── 📄 ru.json            # Русский
-├── 📁 public/                # Статические файлы
-│   └── 📄 favicon.ico        # Иконка сайта
-├── 📁 styles/                # Глобальные стили
-│   └── 📄 globals.css        # Tailwind CSS + кастомные стили
-├── 📁 types/                 # TypeScript определения
-│   └── 📄 index.ts           # Общие типы
-├── 📄 middleware.ts          # Next.js middleware (auth + role guards)
-├── 📄 i18n.ts               # Клиентская i18n конфигурация
-├── 📄 next.config.js        # Next.js конфигурация
-├── 📄 tailwind.config.js    # Tailwind CSS конфигурация
-├── 📄 tsconfig.json         # TypeScript конфигурация
-├── 📄 package.json          # NPM зависимости
-└── 📄 .env.local            # Переменные окружения (локальные)
-```
-
-# 🚀 Роутинг и Система Ролей
-
-## 📍 Layout Groups (Route Groups)
-
-Next.js App Router использует layout groups для организации роутов по логическим группам без влияния на URL структуру.
-
-### Layout Group Architecture
-
-```
-app/
-├── layout.tsx              # ✅ Root Layout (всегда активен)
-│   ├── Navbar              # 🌐 Глобальная навигация
-│   ├── Main Content        # 📄 Меняется в зависимости от роута
-│   └── Footer              # 🌐 Глобальный футер
-│
-├── (auth)/                 # 👤 Route Group: Неавторизованные
-│   ├── layout.tsx          # Auth Guard: редирект если авторизован
-│   ├── loading.tsx         # Loading для auth страниц
-│   └── login/page.tsx      # /login
-│
-├── (user)/                 # 👥 Route Group: Аутентифицированные (USER+)
-│   ├── layout.tsx          # Auth Guard: требует аутентификации
-│   ├── loading.tsx         # Loading для user страниц
-│   ├── page.tsx           # / (главная)
-│   ├── marketplace/page.tsx # /marketplace
-│   ├── inventory/page.tsx  # /inventory
-│   ├── docs/page.tsx      # /docs
-│   └── settings/page.tsx  # /settings
-│
-├── (creator)/              # 🎨 Route Group: Креаторы (CREATOR+)
-│   ├── layout.tsx          # Role Guard: требует CREATOR+
-│   ├── loading.tsx         # Loading для creator страниц
-│   └── labs/page.tsx      # /labs
-│
-└── (admin)/               # 🛡️ Route Group: Администраторы (ADMIN+)
-    ├── layout.tsx          # Role Guard: требует ADMIN+
-    ├── loading.tsx         # Loading для admin страниц
-    └── admin/page.tsx     # /admin
-```
-
-## 🔐 Система Ролей
-
-### Иерархия Ролей
-
-```typescript
-type UserRole = "USER" | "CREATOR" | "ADMIN" | "SUPER_ADMIN";
-
-const roleHierarchy: Record<UserRole, number> = {
-  USER: 1, // Базовый пользователь
-  CREATOR: 2, // Создатель контента + USER права
-  ADMIN: 3, // Администратор + CREATOR + USER права
-  SUPER_ADMIN: 4, // Супер админ + все права
-};
-```
-
-### Права Доступа
-
-| Роль            | Доступные Роуты                                         | Описание                       |
-| --------------- | ------------------------------------------------------- | ------------------------------ |
-| **Анонимный**   | `/login`, `/auth/*`                                     | Только страницы аутентификации |
-| **USER**        | `/`, `/marketplace`, `/inventory`, `/docs`, `/settings` | Базовая функциональность       |
-| **CREATOR**     | USER + `/labs`                                          | Экспериментальные функции      |
-| **ADMIN**       | CREATOR + `/admin`                                      | Административная панель        |
-| **SUPER_ADMIN** | Полный доступ                                           | Все функции системы            |
-
-### Проверка Доступа (config/nav.ts)
-
-```typescript
-// Проверка доступа к навигационному элементу
-export function hasAccess(userRole: UserRole | null, item: NavItem): boolean {
-  if (!userRole) return false;
-
-  // Проверка точной роли (если указана)
-  if (item.exactRole) {
-    return item.exactRole.includes(userRole);
-  }
-
-  // Проверка минимальной роли (иерархическая)
-  if (item.minRole) {
-    return roleHierarchy[userRole] >= roleHierarchy[item.minRole];
-  }
-
-  return true;
-}
-
-// Получение доступных элементов навигации
-export function getAccessibleNavItems(userRole: UserRole | null): NavItem[] {
-  return navigationConfig.filter((item) => hasAccess(userRole, item));
-}
-```
-
-## 🛡️ Auth Guards (Security Layers)
-
-### 1. Middleware Guard (middleware.ts)
-
-```typescript
-// Первый уровень - на уровне запроса
-export async function middleware(req: NextRequest) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Проверка аутентификации
-  if (!user && !isAuthRoute) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  // Проверка ролей для специальных роутов
-  if (pathname.startsWith("/labs") && userRole === "USER") {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  if (
-    pathname.startsWith("/admin") &&
-    !(userRole === "ADMIN" || userRole === "SUPER_ADMIN")
-  ) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-}
-```
-
-### 2. Layout Guards (Server-Side)
-
-```typescript
-// app/(user)/layout.tsx
-export default async function UserLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth(); // Требует аутентификации
-  return <>{children}</>;
-}
-
-// app/(creator)/layout.tsx
-export default async function CreatorLayout({ children }: { children: React.ReactNode }) {
-  await requireRole("CREATOR"); // Требует роль CREATOR+
-  return <>{children}</>;
-}
-
-// app/(admin)/layout.tsx
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireRole("ADMIN"); // Требует роль ADMIN+
-  return <>{children}</>;
-}
-```
-
-### 3. Server-Side Auth Utilities (lib/supabase/server.ts)
-
-```typescript
-// Кэшированное получение пользователя
-export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const supabase = getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-});
-
-// Проверка аутентификации с редиректом
-export async function requireAuth(): Promise<User> {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  return user;
-}
-
-// Проверка роли с редиректом
-export async function requireRole(
-  requiredRole: UserRole | UserRole[]
-): Promise<User> {
-  const user = await requireAuth();
-  const userData = await getCurrentUserData();
-
-  if (!hasRequiredRole(userData.role, requiredRole)) {
-    redirect("/");
-  }
-
-  return user;
-}
-```
-
-## 🗺️ Navigation Configuration
-
-### Main Navigation (config/nav.ts)
-
-```typescript
-export const navigationConfig: NavItem[] = [
-  {
-    key: "discover",
-    label: "navbar.discover",
-    href: "/",
-    icon: "solar:compass-bold",
-    minRole: "USER",
-  },
-  {
-    key: "marketplace",
-    label: "navbar.marketplace",
-    href: "/marketplace",
-    icon: "solar:bag-4-bold",
-    minRole: "USER",
-  },
-  {
-    key: "inventory",
-    label: "navbar.inventory",
-    href: "/inventory",
-    icon: "solar:archive-bold",
-    minRole: "USER",
-  },
-  {
-    key: "labs",
-    label: "navbar.labs",
-    href: "/labs",
-    icon: "solar:test-tube-bold",
-    minRole: "CREATOR", // Только для CREATOR+
-  },
-  {
-    key: "docs",
-    label: "navbar.docs",
-    href: "/docs",
-    icon: "solar:book-bold",
-    minRole: "USER",
-  },
-];
-```
-
-### Profile Menu
-
-```typescript
-export const profileMenuConfig: NavItem[] = [
-  {
-    key: "settings",
-    label: "navbar.mySettings",
-    href: "/settings",
-    icon: "solar:settings-linear",
-    minRole: "USER",
-  },
-  {
-    key: "admin",
-    label: "navbar.adminPanel",
-    href: "/admin",
-    icon: "solar:shield-user-bold",
-    minRole: "ADMIN", // Только для ADMIN+
-  },
-];
-```
-
-## 🎯 SPA Navigation (Single Page Application)
-
-### Проблема Layout Re-rendering
-
-**Проблема**: При переходах между layout группами вся страница перезагружалась.
-
-**Решение**: Перенос Navbar и Footer в root layout.
-
-```typescript
-// app/layout.tsx - Root Layout
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <body>
-        <Providers>
-          <SupabaseProvider>
-            <ThemeProvider>
-              <div className="min-h-screen flex flex-col bg-background">
-                <Navbar />           {/* ✅ Всегда отображается */}
-                <main className="flex-1">
-                  {children}         {/* 🔄 Меняется в зависимости от роута */}
-                </main>
-                <Footer />           {/* ✅ Всегда отображается */}
-              </div>
-            </ThemeProvider>
-          </SupabaseProvider>
-        </Providers>
-      </body>
-    </html>
-  );
-}
-```
-
-### Layout Group Simplification
-
-```typescript
-// app/(user)/layout.tsx - Упрощенный User Layout
-export default async function UserLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth(); // Только проверка авторизации
-
-  return (
-    <Suspense fallback={<UserLayoutSkeleton />}>
-      <PageTransition>{children}</PageTransition>
-    </Suspense>
-  );
-}
-```
-
-**Результат**: Navbar и Footer остаются постоянными при всех переходах, меняется только контент внутри main.
-
-## 🔄 Page Transitions
-
-### PageTransition Component
-
-```typescript
-export const PageTransition = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-    >
-      {children}
-    </motion.div>
-  );
-};
-```
-
-### Loading States
-
-Каждая layout группа имеет свой loading.tsx:
-
-```typescript
-// app/(user)/loading.tsx
-export default function UserLayoutSkeleton() {
-  return (
-    <div className="flex-1 p-6">
-      <div className="container mx-auto space-y-6">
-        <div className="h-8 w-64 bg-default-200 rounded animate-pulse" />
-        <div className="grid gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-32 bg-default-100 rounded animate-pulse" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-## 🎪 Route Examples
-
-### Successful Flows
-
-| URL            | Route Group | Required Role | Layout Chain                   |
-| -------------- | ----------- | ------------- | ------------------------------ |
-| `/`            | `(user)`    | USER+         | Root → User → Home Page        |
-| `/marketplace` | `(user)`    | USER+         | Root → User → Marketplace Page |
-| `/labs`        | `(creator)` | CREATOR+      | Root → Creator → Labs Page     |
-| `/admin`       | `(admin)`   | ADMIN+        | Root → Admin → Admin Page      |
-| `/login`       | `(auth)`    | None          | Root → Auth → Login Page       |
-
-### Failed Flows (Redirects)
-
-| URL      | User Role | Redirect To | Reason                 |
-| -------- | --------- | ----------- | ---------------------- |
-| `/`      | Анонимный | `/login`    | Требует аутентификации |
-| `/labs`  | USER      | `/`         | Недостаточно прав      |
-| `/admin` | CREATOR   | `/`         | Недостаточно прав      |
-| `/login` | USER      | `/`         | Уже авторизован        |
-
-# 🎨 UI/UX Компоненты
-
-## 🧩 Структура Компонентов
-
-```
-components/
-├── 🔐 auth/              # Аутентификация
-│   ├── EmailForm.tsx     # Форма ввода email
-│   ├── LoginManager.tsx  # Состояние логина
-│   └── OtpForm.tsx      # Форма OTP кода
-├── 📊 charts/           # Графики
-│   └── DynamicChart.tsx # Recharts интеграция
-├── 🏗️ layout/           # Layout компоненты
-│   ├── Footer.tsx       # Глобальный футер
-│   └── Navbar.tsx       # Глобальная навигация
-├── 🔄 shared/           # Переиспользуемые
-│   ├── HeroUIComponents.tsx  # HeroUI утилиты
-│   ├── LanguageSwitcher.tsx  # Переключатель языка
-│   ├── PageSkeleton.tsx      # Loading состояния
-│   ├── PageTransition.tsx    # Анимации переходов
-│   └── ThemeSwitch.tsx       # Переключатель темы
-└── ThemeProvider.tsx    # Провайдер темы
-```
-
-## 🏗️ Layout Components
-
-### Navbar (components/layout/Navbar.tsx)
-
-**Архитектура**: Мемоизированный компонент с role-based навигацией
-
-```typescript
-interface NavbarProps {}
-
-export const Navbar = React.memo(() => {
-  const { t } = useTranslation();
-  const { supabase, session, role } = useSupabase() as SupabaseContextType;
-  const pathname = usePathname();
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-
-  // 🎯 Мемоизированные вычисления
-  const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
-  const profileMenuItems = useMemo(
-    () => getAccessibleProfileMenuItems(role),
-    [role]
-  );
-  const isAuth = useMemo(
-    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
-    [pathname]
-  );
-});
-```
-
-**Особенности**:
-
-- ✅ React.memo для предотвращения re-render
-- 🔄 Мемоизация навигационных элементов по роли
-- 📱 Адаптивное мобильное меню с auto-close
-- 🎨 Центрированная навигация на десктопе
-- 🔐 Role-based отображение элементов
-
-**Структура**:
-
-```typescript
-<HeroUINavbar>
-  {/* Brand & Mobile toggle */}
-  <NavbarBrand>
-    <NavbarMenuToggle className="sm:hidden" />
-    <NextLink href="/">MedTravel</NextLink>
-  </NavbarBrand>
-
-  {/* Desktop navigation - центрирована */}
-  <NavbarContent className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6" justify="center">
-    {navItems.map(item => <NavItem key={item.key} {...item} />)}
-  </NavbarContent>
-
-  {/* Right side actions */}
-  <NavbarContent justify="end">
-    <LanguageSwitcher />
-    <ThemeSwitch />
-    <ProfileDropdown />
-  </NavbarContent>
-
-  {/* Mobile menu */}
-  <NavbarMenu>
-    {navItems.map(item => <MobileNavItem key={item.key} {...item} onClose={() => setIsMenuOpen(false)} />)}
-  </NavbarMenu>
-</HeroUINavbar>
-```
-
-### Footer (components/layout/Footer.tsx)
-
-**Архитектура**: Статический футер с условным рендерингом
-
-```typescript
-export const Footer = React.memo(() => {
-  const { t } = useTranslation();
-  const { session } = useSupabase() as SupabaseContextType;
-  const pathname = usePathname();
-
-  // Скрыть футер на auth страницах
-  const shouldHideFooter = useMemo(
-    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
-    [pathname]
-  );
-
-  if (shouldHideFooter) return null;
-});
-```
-
-## 🔐 Auth Components
-
-### LoginManager (components/auth/LoginManager.tsx)
-
-**Архитектура**: State manager для аутентификации
-
-```typescript
-type AuthStep = "email" | "otp";
-
-export const LoginManager = () => {
-  const [step, setStep] = useState<AuthStep>("email");
-  const [email, setEmail] = useState("");
-
-  return (
-    <div>
-      {step === "email" && (
-        <EmailForm
-          onSuccess={(email) => {
-            setEmail(email);
-            setStep("otp");
-          }}
-        />
-      )}
-      {step === "otp" && (
-        <OtpForm
-          email={email}
-          onBack={() => setStep("email")}
-        />
-      )}
-    </div>
-  );
-};
-```
-
-### EmailForm (components/auth/EmailForm.tsx)
-
-**Функциональность**:
-
-- 📧 Email OTP аутентификация
-- 🔍 Google OAuth
-- ✅ React Hook Form + Zod валидация
-
-```typescript
-const emailSchema = z.object({
-  email: z.string().email("auth.invalidEmail"),
-});
-
-export const EmailForm = ({ onSuccess }: Props) => {
-  const form = useForm<z.infer<typeof emailSchema>>({
-    resolver: zodResolver(emailSchema),
-  });
-
-  const handleEmailAuth = async (values: z.infer<typeof emailSchema>) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: values.email,
-      options: { shouldCreateUser: true },
-    });
-
-    if (!error) onSuccess(values.email);
-  };
-
-  const handleGoogleAuth = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
-  };
-};
-```
-
-### OtpForm (components/auth/OtpForm.tsx)
-
-**Функциональность**:
-
-- 🔢 6-значный OTP код
-- ⏰ Таймер для повторной отправки
-- 🔄 Автоматическая верификация
-
-```typescript
-export const OtpForm = ({ email, onBack }: Props) => {
-  const [otp, setOtp] = useState("");
-  const [timeLeft, setTimeLeft] = useState(60);
-
-  useEffect(() => {
-    if (otp.length === 6) {
-      handleVerifyOtp(otp);
-    }
-  }, [otp]);
-
-  const handleVerifyOtp = async (token: string) => {
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: "email",
-    });
-
-    if (!error) {
-      window.location.href = "/";
-    }
-  };
-};
-```
-
-## 🔄 Shared Components
-
-### LanguageSwitcher (components/shared/LanguageSwitcher.tsx)
-
-**Архитектура**: Dropdown с флагами стран
-
-```typescript
-const languages = [
-  { code: "en", name: "English", flag: "🇺🇸" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
-  { code: "ru", name: "Русский", flag: "🇷🇺" },
-] as const;
-
-export const LanguageSwitcher = React.memo(() => {
-  const { i18n } = useTranslation();
-
-  const currentLanguage = useMemo(
-    () => languages.find(lang => lang.code === i18n.language) || languages[0],
-    [i18n.language]
-  );
-
-  return (
-    <Dropdown placement="bottom-end">
-      <DropdownTrigger>
-        <Button startContent={<Icon icon="solar:translation-linear" width={24} />} variant="ghost">
-          <span className="hidden sm:inline">{currentLanguage.flag}</span>
-        </Button>
-      </DropdownTrigger>
-      <DropdownMenu onSelectionChange={(keys) => {
-        const selectedKey = Array.from(keys)[0] as string;
-        if (selectedKey) i18n.changeLanguage(selectedKey);
-      }}>
-        {languages.map(language => (
-          <DropdownItem key={language.code}>
-            <div className="flex items-center gap-2">
-              <span>{language.flag}</span>
-              <span>{language.name}</span>
-            </div>
-          </DropdownItem>
-        ))}
-      </DropdownMenu>
-    </Dropdown>
-  );
-});
-```
-
-### ThemeSwitch (components/shared/ThemeSwitch.tsx)
-
-**Архитектура**: Toggle между light/dark темами
-
-```typescript
-export const ThemeSwitch = React.memo(() => {
-  const { theme, setTheme } = useTheme();
-
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === "light" ? "dark" : "light");
-  }, [theme, setTheme]);
-
-  return (
-    <Button
-      isIconOnly
-      aria-label="Toggle theme"
-      variant="ghost"
-      onPress={toggleTheme}
-    >
-      {theme === "light" ? (
-        <Icon icon="solar:moon-linear" width={24} />
-      ) : (
-        <Icon icon="solar:sun-linear" width={24} />
-      )}
-    </Button>
-  );
-});
-```
-
-### PageTransition (components/shared/PageTransition.tsx)
-
-**Архитектура**: Framer Motion анимации между страницами
-
-```typescript
-export const PageTransition = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="w-full"
-    >
-      {children}
-    </motion.div>
-  );
-};
-```
-
-## 🎯 Memoization Strategy
-
-### Component Optimization
-
-**NavItem - Мемоизированный навигационный элемент**:
-
-```typescript
-const NavItem = React.memo(
-  ({ item, active, t }: { item: any; active: boolean; t: any }) => (
-    <NavbarItem isActive={active}>
-      <NextLink
-        prefetch
-        className={`font-medium transition-colors ${
-          active ? "text-primary" : "text-foreground hover:text-primary"
-        }`}
-        href={item.href}
-      >
-        {t(item.label)}
-      </NextLink>
-    </NavbarItem>
-  )
-);
-```
-
-**MobileNavItem - С функцией закрытия меню**:
-
-```typescript
-const MobileNavItem = React.memo(
-  ({ item, active, t, onClose }: Props) => (
-    <NavbarMenuItem isActive={active}>
-      <Link
-        as={NextLink}
-        href={item.href}
-        onPress={onClose} // 🔄 Закрывает мобильное меню
-      >
-        {t(item.label)}
-      </Link>
-    </NavbarMenuItem>
-  )
-);
-```
-
-**ProfileDropdown - Мемоизированный dropdown профиля**:
-
-```typescript
-const ProfileDropdown = React.memo(
-  ({ session, role, supabase, t, profileMenuItems }: Props) => {
-    const handleLogout = useCallback(async () => {
-      await supabase.auth.signOut();
-      window.location.href = "/login";
-    }, [supabase]);
-
-    return (
-      <Dropdown placement="bottom-end">
-        <DropdownTrigger>
-          <Button>
-            <Badge color="success" content="" placement="bottom-right" shape="circle">
-              <Icon icon="solar:user-linear" width={24} />
-            </Badge>
-          </Button>
-        </DropdownTrigger>
-        <DropdownMenu>
-          <DropdownItem key="profile" className="cursor-default">
-            <p className="font-semibold">{t("navbar.signedInAs")}</p>
-            <p className="text-default-500">{session?.user?.email}</p>
-          </DropdownItem>
-          <DropdownItem as={NextLink} href="/settings">
-            {t("navbar.mySettings")}
-          </DropdownItem>
-          {(role === "ADMIN" || role === "SUPER_ADMIN") && (
-            <DropdownItem as={NextLink} href="/admin">
-              {t("navbar.adminPanel")}
-            </DropdownItem>
-          )}
-          <DropdownItem
-            key="logout"
-            color="danger"
-            startContent={<Icon icon="solar:logout-linear" width={16} />}
-            onPress={handleLogout}
-          >
-            {t("navbar.logOut")}
-          </DropdownItem>
-        </DropdownMenu>
-      </Dropdown>
-    );
-  }
-);
-```
-
-## 📱 Responsive Design
-
-### Breakpoint Strategy
-
-```css
-/* Tailwind CSS breakpoints */
-sm: 640px   /* Small devices (landscape phones) */
-md: 768px   /* Medium devices (tablets) */
-lg: 1024px  /* Large devices (laptops/desktops) */
-xl: 1280px  /* Extra large devices (large laptops/desktops) */
-2xl: 1536px /* 2x Extra large devices (larger desktops) */
-```
-
-### Adaptive Components
-
-**Navbar Responsiveness**:
-
-```typescript
-// Desktop navigation - скрыта на мобильных
-<NavbarContent className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6">
-
-// Mobile menu toggle - показан только на мобильных
-<NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
-
-// Language switcher - флаг скрыт на мобильных
-<span className="hidden sm:inline">{currentLanguage.flag}</span>
-```
-
-**Content Layout**:
-
-```typescript
-// Адаптивная ширина контейнера
-<div className="rounded-large bg-content1 px-8 py-12 w-full max-w-screen-xl mx-4 text-center shadow-small">
-
-// Мобильное меню с центрированием
-<div className="w-full max-w-screen-md mx-auto space-y-2">
-```
-
-## 🎨 HeroUI Integration
-
-### Theme Configuration
-
-```typescript
-// tailwind.config.js
-plugins: [
-  heroui({
-    prefix: "heroui",
-    addCommonColors: false,
-    defaultTheme: "light",
-    themes: {
-      light: {
-        colors: {
-          primary: {
-            DEFAULT: "#3b82f6", // Blue-500
-            foreground: "#FFFFFF",
-          },
-          // ... остальные цвета
-        },
-      },
-      dark: {
-        colors: {
-          primary: {
-            DEFAULT: "#60a5fa", // Blue-400
-            foreground: "#0d1117",
-          },
-        },
-      },
-    },
-  }),
-];
-```
-
-### Component Usage
-
-```typescript
-// Примеры использования HeroUI компонентов
-import {
-  Navbar as HeroUINavbar,
-  NavbarBrand,
-  NavbarContent,
-  NavbarItem,
-  Button,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Badge,
-} from "@heroui/react";
-```
-
-# ⚡ Производительность и Оптимизации
-
-## 🚀 Next.js 15 Optimizations
-
-### Bundle Optimization (next.config.js)
-
-```javascript
-const nextConfig = {
-  // Экспериментальные оптимизации
-  experimental: {
-    optimizePackageImports: [
-      "@heroui/react", // Tree-shaking UI компонентов
-      "@iconify/react", // Оптимизация иконок
-      "react-i18next", // i18n оптимизация
-      "framer-motion", // Анимации tree-shaking
-    ],
-    ppr: false, // Partial Prerendering (когда стабилизируется)
-  },
-
-  // Внешние серверные пакеты
-  serverExternalPackages: ["@supabase/supabase-js"],
-
-  // Compiler optimizations
-  compiler: {
-    removeConsole: process.env.NODE_ENV === "production", // Удаление console.log в продакшене
-    reactRemoveProperties: process.env.NODE_ENV === "production", // Удаление React dev свойств
-  },
-
-  // Webpack оптимизации
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.optimization.splitChunks = {
-        chunks: "all",
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: "vendors",
-            chunks: "all",
-          },
-          heroui: {
-            test: /[\\/]node_modules[\\/]@heroui[\\/]/,
-            name: "heroui",
-            chunks: "all",
-            priority: 10, // Высокий приоритет для UI библиотеки
-          },
-          supabase: {
-            test: /[\\/]node_modules[\\/]@supabase[\\/]/,
-            name: "supabase",
-            chunks: "all",
-            priority: 10,
-          },
-        },
-      };
-    }
-    return config;
-  },
-};
-```
-
-## 📦 Bundle Analysis
-
-### Current Bundle Sizes
-
-```
-Route (app)                                Size  First Load JS
-┌ ƒ /                                     154 B         341 kB
-├ ƒ /_not-found                           195 B         341 kB
-├ ƒ /admin                                154 B         341 kB
-├ ƒ /auth/callback                        154 B         341 kB
-├ ƒ /docs                                 154 B         341 kB
-├ ƒ /inventory                            154 B         341 kB
-├ ƒ /labs                                 154 B         341 kB
-├ ƒ /login                              2.03 kB         417 kB
-├ ƒ /marketplace                          154 B         341 kB
-└ ƒ /settings                             154 B         341 kB
-+ First Load JS shared by all            342 kB
-  ├ chunks/vendors-e366cc834430827a.js   338 kB
-  └ other shared chunks (total)         3.74 kB
-```
-
-**Анализ**:
-
-- ✅ **Маленькие страницы**: Все страницы ~154B (только контент)
-- ✅ **Общий бандл**: 342kB shared chunks
-- ✅ **Vendor chunk**: 338kB (HeroUI + React + Supabase)
-- ✅ **Login страница**: +76kB (формы + валидация)
-
-## 🔄 React Performance
-
-### Memoization Strategy
-
-**1. Component Memoization**
-
-```typescript
-// Navbar - предотвращает re-render при изменении роута
-export const Navbar = React.memo(() => {
-  // Мемоизация навигационных элементов
-  const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
-  const profileMenuItems = useMemo(
-    () => getAccessibleProfileMenuItems(role),
-    [role]
-  );
-
-  // Мемоизация проверки auth страниц
-  const isAuth = useMemo(
-    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
-    [pathname]
-  );
-});
-
-// Footer - статический мемоизированный компонент
-export const Footer = React.memo(() => {
-  const shouldHideFooter = useMemo(
-    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
-    [pathname]
-  );
-});
-
-// ThemeSwitch - мемоизированный переключатель
-export const ThemeSwitch = React.memo(() => {
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === "light" ? "dark" : "light");
-  }, [theme, setTheme]);
-});
-```
-
-**2. Context Optimization**
-
-```typescript
-// SupabaseProvider с мемоизированным значением контекста
-export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createClient());
-  const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
-
-  // Мемоизация значения контекста для предотвращения re-render
-  const contextValue = useMemo(
-    () => ({ supabase, session, role }),
-    [supabase, session, role]
-  );
-
-  return (
-    <SupabaseContext.Provider value={contextValue}>
-      {children}
-    </SupabaseContext.Provider>
-  );
-}
-```
-
-**3. Expensive Computations**
-
-```typescript
-// Мемоизация дорогих вычислений в навигации
-const getAccessibleNavItems = useMemo(() => {
-  return (userRole: UserRole | null): NavItem[] => {
-    return navigationConfig.filter((item) => hasAccess(userRole, item));
-  };
-}, []);
-
-// Мемоизация проверки роли
-const hasAccessMemo = useMemo(() => {
-  return (userRole: UserRole | null, item: NavItem): boolean => {
-    if (!userRole) return false;
-
-    if (item.exactRole) {
-      return item.exactRole.includes(userRole);
-    }
-
-    if (item.minRole) {
-      return roleHierarchy[userRole] >= roleHierarchy[item.minRole];
-    }
-
-    return true;
-  };
-}, []);
-```
-
-## 🗄️ Caching Strategy
-
-### Server-Side Caching
-
-**1. React Cache для Server Components**
-
-```typescript
-// lib/supabase/server.ts
-import { cache } from "react";
-
-// Кэшированный Supabase клиент
-export const getServerSupabase = cache(() => {
-  return createServerClient<Database>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll: async () => {
-          const store = await cookies();
-          return store.getAll().map(({ name, value }) => ({ name, value }));
-        },
-      },
-    }
-  );
-});
-
-// Кэшированное получение пользователя
-export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const supabase = getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-});
-
-// Кэшированное получение профиля
-export const getUserProfile = cache(async (userId: string) => {
-  const supabase = getServerSupabase();
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
-  return data;
-});
-```
-
-**2. Middleware Caching**
-
-```typescript
-// middleware.ts
-const roleCache = new Map<string, { role: string; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 минут
-
-export async function middleware(req: NextRequest) {
-  if (user) {
-    const cacheKey = user.id;
-    const cached = roleCache.get(cacheKey);
-    const now = Date.now();
-
-    // Проверка кэша сначала
-    if (cached && now - cached.timestamp < CACHE_TTL) {
-      userRole = cached.role;
-    } else {
-      // Загрузка из БД если нет в кэше или истек срок
-      const { data } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      userRole = data?.role ?? "USER";
-
-      // Обновление кэша
-      if (userRole) {
-        roleCache.set(cacheKey, { role: userRole, timestamp: now });
-      }
-
-      // Очистка старых записей кэша
-      if (roleCache.size > 1000) {
-        for (const [key, value] of roleCache.entries()) {
-          if (now - value.timestamp > CACHE_TTL) {
-            roleCache.delete(key);
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### Client-Side Caching
-
-**1. i18n Resource Caching**
-
-```typescript
-// i18n.ts
-const resources = {
-  en: { translation: en },
-  es: { translation: es },
-  ru: { translation: ru },
-};
-
-i18n.init({
-  resources,
-  fallbackLng: "en",
-  detection: {
-    order: ["localStorage", "navigator", "htmlTag"],
-    caches: ["localStorage"], // Кэширование выбранного языка
-  },
-});
-```
-
-**2. Font Optimization**
-
-```typescript
-// config/fonts.ts & app/layout.tsx
-const roboto = Roboto({
-  subsets: ["latin", "cyrillic"],
-  display: "swap", // Быстрая загрузка с fallback
-  variable: "--font-roboto",
-  weight: ["300", "400", "500", "700"],
-  preload: true, // Предзагрузка критических шрифтов
-});
-```
-
-## 🖼️ Image Optimization
-
-### Next.js Image Config
-
-```javascript
-// next.config.js
-images: {
-  formats: ['image/avif', 'image/webp'],          // Современные форматы
-  deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // Адаптивные размеры
-  imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],            // Иконки и маленькие изображения
-  dangerouslyAllowSVG: true,                      // SVG поддержка
-  contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-}
-```
-
-## 🌐 HTTP Optimizations
-
-### Headers Configuration
-
-```javascript
-// next.config.js
-async headers() {
-  return [
-    {
-      source: '/(.*)',
-      headers: [
-        {
-          key: 'X-Content-Type-Options',
-          value: 'nosniff',              // MIME type защита
-        },
-        {
-          key: 'X-Frame-Options',
-          value: 'DENY',                 // Clickjacking защита
-        },
-        {
-          key: 'X-XSS-Protection',
-          value: '1; mode=block',        // XSS защита
-        },
-        {
-          key: 'Referrer-Policy',
-          value: 'origin-when-cross-origin', // Referrer политика
-        }
-      ],
-    },
-    {
-      source: '/static/(.*)',
-      headers: [
-        {
-          key: 'Cache-Control',
-          value: 'public, max-age=31536000, immutable', // Долгосрочное кэширование статики
-        },
-      ],
-    },
-    {
-      source: '/_next/static/(.*)',
-      headers: [
-        {
-          key: 'Cache-Control',
-          value: 'public, max-age=31536000, immutable', // Next.js статика
-        },
-      ],
-    },
-  ];
-}
-```
-
-## 📊 Performance Monitoring
-
-### Vercel Analytics Integration
-
-```typescript
-// app/layout.tsx
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <body>
-        {children}
-        <Analytics />      {/* 📊 Аналитика пользователей */}
-        <SpeedInsights />  {/* ⚡ Метрики производительности */}
-      </body>
-    </html>
-  );
-}
-```
-
-### Custom Performance Monitoring
-
-```typescript
-// Отслеживание времени загрузки компонентов
-export const withPerformanceTracking = <P extends object>(
-  Component: React.ComponentType<P>,
-  name: string
-) => {
-  return React.memo((props: P) => {
-    useEffect(() => {
-      const start = performance.now();
-
-      return () => {
-        const end = performance.now();
-        console.log(`${name} render time: ${end - start}ms`);
-      };
-    }, []);
-
-    return <Component {...props} />;
-  });
-};
-```
-
-## 🚀 SSR Optimizations
-
-### Loading States для каждой Route Group
-
-```typescript
-// app/(user)/loading.tsx
-export default function UserLayoutSkeleton() {
-  return (
-    <div className="flex-1 p-6">
-      <div className="container mx-auto space-y-6">
-        <div className="h-8 w-64 bg-default-200 rounded animate-pulse" />
-        <div className="grid gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-32 bg-default-100 rounded animate-pulse" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// app/(creator)/loading.tsx - такая же структура
-// app/(admin)/loading.tsx - такая же структура
-```
-
-### Suspense Boundaries
-
-```typescript
-// Использование Suspense для асинхронных компонентов
-export default async function UserLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth();
-
-  return (
-    <Suspense fallback={<UserLayoutSkeleton />}>
-      <PageTransition>{children}</PageTransition>
-    </Suspense>
-  );
-}
-```
-
-## 🎯 Performance Metrics
-
-### Core Web Vitals Targets
-
-- **LCP** (Largest Contentful Paint): < 2.5s
-- **FID** (First Input Delay): < 100ms
-- **CLS** (Cumulative Layout Shift): < 0.1
-- **TTFB** (Time to First Byte): < 800ms
-
-### Current Performance
-
-- ✅ **First Load**: 341kB shared bundle
-- ✅ **Page Loads**: ~154B per page
-- ✅ **SSR**: Instant server rendering
-- ✅ **Hydration**: Fast React hydration
-- ✅ **Navigation**: SPA-like transitions без перезагрузки layout
-
-### Optimization Checklist
-
-- [x] Bundle splitting по библиотекам
-- [x] Tree-shaking неиспользуемого кода
-- [x] React memoization для предотвращения re-render
-- [x] Server-side caching с React cache()
-- [x] Middleware role caching
-- [x] Font optimization с preload
-- [x] Image optimization с современными форматами
-- [x] HTTP headers для кэширования
-- [x] Loading states для UX
-- [x] Suspense boundaries для async компонентов
-- [x] Console.log removal в продакшене
-- [x] CSS оптимизация с Tailwind purging
-
-# 🔐 Безопасность и База Данных
-
-## 🛡️ Security Architecture
-
-### Row Level Security (RLS)
-
-```sql
--- Профили пользователей
-CREATE POLICY "Users can view own profile" ON profiles
-FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own profile" ON profiles
-FOR UPDATE USING (auth.uid() = id);
-
--- Админы могут видеть все профили
-CREATE POLICY "Admins can view all profiles" ON profiles
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid()
-    AND role IN ('ADMIN', 'SUPER_ADMIN')
-  )
-);
-```
-
-### Authentication Flow
-
-```typescript
-// Supabase Auth с Email OTP + Google OAuth
-const authMethods = {
-  emailOtp: {
-    signIn: () =>
-      supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true },
-      }),
-    verify: () => supabase.auth.verifyOtp({ email, token, type: "email" }),
-  },
-
-  googleOAuth: {
-    signIn: () =>
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: { access_type: "offline", prompt: "consent" },
-        },
-      }),
-  },
-};
-```
-
-### Database Schema
-
-```sql
--- Пользователи (расширение auth.users)
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users(id) PRIMARY KEY,
-  email TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'USER' CHECK (role IN ('USER', 'CREATOR', 'ADMIN', 'SUPER_ADMIN')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Автоматическое создание профиля при регистрации
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, role)
-  VALUES (NEW.id, NEW.email, 'USER');
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-```
-
-## 🌍 Интернационализация (i18n)
-
-### Архитектура i18n
-
-```typescript
-// Поддерживаемые языки
-const locales = ["en", "es", "ru"] as const;
-type Locale = (typeof locales)[number];
-
-// Серверная детекция языка
-export function detectLocale(acceptLanguage?: string): Locale {
-  if (!acceptLanguage) return "en";
-
-  const preferredLocales = acceptLanguage
-    .split(",")
-    .map((lang) => lang.split(";")[0].trim().toLowerCase());
-
-  for (const preferred of preferredLocales) {
-    if (locales.includes(preferred as Locale)) {
-      return preferred as Locale;
-    }
-
-    // Проверка языка без кода страны (en-US -> en)
-    const langCode = preferred.split("-")[0];
-    if (locales.includes(langCode as Locale)) {
-      return langCode as Locale;
-    }
-  }
-
-  return "en";
-}
-```
-
-### Структура переводов
-
-```json
-// locales/en.json
-{
-  "navbar.discover": "Discover",
-  "navbar.marketplace": "Marketplace",
-  "navbar.labs": "Labs",
-  "navbar.docs": "Docs",
-  "navbar.inventory": "Inventory",
-  "navbar.adminPanel": "Admin Panel",
-  "navbar.mySettings": "My Settings",
-  "navbar.signedInAs": "Signed in as",
-  "navbar.logOut": "Log Out",
-
-  "auth.emailLabel": "Email Address",
-  "auth.emailPlaceholder": "Enter your email",
-  "auth.continueWithEmail": "Continue with Email",
-  "auth.continueWithGoogle": "Continue with Google",
-  "auth.codeLabel": "Authentication code",
-  "auth.resendCode": "Resend code",
-  "auth.verify": "Verify",
-
-  "theme.light": "Light",
-  "theme.dark": "Dark",
-  "theme.toggleLabel": "Toggle Theme",
-
-  "footer.copyright": "© 2024 MEDTRAVEL.ME Inc. All rights reserved."
-}
-```
-
-### Клиентская i18n конфигурация
-
-```typescript
-// i18n.ts
-import i18n from "i18next";
-import { initReactI18next } from "react-i18next";
-import LanguageDetector from "i18next-browser-languagedetector";
-
-const resources = {
-  en: { translation: en },
-  es: { translation: es },
-  ru: { translation: ru },
-};
-
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources,
-    fallbackLng: "en",
-    interpolation: { escapeValue: false },
-    detection: {
-      order: ["localStorage", "navigator", "htmlTag"],
-      caches: ["localStorage"],
-    },
-  });
-```
-
-## 🎨 Стили и Темы
-
-### Tailwind + HeroUI Configuration
-
-```javascript
-// tailwind.config.js
-module.exports = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ["var(--font-roboto)", "Inter", "ui-sans-serif", "system-ui"],
-      },
-      animation: {
-        "fade-in": "fadeIn 0.5s ease-in-out",
-        "slide-up": "slideUp 0.3s ease-out",
-      },
-    },
-  },
-  darkMode: "class",
-  plugins: [
-    heroui({
-      themes: {
-        light: {
-          colors: {
-            background: "#FFFFFF",
-            foreground: "#11181C",
-            primary: {
-              50: "#eff6ff",
-              500: "#3b82f6", // Blue-500
-              DEFAULT: "#3b82f6",
-              foreground: "#FFFFFF",
-            },
-            // ... полная цветовая палитра
-          },
-        },
-        dark: {
-          colors: {
-            background: "#0d1117",
-            foreground: "#e6edf3",
-            primary: {
-              500: "#60a5fa", // Blue-400
-              DEFAULT: "#60a5fa",
-              foreground: "#0d1117",
-            },
-            // ... темная цветовая палитра
-          },
-        },
-      },
-    }),
-  ],
-};
-```
-
-### Theme Provider Implementation
-
-```typescript
-// components/ThemeProvider.tsx
-"use client";
-
-import { ThemeProvider as NextThemeProvider } from "next-themes";
-import { ThemeProviderProps } from "next-themes/dist/types";
-
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return (
-    <NextThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem={true}
-      {...props}
-    >
-      {children}
-    </NextThemeProvider>
-  );
-}
-```
-
-### CSS Custom Properties
-
-```css
-/* styles/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --font-roboto: "Roboto", "Inter", ui-sans-serif, system-ui;
-}
-
-/* Custom animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* HeroUI custom overrides */
-.heroui-navbar {
-  backdrop-filter: blur(12px);
-  background-color: rgb(255 255 255 / 0.8);
-}
-
-.dark .heroui-navbar {
-  background-color: rgb(13 17 23 / 0.8);
-}
-```
-
-## 🚀 Развертывание
-
-### Environment Variables
-
-```bash
-# .env.local
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# Production only
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-### Vercel Deployment
-
-```json
-// vercel.json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key"
-  }
-}
-```
-
-### Build Optimization
-
-```json
-// package.json scripts
-{
-  "scripts": {
-    "dev": "next dev --turbopack", // Turbopack для dev
-    "build": "next build", // Production build
-    "start": "next start", // Production server
-    "lint": "eslint --fix", // Linting с автофиксом
-    "analyze": "ANALYZE=true npm run build" // Bundle анализ
-  }
-}
-```
-
-## 🛠 Development Setup
-
-### Prerequisites
-
-```bash
-Node.js 18.17+ or 20.0+
-npm 9+ or yarn 1.22+
-Git 2.0+
-```
-
-### Installation
-
-```bash
-# Клонирование репозитория
-git clone <repository-url>
-cd frontend
-
-# Установка зависимостей
-npm install
-
-# Настройка переменных окружения
-cp .env.example .env.local
-# Заполните SUPABASE_URL и ANON_KEY
-
-# Запуск в режиме разработки
-npm run dev
-```
-
-### Development Scripts
-
-```bash
-npm run dev          # Запуск dev сервера с Turbopack
-npm run build        # Production build
-npm run start        # Запуск production сервера
-npm run lint         # ESLint проверка с автофиксом
-npm run type-check   # TypeScript проверка типов
-```
-
-### Code Quality
-
-```javascript
-// eslint.config.mjs
-export default [
-  {
-    files: ["**/*.{js,jsx,ts,tsx}"],
-    rules: {
-      "react-hooks/exhaustive-deps": "error",
-      "@typescript-eslint/no-unused-vars": "error",
-      "import/order": "warn",
-      "prettier/prettier": "warn",
-    },
-  },
-];
-```
-
-### Git Hooks (рекомендуется)
-
-```json
-// package.json
-{
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged",
-      "pre-push": "npm run type-check"
-    }
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"]
-  }
-}
-```
-
-## 📱 Testing Strategy
-
-### Unit Testing (рекомендуется добавить)
-
-```bash
-# Добавить в зависимости
-npm install --save-dev @testing-library/react @testing-library/jest-dom jest
-
-# Jest конфигурация
-// jest.config.js
-module.exports = {
-  testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/$1',
-  },
-};
-```
-
-### E2E Testing (рекомендуется добавить)
-
-```bash
-# Playwright для E2E тестов
-npm install --save-dev @playwright/test
-
-# Playwright конфигурация
-// playwright.config.ts
-export default {
-  testDir: './e2e',
-  fullyParallel: true,
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-  ],
-};
-```
-
-## 🔮 Future Improvements
-
-### Планируемые функции
-
-- [ ] **Real-time features**: WebSocket интеграция с Supabase Realtime
-- [ ] **PWA support**: Service Worker + Web App Manifest
-- [ ] **Mobile app**: React Native версия с shared компонентами
-- [ ] **Advanced analytics**: Custom events tracking
-- [ ] **Content management**: Admin панель для управления контентом
-- [ ] **Payment integration**: Stripe/PayPal для маркетплейса
-- [ ] **File upload**: Supabase Storage интеграция
-- [ ] **Search functionality**: Full-text search с PostgreSQL
-- [ ] **Notifications**: Push уведомления + email
-- [ ] **API rate limiting**: Защита от злоупотреблений
-
-### Performance Improvements
-
-- [ ] **Partial Prerendering**: Когда стабилизируется в Next.js
-- [ ] **Edge runtime**: Для API routes
-- [ ] **Service Worker**: Для offline функциональности
-- [ ] **Bundle analyzer**: Регулярный мониторинг размера бандла
-- [ ] **Lazy loading**: Дополнительная оптимизация компонентов
-- [ ] **CDN optimization**: Оптимизация доставки статических ресурсов
-
-## 📊 Project Metrics
-
-### Codebase Statistics
-
-- **Total Files**: 63 файлов
-- **Components**: 15+ React компонентов
-- **Pages**: 8 страниц приложения
-- **Layouts**: 4 layout группы
-- **Languages**: 3 языка (EN/ES/RU)
-- **Dependencies**: 25+ production пакетов
-- **Dev Dependencies**: 20+ development пакетов
-
-### Performance Metrics
-
-- **Bundle Size**: 341kB shared + ~154B per page
-- **First Load**: < 500ms (target)
-- **Time to Interactive**: < 1s (target)
-- **Lighthouse Score**: 90+ (target)
-- **Core Web Vitals**: Green (target)
+# MedTravel — Customer Panel & Platform
+
+MedTravel — платформа для медицинского туризма: пациенты ищут клиники, читают профили/отзывы и записываются на приём.  
+Этот репозиторий содержит **Customer Panel** (кабинет клиники) и базовые части фронтенда.
+
+## TL;DR
+- **Stack:** Next.js (App Router) + TypeScript + TailwindCSS  
+- **Data:** Supabase (Postgres + RLS), вьюхи `v_customer_*`  
+- **UI:** наши локальные компоненты (+ `@heroui` выборочно)  
+- **Фокус:** Bookings, Reports, **Clinic Profile (многошаговая анкета)**
 
 ---
 
-**MedTravel** - это современная, масштабируемая и высокопроизводительная платформа, построенная с использованием лучших практик веб-разработки 2024 года. Архитектура приложения обеспечивает отличный developer experience, безопасность, производительность и готовность к продакшену.
+## Содержание
+- [Архитектура](#архитектура)
+- [Стандарты UI/UX](#стандарты-uiux)
+- [База данных](#база-данных)
+- [RLS и безопасность](#rls-и-безопасность)
+- [Локальный запуск](#локальный-запуск)
+- [ENV переменные](#env-переменные)
+- [Команды](#команды)
+- [Дорожная карта](#дорожная-карта)
+- [Contribution](#contribution)
 
-----------------------------------------------
+---
 
--блог *
--метатеги *
--парсинг *
--темная тема
--весь ux/ui
--локализация
+## Архитектура
+
+app/
+(customer)/customer/
+bookings/ # Bookings list + filters + actions
+reports/ # Reports list (user-submitted about clinic)
+clinic/
+basic/ # Basic Information
+services/
+doctors/
+facilities/
+hours/
+gallery/
+location/
+pricing/ # Payment methods
+dashboard/
+patients/
+reviews/
+transactions/
+settings/
+components/
+customer/
+TableShell.tsx
+clinic/ClinicProfileLayout.tsx
+ui/ # общие UI (button, input, select, card, ...)
+contexts/
+ClinicProfileContext.tsx
+lib/
+supabase/
+adminClient.ts
+serverClient.ts
+server-actions/
+clinic-profile.ts # saveDraftSection/getDraft/submitForReview
+export.ts # CSV экспорты
+types/
+clinic.ts # типы: ClinicStatus, Doctor, PaymentMethod, ...
+
+
+**Ключевые принципы**
+- App Router, серверные компоненты там, где уместно (списки/таблицы).
+- Никаких внешних шаблонов «как есть» — только наш слой UI/контексты/экшены.
+- Фильтры синхронизируются с URL query params.
+- Опасные действия — с явным подтверждением.
+
+---
+
+## Стандарты UI/UX
+
+- Заголовок слева, действия справа (Refresh / Export / Delete All).
+- Фильтры в `Card` со стандартными полями и кнопкой `Reset Filters` справа снизу.
+- Таблицы через `TableShell`; пустое состояние — в пропсе `empty`.
+- Цвета действий:
+  - Primary: синий (submit/save),
+  - Destructive: розовый/красный (Delete All),
+  - Outline: вторичное действие.
+- Даты — короткий локализованный формат.
+- Кликабельные ряды — с hover, но без сюрпризов (никаких «скрытых» действий).
+
+---
+
+## База данных
+
+### Вьюхи
+
+**`v_customer_bookings` (пример полей)**
+
+```sql
+create or replace view v_customer_bookings as
+select
+  b.id            as booking_id,
+  b.clinic_id,
+  b.created_at,
+  p.full_name     as patient_name,
+  p.phone,
+  b.contact_method,
+  s.name          as service,
+  b.status
+from bookings b
+join patients p on p.id = b.patient_id
+left join services s on s.id = b.service_id;
+
+Индексы на исходных таблицах:
+
+bookings (clinic_id, created_at desc),
+
+bookings (clinic_id, status),
+
+patients (phone).
+
+v_customer_reports
+
+Уже используется: id, clinic_id, created_at, reporter, contact, relationship, details, status.
+
+Черновик клиники
+
+clinic_profile_drafts (рекомендуемая схема)
+
+create table if not exists clinic_profile_drafts (
+  clinic_id uuid primary key references clinics(id) on delete cascade,
+  status text not null default 'draft', -- draft|pending|published|rejected
+  basic_info jsonb,
+  services jsonb,
+  doctors jsonb,
+  facilities jsonb,
+  hours jsonb,
+  gallery jsonb,
+  location jsonb,
+  pricing jsonb,
+  updated_at timestamptz not null default now()
+);
+
+
+JSON-формы (shape)
+
+basic_info: { name, specialty, country, city, province?, district?, address, description?, slug? }
+
+services: [{ name, price, category, description }]
+
+doctors: [{ name, specialty, experience, qualifications, photo_url? }]
+
+facilities: { premises: string[], clinic_services: string[], travel_services: string[], languages_spoken: string[] }
+
+hours: [{ day: "Monday", hours: "9:00 AM - 5:00 PM" | "Closed" }]
+
+gallery: [{ url, title? }]
+
+location: { google_maps_url, directions, latitude?, longitude? }
+
+pricing: { paymentMethods: string[] }
+
+RLS и безопасность
+
+Все селекты в Customer Panel фильтруются по clinic_id текущей клиники.
+
+RLS политики:
+
+using (clinic_id = auth.uid()::uuid or clinic_id in (... mapping ...)) — зависит от вашей модели маппинга аккаунта ↔ клиника.
+
+Запись в clinic_profile_drafts разрешена только владельцу клиники.
+
+Массовые операции (Delete All) — только в рамках своего clinic_id.
+
+Экспорты CSV — формируются на сервере и включают только доступные пользователю данные.
+
+
+------------------------------------------------
+
+кастомер панель нужна для клиники, которая хочет пользоваться нашим сервисом агрегатором и загрузить свою клинику на сервис. мы уже реализовали некоторые страницы в кастомер панели полностью статичные и с самым базовым дизайном, сейчас мы полностью переходим на ее разработку. и прежде всего нужно подготовить все в supabase, это также и новая роль customer. в этой панели нужен будет функционал добавления клиники вручную в точности такой же, который мы реализовали в админ панели, лишь одно дополнение будет, это то, что при коли customer клиника не сразу будет грузиться в публичный каталог, она должна будет пройти модерацию, у нас в таблице clinics уже есть кое-какие колонки для этого как owner_id и moderation_status, и я думаю модерацией будет заниматься роль admin, то есть просто в админ панели реализуем для начала какой-то раздел, чтобы модерировать клиники поступающие на добавление в каталог от роли customer. далее разделы в кастомер панели это Bookings - принятие заявок для конкретно этой клиники, которая ее опубликовала и прошла модерацию(практически как в админ панели уже реализовывали), раздел Patients - список пациентов этой клиники, которые записались на какие-либо услуги клиники, раздел Reviews - список отзывов, который пользователи оставляли конкретно этой клинике, причем у клиники должна быть возможность модерировать своими отзывами, который пользователи оставляют для этой клиники, то есть клиники может его опубликовать и он должен будет отобразиться на странице этой клиники в той секции где отзывы или же отклонить и не публиковать отзыв, раздел Transactions - список транзакций, раздел Reports - это список репортов как мы реализовывали в админ панели, только для этой конкретной клиники, раздел Settings - это настройки профиля этой клиники, такие как смена пароля, поле с главным email, дополнительным email, настройкой time zone, раздел Dashboard - такой же раздел как в админ панели, только статистика ведется конкретной этой клиники, количество заявок, репортов и так далее. это я расписал по разделам кастомер панели, в которые будут приходить данные в виде списков(кроме раздела settings) и это колонки в каком виде для каждого раздела должны будут приходить данные конкретной клиники из supabase: bookings_customer - name, phone, contact method, service, status, created at, actions. patiens_customer - patient id, patient name, phone, service, status, preliminary cost of service, actual cost of service, actions. reviews_customer - date, reviewer, rating, comment, status, actions. transactions_customer - invoice id, status, invoice price, actions. settings - main email, password, additional email, time zone. reports_customer - date, reporter, contact, relationship, details, status, actions.
+
+--------------------------------------------------
+
+Этап 0. Базовые определения, роли, справочники
+0.1. Роли и аккаунты
+
+В profiles (или вашей users-профиль таблице) добавляем поле:
+
+role text check (role in ('admin','customer','patient') ) default 'patient'
+
+Для клиник с несколькими операторами сразу предусмотрим членство:
+
+clinic_members(id, clinic_id uuid, user_id uuid, role text check (role in ('owner','manager','agent')), created_at)
+
+Один владелец (owner) = тот, кто создал клинику; остальные — менеджеры.
+
+0.2. Статусы/enum’ы
+
+clinics.moderation_status ∈ ('pending','approved','rejected'), default 'pending'
+
+reviews.status ∈ ('pending','published','rejected'), default 'pending'
+
+bookings.status ∈ ('new','in_progress','done','cancelled')
+
+invoices.status ∈ ('draft','awaiting_payment','paid','void')
+
+Этап 1. Схема БД (миграции)
+1.1. Клиники и модерация
+1.2. Заявки/бронирования (Bookings)
+1.3. Пациенты
+1.4. Отзывы
+1.5. Транзакции/Счета
+1.6. Репорты (жалобы/сообщения)
+1.7. Вьюхи под SEO/дашборды (есть часть уже)
+
+Этап 2. RLS-политики (Supabase Row-Level Security)
+
+Включаем RLS на таблицах и прописываем правила:
+
+2.1. Клиники
+Модерацию (moderation_status) меняем через админ-API (серверный ключ) — RLS на UPDATE для админов можно не писать, т.к. это будет идти от Service Role.
+
+2.2. Остальные таблицы (аналогично)
+
+Для каждой: bookings, patients, reviews, invoices, clinic_reports:
+
+2.3. Публичный каталог
+
+Этап 3. Модерация клиник (админ)
+
+В админ-панели раздел “Moderation”:
+
+листинг всех клиник moderation_status in ('pending','rejected') (+ поиск/фильтры)
+
+действия: Approve/Reject с комментарием → апдейт clinics.moderation_status (через серверные действия/роуты с сервис-ключом).
+
+Нотификации (опционально): письмо/телеграм владельцу.
+
+Этап 4. Customer-панель: структура роутинга (Next.js)
+
+Под /customer/*:
+
+/customer → Dashboard (виджеты по v_clinic_dashboard + графики)
+
+/customer/clinics/new → форма «Добавить клинику» (создаёт запись clinics со status='pending')
+
+/customer/bookings → таблица заявок (колонки: name, phone, contact method, service, status, created at, actions)
+
+/customer/patients → таблица пациентов (patient id, name, phone, service, status, preliminary cost, actual cost, actions)
+
+/customer/reviews → список отзывов (date, reviewer, rating, comment, status, actions [Publish/Reject])
+
+/customer/transactions → счета (invoice id, status, price, actions [оплатить/скачать])
+
+/customer/reports → репорты (date, reporter, contact, relationship, details, status, actions)
+
+/customer/settings → настройки: main email (readonly из auth?), password (reset), additional email(s), time zone
+
+Пока простые серверные компоненты + server actions со Zod-валидацией.
+
+Этап 5. API/Server Actions (первый набор)
+5.1. Клиника
+
+createClinic(payload) — owner_id = auth.uid(), moderation_status='pending'
+
+updateClinicBasics(payload) — только для owner/manager; без права менять moderation_status
+
+5.2. Bookings
+
+listBookings(clinic_id, paging, search)
+
+updateBookingStatus(id, status)
+
+createBooking (если надо из панели)
+
+setCosts(id, preliminary_cost, actual_cost)
+
+5.3. Patients
+
+listPatients(clinic_id, paging, search)
+
+createPatient / updatePatient (опционально). В простом варианте пациенты автосоздаются при подтверждённых заявках.
+
+5.4. Reviews
+
+listReviews(clinic_id, status?)
+
+moderateReview(id, 'published'|'rejected')
+
+5.5. Invoices
+
+listInvoices(clinic_id)
+
+payInvoice(id) (интеграция с платежкой позже; пока — заглушка ‘paid’)
+
+5.6. Reports
+
+listReports(clinic_id)
+
+updateReportStatus(id, status)
+
+Этап 6. UI-компоненты таблиц
+
+Единая таблица (DataTable) с:
+
+серверной пагинацией, сортировкой
+
+сохранением фильтров в query-строке
+
+«Actions» (кнопки/меню)
+
+Колонки:
+
+Bookings: name | phone | contact_method | service | status | created_at | actions
+
+Patients: id | name | phone | service | status | preliminary_cost | actual_cost | actions
+
+Reviews: date | reviewer | rating | comment | status | actions (Publish / Reject)
+
+Transactions: invoice id | status | amount | actions
+
+Reports: date | reporter | contact | relationship | details | status | actions
+
+Этап 7. Settings
+
+Main email: тянем из Supabase Auth; редактирование через Magic Link / email change flow (родной Supabase)
+
+Password: reset password (Supabase)
+
+Additional emails: массив/таблица clinic_emails(clinic_id, email, is_primary bool default false) или jsonb-поле
+
+Time zone: хранить в clinics.time_zone / clinic_settings(time_zone, …)
+
+RLS: редактировать может только владелец/менеджер
+
+Этап 8. Права доступа/гард для маршрутов
+
+Серверные layout-guard: если profile.role !== 'customer' → 403
+
+Если customer привязан к нескольким клиникам:
+
+быстрый селектор «Current clinic» в шапке панели → передавать clinic_id в запросы
+
+Фолбэк: если клиник нет → редирект на /customer/clinics/new
+
+Этап 9. Модуль модерации отзывов клиникой
+
+В панели клиника видит только свои отзывы в status='pending'|'rejected'|'published'
+
+Действия:
+
+Publish → reviews.status='published'
+
+Reject → reviews.status='rejected'
+
+На публичной карточке клиники выводим только status='published'
+
+Этап 10. Отчётность и аудит
+
+Таблица audit_log(id, user_id, clinic_id, entity, entity_id, action, meta jsonb, created_at)
+
+пишем через DB trigger или в Server Action
+
+поможет в разборе инцидентов/споров
+
+Для админки — сводка по изменениями клиник/цен/отказам
+
+Этап 11. Уведомления (после MVP)
+
+Email/SMS/Telegram о:
+
+новой заявке клинике
+
+новом отзыве (ожидает модерации)
+
+решении по модерации клиники
+
+Хранить настройки уведомлений в clinic_settings
+
+Этап 12. Безопасность / хозяйка
+
+Все критичные операции — через Server Actions (с проверкой auth.uid() и RLS)
+
+Маскирование телефонов в таблицах по умолчанию (показывать целиком в модалке “View”)
+
+Rate limiting на публичные формы (Cloudflare Turnstile/ReCAPTCHA + edge-rate-limit)
+
+Политики доступа перепроверить на каждой таблице (select/insert/update/delete)
+
+Логи и алерты Supabase + Vercel (ошибки/латентность)
+
+Этап 13. План внедрения по спринтам
+
+Спринт 1 (бэкенд база + доступы)
+
+Миграции (таблицы из Этапа 1)
+
+RLS-политики (Этап 2)
+
+Вьюха mv_catalog_clinics/v_clinic_dashboard
+
+Базовые серверные функции createClinic, listBookings
+
+Спринт 2 (UI каркас панели)
+
+/customer layout, селектор текущей клиники
+
+Dashboard (счётчики из v_clinic_dashboard)
+
+/customer/clinics/new форма отправки на модерацию
+
+Спринт 3 (Bookings + Patients)
+
+Таблицы, фильтры, смена статусов
+
+Автосоздание пациента при подтверждении заявки
+
+Спринт 4 (Reviews + Moderation by clinic)
+
+Таблица отзывов, кнопки publish/reject
+
+Публичный вывод только published
+
+Спринт 5 (Transactions + Reports)
+
+Таблицы, минимум действий (оплата — заглушка)
+
+Обработка статусов репортов
+
+Спринт 6 (Settings + polish)
+
+Emails/timezone/password
+
+Улучшение UX, пустые состояния, экспорт CSV
+
+Спринт 7 (Админ-модерация клиник)
+
+Раздел в админке: approve/reject + комментарий
+
+Почтовые нотификации
+
+Спринт 8 (Нотификации и защита)
+
+Email/Telegram уведомления
+
+Rate limiting, captcha на формы
+
+Соответствие колонок из ТЗ ↔ источники
+
+bookings_customer: name, phone, contact_method, service, status, created_at → bookings
+
+patients_customer: patient id, patient name, phone → patients; service, status, preliminary/actual cost → из bookings (последняя заявка/связь по patient_id)
+
+reviews_customer: date(created_at), reviewer, rating, comment, status → reviews
+
+transactions_customer: invoice id, status, invoice price → invoices (id, status, amount)
+
+reports_customer: date, reporter, contact, relationship, details, status → clinic_reports
+
+settings: main email (Auth), password (reset flow), additional email(s) (таблица/поле), time zone (clinic_settings/clinics)
+
+
+
+
+------------------------------------------
+
+
+Отчёт: импорт клиник из WhatClinic в Supabase
+1) Общая схема процесса (ETL)
+
+Staging загрузка «как есть» → таблица public.whatclinic_raw (CSV/NDJSON/JSONL).
+
+Очистка и нормализация в stg_* представлениях/CTE: тримы, lower-case e-mail/URL, нормализация телефонов, разбор JSON-полей (услуги/языки/часы/врачи), выравнивание страны/города, генерация slug.
+
+Дедупликация по устойчивым ключам (src='whatclinic' + src_id, или fallback по (normalized_name, city, phone)), вычисление content_hash для идемпотентных upsert’ов.
+
+Upsert в боевые таблицы:
+
+clinics (мастер-карточка клиники),
+
+clinic_services, clinic_doctors, clinic_images, clinic_hours, clinic_accreditations, clinic_languages,
+
+clinic_sources (линк на первоисточник + content_hash).
+
+Обогащение (опц.): геокодинг недостающих координат, нормализация категорий к нашему справочнику service_categories.
+
+Индексы + FTS: быстрый поиск и фильтрация.
+
+Аудит/повторная загрузка: идемпотентность через content_hash + updated_at, обновляем только изменившиеся записи.
+
+2) Схема стейджинга: public.whatclinic_raw
+
+Храним всё из WhatClinic без потерь, включая сложные поля как jsonb.
+
+create table if not exists public.whatclinic_raw (
+  id                bigserial primary key,
+  src               text not null default 'whatclinic',  -- источник
+  src_id            text not null,                       -- id в источнике
+  fetched_at        timestamptz not null default now(),  -- когда скачали
+  url               text,
+  website           text,
+  email             text,
+  phones            jsonb,         -- массив строк телефонов
+  name              text,
+  description       text,
+  country           text,
+  country_code      text,          -- если отдаёт ISO2/3, сохраняем
+  city              text,
+  district          text,
+  address           text,
+  latitude          numeric,       -- как пришло
+  longitude         numeric,
+  services          jsonb,         -- массив строк/объектов
+  specialties       jsonb,         -- массив строк
+  pricing           jsonb,
+  opening_hours     jsonb,         -- массив объектов {day, open, close}
+  languages         jsonb,         -- массив строк
+  accreditations    jsonb,         -- массив объектов {name, logo_url?}
+  images            jsonb,         -- массив URL'ов или объектов
+  doctors           jsonb,         -- массив объектов {name, specialty, ...}
+  reviews           jsonb,         -- опц.
+  raw               jsonb,         -- оригинальный JSON (как бэкап)
+  content_hash      text,          -- md5 от нормализованных ключевых полей
+  unique (src, src_id)
+);
+
+
+Замечания
+
+content_hash вычисляем на этапе загрузки/очистки из подмножества ключевых полей (имя, адрес, телефоны, услуги и т.п.) — помогает определять, менялась ли запись с прошлого импорта.
+
+3) Нормализация/очистка (ключевые правила)
+
+name, city, country — trim(), переизбыточные пробелы → одиночный пробел.
+
+email → lower(email), валидация простой regex.
+
+website/url → добавляем https:// если отсутствует схема; убираем UTM-хвосты.
+
+телефоны: оставляем только цифры и +, приводим к E.164 когда возможно (через страну), храним и «сырое», и нормализованное.
+
+slug генерируем как slugify(name + '-' + city) с латиницей.
+
+country → ISO2 через мэппинг; city/district — без диакритики (для поиска).
+
+latitude/longitude: если отсутствуют, можем попробовать геокодер позже (отложенное обогащение).
+
+services/specialties/languages — к нижнему регистру и trim; в дальнейшем сопоставляем со справочником категорий (опционально уже на этапе upsert).
+
+4) Боевая модель (фрагмент)
+-- мастер
+create table if not exists public.clinics (
+  id               uuid primary key default gen_random_uuid(),
+  name             text not null,
+  slug             text not null unique,
+  description      text,
+  country_code     text not null,       -- ISO2
+  city             text not null,
+  district         text,
+  address          text,
+  latitude         numeric,
+  longitude        numeric,
+  website          text,
+  email            text,
+  phone_primary    text,
+  phone_alt        text[],
+  status           text not null default 'imported', -- imported|enriched|published|hidden
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+create table if not exists public.clinic_sources (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  src              text not null,
+  src_id           text not null,
+  content_hash     text not null,
+  first_seen_at    timestamptz not null default now(),
+  last_seen_at     timestamptz not null default now(),
+  primary key (clinic_id, src, src_id)
+);
+
+create table if not exists public.clinic_services (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  service_name     text not null,
+  category         text,          -- нормализованная категория (из справочника), опц.
+  price_text       text,
+  description      text,
+  primary key (clinic_id, service_name)  -- грубый, ок для импорта
+);
+
+create table if not exists public.clinic_doctors (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  idx              int not null,
+  full_name        text not null,
+  specialty        text,
+  experience       text,
+  qualifications   text,
+  photo_url        text,
+  primary key (clinic_id, idx)
+);
+
+create table if not exists public.clinic_images (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  idx              int not null,
+  url              text not null,
+  title            text,
+  primary key (clinic_id, idx)
+);
+
+create table if not exists public.clinic_hours (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  day              text not null,        -- Monday..Sunday
+  status           text not null,        -- open|closed
+  time_open        text,
+  time_close       text,
+  primary key (clinic_id, day)
+);
+
+create table if not exists public.clinic_accreditations (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  idx              int not null,
+  name             text not null,
+  logo_url         text,
+  description      text,
+  primary key (clinic_id, idx)
+);
+
+create table if not exists public.clinic_languages (
+  clinic_id        uuid references public.clinics(id) on delete cascade,
+  language         text not null,
+  primary key (clinic_id, language)
+);
+
+5) Индексы и поиск
+-- поиск по названию/городу
+create index if not exists clinics_city_idx on clinics (lower(city));
+create index if not exists clinics_country_idx on clinics (country_code);
+
+-- FTS
+alter table clinics add column if not exists search_tsv tsvector;
+create index if not exists clinics_search_tsv_idx on clinics using gin(search_tsv);
+
+create or replace function clinics_tsv_update() returns trigger as $$
+begin
+  new.search_tsv :=
+    setweight(to_tsvector('simple', coalesce(new.name,'')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(new.city,'')), 'B') ||
+    setweight(to_tsvector('simple', coalesce(new.address,'')), 'C');
+  return new;
+end $$ language plpgsql;
+
+drop trigger if exists trg_clinics_tsv on clinics;
+create trigger trg_clinics_tsv
+before insert or update on clinics
+for each row execute function clinics_tsv_update();
+
+6) Стратегия upsert и идемпотентность
+
+Уникальный внешний ключ: (src, src_id).
+
+Таблица clinic_sources хранит content_hash.
+
+Алгоритм:
+
+Находим существующую clinic_id по (src, src_id). Если нет — создаём новую клинику (status='imported').
+
+Если content_hash совпадает с последним clinic_sources.content_hash → пропускаем обновление (ничего не менялось).
+
+Если хэш различается — обновляем поля клиники и зависимые коллекции атомарно (транзакция).
+
+В clinic_sources.last_seen_at и content_hash — апдейт.
+
+7) RLS/безопасность (кратко)
+
+Для всех публичных страниц поиска RLS не включаем или используем публичную роль чтения.
+
+Для Customer Panel RLS фильтрует по clinic_id, связанной с текущим пользователем/организацией.
+
+В импортных таблицах (whatclinic_raw) RLS можно отключить — это админский стейджинг.
+
+Инструкция: как повторить импорт с нуля
+A. Подготовка
+
+Создайте таблицы (из секций выше): whatclinic_raw и боевые (clinics, clinic_*, clinic_sources).
+Выполните SQL в Supabase SQL Editor.
+
+Создайте функцию tsv/триггер (см. раздел про FTS).
+
+(Опц.) Добавьте справочник категорий service_categories и таблицу соответствий, если хотите нормализовать названия услуг.
+
+B. Загрузка сырых данных (CSV/NDJSON)
+Вариант 1 — через psql \copy (быстро и надёжно)
+# CSV с хедерами, поля: как в whatclinic_raw, сложные поля в JSON строках
+psql "$SUPABASE_DB_URL" \
+  -c "\copy public.whatclinic_raw (src,src_id,url,website,email,phones,name,description,country,country_code,city,district,address,latitude,longitude,services,specialties,pricing,opening_hours,languages,accreditations,images,doctors,reviews,raw,content_hash) from 'whatclinic_dump.csv' with (format csv, header true, quote '\"', escape '\"')"
+
+
+Если у вас NDJSON/JSONL, можно временно грузить в raw jsonb, а затем jsonb_populate_record/-> разложить по целевым колонкам.
+
+Вариант 2 — Supabase Studio → «Import data»
+
+Таблица public.whatclinic_raw → Import → CSV.
+
+Поставьте галочку «First row is header».
+
+C. Очистка/трансформация (CTE или временные представления)
+
+Ниже — пример запроса, который нормализует ключевые поля и готовит данные к upsert в clinics:
+
+with base as (
+  select
+    r.*,
+    trim(regexp_replace(r.name, '\s+', ' ', 'g')) as name_clean,
+    trim(regexp_replace(coalesce(r.city,''), '\s+', ' ', 'g')) as city_clean,
+    trim(regexp_replace(coalesce(r.country,''), '\s+', ' ', 'g')) as country_clean,
+    lower(r.email) as email_lower,
+    case
+      when r.website ~* '^(http|https)://' then r.website
+      when r.website is null or r.website = '' then null
+      else 'https://' || r.website
+    end as website_norm
+  from whatclinic_raw r
+),
+phones_norm as (
+  select
+    b.id,
+    array_agg(distinct regexp_replace(x::text, '[^0-9+]', '', 'g')) filter (where x is not null and x <> '') as phones_e164
+  from base b
+  left join lateral jsonb_array_elements_text(b.phones) as x on true
+  group by b.id
+),
+prep as (
+  select
+    b.*, p.phones_e164,
+    lower(regexp_replace(b.city_clean, '[^a-z0-9]+', '-', 'g')) as city_slug,
+    lower(regexp_replace(b.name_clean || '-' || b.city_clean, '[^a-z0-9]+', '-', 'g')) as clinic_slug
+  from base b
+  left join phones_norm p on p.id = b.id
+)
+select * from prep;
+
+
+Этот CTE можно сохранить как view stg_whatclinic_prepared для удобства.
+
+D. Upsert в clinics (мастер) и clinic_sources
+-- 1) вставляем/обновляем клинику
+with prepared as (
+  select * from stg_whatclinic_prepared
+),
+upsert_clinic as (
+  insert into clinics as c (
+    name, slug, description,
+    country_code, city, district, address,
+    latitude, longitude, website, email, phone_primary, phone_alt, status
+  )
+  select
+    p.name_clean,
+    p.clinic_slug,
+    p.description,
+    coalesce(nullif(p.country_code,''), p.country_clean),  -- если есть ISO2, используем
+    p.city_clean,
+    p.district,
+    p.address,
+    p.latitude, p.longitude,
+    p.website_norm,
+    p.email_lower,
+    coalesce(p.phones_e164[1], null),
+    case when array_length(p.phones_e164,1) > 1 then p.phones_e164[2:array_length(p.phones_e164,1)] else null end,
+    'imported'
+  from prepared p
+  on conflict (slug) do update set
+    description   = excluded.description,
+    address       = excluded.address,
+    latitude      = excluded.latitude,
+    longitude     = excluded.longitude,
+    website       = excluded.website,
+    email         = excluded.email,
+    phone_primary = excluded.phone_primary,
+    phone_alt     = excluded.phone_alt,
+    updated_at    = now()
+  returning c.id, c.slug
+),
+link_source as (
+  -- сопоставляем prepared к clinics по slug
+  select p.id as raw_id, c.id as clinic_id, p.src, p.src_id, p.content_hash
+  from stg_whatclinic_prepared p
+  join clinics c on c.slug = p.clinic_slug
+)
+insert into clinic_sources (clinic_id, src, src_id, content_hash, first_seen_at, last_seen_at)
+select clinic_id, src, src_id, content_hash, now(), now()
+from link_source
+on conflict (clinic_id, src, src_id) do update
+set content_hash = excluded.content_hash,
+    last_seen_at = excluded.last_seen_at;
+
+
+Если вы хотите строже матчить по (src, src_id) (а не по slug), то сначала найдите clinic_id по clinic_sources, и только если не нашли — создайте новую clinic и сразу вставьте строку в clinic_sources.
+
+E. Upsert зависимых коллекций
+Services
+with items as (
+  select
+    c.id as clinic_id,
+    trim(x->> 'name') as service_name,
+    nullif(trim(x->> 'category'),'') as category,
+    nullif(trim(x->> 'price'),'')    as price_text,
+    nullif(trim(x->> 'description'),'') as description
+  from whatclinic_raw r
+  join clinic_sources cs on cs.src='whatclinic' and cs.src_id = r.src_id
+  join clinics c on c.id = cs.clinic_id
+  left join lateral jsonb_array_elements(
+    case when jsonb_typeof(r.services) = 'array' then r.services else '[]'::jsonb end
+  ) x on true
+)
+insert into clinic_services (clinic_id, service_name, category, price_text, description)
+select clinic_id, service_name, category, price_text, description
+from items
+where coalesce(service_name,'') <> ''
+on conflict (clinic_id, service_name) do update
+set category   = excluded.category,
+    price_text = excluded.price_text,
+    description= excluded.description;
+
+
+Аналогично — clinic_doctors, clinic_images, clinic_hours, clinic_accreditations, clinic_languages, меняя парсер jsonb_array_elements под конкретную структуру.
+
+Пример для hours (если в raw [{ "day": "Monday", "open": "09:00", "close": "17:00" }]):
+
+with items as (
+  select
+    c.id as clinic_id,
+    x->> 'day'  as day,
+    case when (x->> 'open') is null then 'closed' else 'open' end as status,
+    x->> 'open'  as time_open,
+    x->> 'close' as time_close
+  from whatclinic_raw r
+  join clinic_sources cs on cs.src='whatclinic' and cs.src_id = r.src_id
+  join clinics c on c.id = cs.clinic_id
+  left join lateral jsonb_array_elements(
+    case when jsonb_typeof(r.opening_hours)='array' then r.opening_hours else '[]'::jsonb end
+  ) x on true
+)
+insert into clinic_hours (clinic_id, day, status, time_open, time_close)
+select clinic_id, day, status, time_open, time_close
+from items
+where coalesce(day,'') <> ''
+on conflict (clinic_id, day) do update
+set status    = excluded.status,
+    time_open = excluded.time_open,
+    time_close= excluded.time_close;
+
+F. Идемпотентные перезагрузки (только изменения)
+
+Чтобы не трогать неизменившиеся клиники:
+
+-- список src_id, у которых изменился content_hash
+with changed as (
+  select r.src_id, r.content_hash
+  from whatclinic_raw r
+  join clinic_sources cs
+    on cs.src = r.src and cs.src_id = r.src_id
+  where cs.content_hash is distinct from r.content_hash
+)
+-- дальше ограничивайте upsert коллекций join'ом на changed
+
+
+Либо в каждом upsert делать where exists (select 1 from changed where changed.src_id = r.src_id).
+
+G. Контроль качества (QA) — быстрые проверки
+-- 1) Сколько клиник импортировано
+select count(*) from clinics;
+
+-- 2) Сколько привязано источников WhatClinic
+select count(*) from clinic_sources where src = 'whatclinic';
+
+-- 3) Пустые координаты (кандидаты на геокодинг)
+select id, name, city, address from clinics where latitude is null or longitude is null limit 50;
+
+-- 4) Клиники без услуг
+select c.id, c.name from clinics c
+left join clinic_services s on s.clinic_id = c.id
+group by c.id, c.name
+having count(s.service_name)=0;
+
+-- 5) Дубликаты по slug (не должно быть)
+select slug, count(*) from clinics group by slug having count(*)>1;
+
+H. Роллбэк / повторная сборка
+
+Стейджинг whatclinic_raw не трогаем — это история.
+
+Для полной пересборки боевых таблиц:
+
+truncate clinics cascade; (сотрёт все зависимые clinic_*),
+
+затем заново запустить шаги D/E.
+
+Для частичной пересборки по набору src_id — ограничиваем upsert join’ом на подмножество.
+
+I. Мини-скрипт Node (если импортировать из app)
+
+Иногда удобнее подтянуть CSV и выполнить upsert через supabase-js на сервере (Node script), но для больших объёмов предпочтительнее psql \copy.
+
+// scripts/import-whatclinic.ts
+import { createClient } from '@supabase/supabase-js';
+import fs from 'node:fs/promises';
+import { parse } from 'csv-parse/sync';
+import crypto from 'node:crypto';
+
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+function hashRecord(r: any) {
+  const key = JSON.stringify({
+    name: r.name?.trim(),
+    city: r.city?.trim(),
+    address: r.address?.trim(),
+    phones: r.phones,
+    services: r.services,
+  });
+  return crypto.createHash('md5').update(key).digest('hex');
+}
+
+async function main() {
+  const csv = await fs.readFile('whatclinic_dump.csv', 'utf8');
+  const rows = parse(csv, { columns: true, skip_empty_lines: true });
+
+  for (const r of rows) {
+    r.content_hash = hashRecord(r);
+  }
+
+  // батчами по 1000 строк
+  const chunk = 1000;
+  for (let i = 0; i < rows.length; i += chunk) {
+    const part = rows.slice(i, i + chunk);
+    const { error } = await supabase.from('whatclinic_raw').upsert(part, {
+      onConflict: 'src,src_id'
+    });
+    if (error) throw error;
+    console.log(`upserted: ${i + part.length}/${rows.length}`);
+  }
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });
+
+J. Что ещё запланировано/зарезервировано
+
+Нормализация услуг к внутреннему справочнику service_categories + Many-to-many таблица clinic_service_tags.
+
+Отложенный геокодинг пустых координат (batch через cron function).
+
+Правила публикации: status → после ручной модерации published, тогда клиника становится доступной в публичном каталоге.
+
+Единая «история импорта»/лог в таблице import_runs (timestamp, source, rows_total, inserted, updated, skipped, duration_ms).

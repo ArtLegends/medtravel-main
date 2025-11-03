@@ -1,57 +1,88 @@
 // app/(customer)/customer/layout.tsx
-import type { ReactNode } from 'react';
-import Link from 'next/link';
+"use client";
 
-export default function CustomerLayout({ children }: { children: ReactNode }) {
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import React from "react";
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  FileText,
+  DollarSign,
+  Settings,
+  BarChart2,
+  LogOut,
+  Menu,
+} from "lucide-react";
+
+const MENU = [
+  { title: "Dashboard",      href: "/customer",                 icon: LayoutDashboard },
+  { title: "Bookings",       href: "/customer/bookings",        icon: Calendar },
+  { title: "Patients",       href: "/customer/patients",        icon: Users },
+  { title: "Reviews",       href: "/customer/reviews",        icon: Users },
+  { title: "Clinic Profile", href: "/customer/clinic-profile",  icon: FileText },
+  { title: "Transactions",   href: "/customer/transactions",    icon: DollarSign },
+  { title: "Settings",       href: "/customer/settings",        icon: Settings },
+  { title: "Reports",        href: "/customer/reports",         icon: BarChart2 },
+];
+
+export default function CustomerLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  const isActive = (href: string) =>
+    href === "/customer"
+      ? pathname === "/customer"
+      : pathname?.startsWith(href);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-[1280px] px-4 py-6">
-        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-          {/* Sidebar */}
-          <aside className="rounded-xl border bg-white p-4">
-            <div className="mb-4 text-xl font-semibold">
-              <span className="text-teal-600">Med</span>Travel
-            </div>
-            <nav className="space-y-1 text-[15px]">
-              <NavItem href="/customer" label="Dashboard" />
-              <NavItem href="/customer/bookings" label="Bookings" />
-              <NavItem href="/customer/patients" label="Patients" />
-              <NavItem href="/customer/profile" label="Clinic Profile" />
-              <NavItem href="/customer/transactions" label="Transactions" />
-              <NavItem href="/customer/settings" label="Settings" />
-              <NavItem href="/customer/reports" label="Reports" />
-            </nav>
+    <div className="min-h-screen w-full bg-gray-50">
+      <div className="mx-auto flex w-full max-w-[1920px]">
+        {/* Sidebar */}
+        <aside className="hidden w-[240px] shrink-0 border-r border-gray-200 bg-white lg:block">
+          <nav className="p-2">
+            <ul className="space-y-1">
+              {MENU.map((item) => {
+                const ActiveIcon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={[
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition",
+                        active
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-700 hover:bg-gray-100",
+                      ].join(" ")}
+                    >
+                      <ActiveIcon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
-            <div className="mt-6">
-              <Link
-                href="/"
-                className="inline-flex items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-              >
-                ↪ Back to Home
-              </Link>
-            </div>
-          </aside>
+          <div className="border-t border-gray-200 p-4">
+            <Link
+              href="/"
+              className="flex w-full items-center justify-start gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <LogOut className="h-4 w-4" />
+              Back to Home
+            </Link>
+          </div>
+        </aside>
+
+        {/* Right side: header + main */}
+        <div className="flex min-h-screen flex-1 flex-col">
 
           {/* Content */}
-          <main className="rounded-xl border bg-white p-6">{children}</main>
+          <main className="flex-1 p-6">{children}</main>
         </div>
       </div>
     </div>
-  );
-}
-
-function NavItem({ href, label }: { href: string; label: string }) {
-  // простая активность — можно заменить на usePathname
-  const active = false;
-  return (
-    <Link
-      href={href}
-      className={
-        'block rounded-lg px-3 py-2 ' +
-        (active ? 'bg-gray-900 text-white' : 'hover:bg-gray-50')
-      }
-    >
-      {label}
-    </Link>
   );
 }

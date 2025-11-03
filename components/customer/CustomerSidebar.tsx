@@ -8,6 +8,7 @@ const NAV = [
   { label: "Dashboard",      href: "/customer" },
   { label: "Bookings",       href: "/customer/bookings" },
   { label: "Patients",       href: "/customer/patients" },
+  { label: "Reviews",       href: "/customer/reviews" },
   { label: "Clinic Profile", href: "/customer/clinic-profile" },
   { label: "Transactions",   href: "/customer/transactions" },
   { label: "Settings",       href: "/customer/settings" },
