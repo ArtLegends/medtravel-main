@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/browserClient";
 // import CategoryFilters from "./CategoryFilters"; // ❌ не используем в этой версии
 import { clinicPath } from "@/lib/clinic-url";
 
+type ServiceMap = Record<string, string>;
+
 type CatalogItem = {
   id: string;
   slug: string;
@@ -121,19 +123,26 @@ export default function CategoryGridClient({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const {
-    page,
-    sort,
-    country,
-    province,
-    city,
-    district,
-    services,
-    setParams,
-    setPage,
-    resetAll,
-    buildHref,
-    router,
+    page, sort, country, province, city, district, services,
+    setParams, setPage, resetAll, buildHref,
   } = useUrlState();
+
+  const [svcMap, setSvcMap] = useState<ServiceMap>({}); // <— словарь slug→name
+
+  // грузим словарь услуг один раз (или можно по facets.services)
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const { data } = await supabase.from('services').select('slug,name').limit(1000);
+      if (!cancelled) {
+        const map: ServiceMap = {};
+        for (const r of (data ?? [])) map[r.slug] = r.name;
+        setSvcMap(map);
+      }
+    }
+    run();
+    return () => { cancelled = true; };
+  }, [supabase]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,6 +220,7 @@ export default function CategoryGridClient({
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const labelOf = (slug: string) => svcMap[slug] ?? slug.replace(/-/g,' ');
 
   // База для популярных — либо закэшированные «первичные», либо текущие фасеты
   const baseFacets = initialFacetsRef.current ?? facets;
@@ -277,14 +287,21 @@ export default function CategoryGridClient({
                 </div>
                 {c.service_slugs?.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {c.service_slugs.slice(0, 5).map((t) => (
-                      <span
-                        key={t}
-                        className="rounded-full bg-gray-100 px-3 py-1 text-xs"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                    {c.service_slugs.slice(0, 5).map((t) => {
+                      const active = services.includes(t);
+                      return (
+                        <span
+                          key={t}
+                          className={
+                            `rounded-full px-3 py-1 text-xs border
+               ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-gray-100'}`
+                          }
+                          title={t}
+                        >
+                          {labelOf(t)}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
               </Link>
@@ -335,19 +352,20 @@ export default function CategoryGridClient({
             />
             <h3 className="mt-4 text-lg font-semibold">Popular locations</h3>
             <ul className="mt-2 space-y-2">
-              {popularCities.map((l) => (
-                <li key={l}>
-                  <Link
-                    className="text-blue-600 hover:underline"
-                    href={buildHref({ city: l })}
-                  >
-                    {l}
-                  </Link>
-                </li>
-              ))}
-              {popularCities.length === 0 && (
-                <li className="text-sm text-gray-500">No matches.</li>
-              )}
+              {popularCities.map((l) => {
+                const isActive = city && l.toLowerCase() === city.toLowerCase();
+                return (
+                  <li key={l}>
+                    <Link
+                      className={isActive ? 'font-semibold text-blue-700 underline' : 'text-blue-600 hover:underline'}
+                      href={buildHref({ city: l })}
+                    >
+                      {l}
+                    </Link>
+                  </li>
+                );
+              })}
+              {popularCities.length === 0 && <li className="text-sm text-gray-500">No matches.</li>}
             </ul>
           </div>
 
@@ -362,19 +380,20 @@ export default function CategoryGridClient({
             <h3 className="mt-4 text-lg font-semibold">Popular treatments</h3>
             <ul className="mt-2 space-y-2">
               {popularServices.map((t) => {
-                const slug = t.toLowerCase().replace(/\s+/g, "-");
+                const slug = t.toLowerCase().replace(/\s+/g, "-"); // если facets отдает имя; если уже slug — оставьте t
+                const isActive = services.includes(slug);
                 return (
                   <li key={t}>
                     <Link
-                      className="text-blue-600 hover:underline"
+                      className={`hover:underline ${isActive ? 'font-semibold text-blue-700' : 'text-blue-600'}`}
                       href={toggleServiceHref(slug)}
                       title="Toggle treatment filter"
                     >
-                      {t}
+                      {labelOf(slug)}
                     </Link>
                   </li>
                 );
-                })}
+              })}
               {popularServices.length === 0 && (
                 <li className="text-sm text-gray-500">No matches.</li>
               )}

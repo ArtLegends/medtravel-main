@@ -71,27 +71,47 @@ function tplTreatmentDesc(
   max?: number | null,
   currency = '€'
 ) {
-  const pricePart =
-    min != null && max != null
-      ? (lng === 'ru'
-          ? `${treatment} в ${loc} стоит от ${min}${currency} до ${max}${currency}.`
-          : lng === 'pl'
-            ? `${treatment} w ${loc} kosztuje od ${min}${currency} do ${max}${currency}.`
-            : `${treatment} in ${loc} costs from ${min}${currency} to ${max}${currency}.`)
-      : (lng === 'ru'
-          ? `Узнайте цены и сравните предложения.`
-          : lng === 'pl'
-            ? `Poznaj ceny i porównaj oferty.`
-            : `See prices and compare offers.`)
+  // База: всегда называем процедуру и локацию
+  const base =
+    lng === 'ru'
+      ? `${treatment} в ${loc}. `
+      : lng === 'pl'
+        ? `${treatment} w ${loc}. `
+        : `${treatment} in ${loc}. `
+
+  // Цены — по наличию min/max
+  let pricePart = ''
+  if (min != null && max != null) {
+    pricePart =
+      lng === 'ru'
+        ? `Цены от ${min}${currency} до ${max}${currency}. `
+        : lng === 'pl'
+          ? `Ceny od ${min}${currency} do ${max}${currency}. `
+          : `Prices from ${min}${currency} to ${max}${currency}. `
+  } else if (min != null) {
+    pricePart =
+      lng === 'ru'
+        ? `Цены от ${min}${currency}. `
+        : lng === 'pl'
+          ? `Ceny od ${min}${currency}. `
+          : `Prices from ${min}${currency}. `
+  } else if (max != null) {
+    pricePart =
+      lng === 'ru'
+        ? `Цены до ${max}${currency}. `
+        : lng === 'pl'
+          ? `Ceny do ${max}${currency}. `
+          : `Prices up to ${max}${currency}. `
+  }
 
   const tail =
     lng === 'ru'
-      ? ` Сравните клиники с высокими рейтингами и получите бесплатную консультацию ★ Проверенные отзывы реальных пациентов.`
+      ? `Сравните клиники с высокими рейтингами и получите бесплатную консультацию ★ Проверенные отзывы реальных пациентов.`
       : lng === 'pl'
-        ? ` Porównaj najlepiej oceniane kliniki i uzyskaj darmową wycenę ★ Zweryfikowane opinie pacjentów.`
-        : ` Compare top-rated clinics and get a free quote ★ Verified reviews from real patients.`
+        ? `Porównaj najlepiej oceniane kliniki i uzyskaj darmową wycenę ★ Zweryfikowane opinie pacjentów.`
+        : `Compare top-rated clinics and get a free quote ★ Verified reviews from real patients.`
 
-  return pricePart + tail
+  return base + pricePart + tail
 }
 
 // Карточка клиники (детальная)

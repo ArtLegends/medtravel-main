@@ -1,16 +1,16 @@
+// app/(admin)/admin/reviews/DeleteAllBtn.tsx
 'use client';
 
-export function DeleteAllBtn({ action }: { action: () => void }) {
+export function DeleteAllBtn() {
   return (
-    <form
-      action={action}
-      onSubmit={(e) => {
-        if (!confirm('Delete ALL reviews matching the current filter?')) e.preventDefault();
+    <button
+      type="submit"
+      onClick={(e) => {
+        if (!confirm('Delete ALL reviews in the current range?')) e.preventDefault();
       }}
+      className="rounded-md bg-rose-500 px-3 py-2 text-sm text-white hover:bg-rose-600"
     >
-      <button type="submit" className="rounded bg-rose-600 text-white px-3 py-2">
-        Delete All
-      </button>
-    </form>
+      Delete All
+    </button>
   );
 }

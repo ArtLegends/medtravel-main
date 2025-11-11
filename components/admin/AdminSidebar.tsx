@@ -31,6 +31,7 @@ const NAV: Item[] = [
   { label: "Reviews", href: "/admin/reviews", icon: MessageSquareText },
   { label: "Reports", href: "/admin/reports", icon: FileBarChart2 },
   { label: "Clinic Inquiries", href: "/admin/clinic-inquiries", icon: LifeBuoy },
+  { label: "Moderation", href: "/admin/moderation", icon: LifeBuoy },
 ];
 
 export default function AdminSidebar() {

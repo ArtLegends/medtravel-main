@@ -51,25 +51,25 @@ export default async function AdminReviewsPage({
     <div className="p-6">
       <h1 className="text-xl font-semibold mb-4">Reviews</h1>
 
-      {/* Filters */}
-      <form className="mb-4 flex flex-wrap items-end gap-2">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Start Date</label>
-          <input type="date" name="start" defaultValue={start ?? ''} className="rounded border px-2 py-1" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">End Date</label>
-          <input type="date" name="end" defaultValue={end ?? ''} className="rounded border px-2 py-1" />
-        </div>
-        <button formAction="/admin/reviews" className="rounded bg-gray-800 text-white px-3 py-2">
-          Apply
-        </button>
+      <div className="mb-4 flex flex-wrap items-end gap-2">
+        {/* Форма фильтров */}
+        <form action="/admin/reviews" className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+            <input type="date" name="start" defaultValue={start ?? ''} className="rounded border px-2 py-1" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">End Date</label>
+            <input type="date" name="end" defaultValue={end ?? ''} className="rounded border px-2 py-1" />
+          </div>
+          <button className="rounded bg-gray-800 text-white px-3 py-2">Apply</button>
+        </form>
 
-        <div className="ml-auto">
-          {/* ✅ Кнопка удаления вынесена в клиент */}
-          <DeleteAllBtn action={doDeleteAll} />
-        </div>
-      </form>
+        {/* Отдельная форма для Delete All — без вложения */}
+        <form action={doDeleteAll} className="ml-auto">
+          <DeleteAllBtn />
+        </form>
+      </div>
 
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border">

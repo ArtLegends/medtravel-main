@@ -186,6 +186,7 @@ export type Database = {
       }
       bookings: {
         Row: {
+          clinic_id: string | null
           contact_method: string
           created_at: string
           id: string
@@ -195,6 +196,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          clinic_id?: string | null
           contact_method: string
           created_at?: string
           id?: string
@@ -204,6 +206,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          clinic_id?: string | null
           contact_method?: string
           created_at?: string
           id?: string
@@ -264,6 +267,20 @@ export type Database = {
             foreignKeyName: "clinic_accreditations_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -273,6 +290,88 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_amenities: {
+        Row: {
+          clinic_id: string
+          enabled: boolean
+          key: string
+        }
+        Insert: {
+          clinic_id: string
+          enabled: boolean
+          key: string
+        }
+        Update: {
+          clinic_id?: string
+          enabled?: boolean
+          key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_amenities_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -361,6 +460,20 @@ export type Database = {
             foreignKeyName: "clinic_categories_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_categories_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_categories_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -370,6 +483,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_categories_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_categories_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -416,6 +543,20 @@ export type Database = {
             foreignKeyName: "clinic_hours_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -425,6 +566,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -456,6 +611,20 @@ export type Database = {
             foreignKeyName: "clinic_hours_raw_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_raw_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_raw_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -465,6 +634,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_raw_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_hours_raw_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -505,6 +688,20 @@ export type Database = {
             foreignKeyName: "clinic_images_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_images_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_images_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -514,6 +711,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_images_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_images_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -563,6 +774,20 @@ export type Database = {
             foreignKeyName: "clinic_inquiries_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -572,6 +797,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "clinic_inquiries_user_id_fkey"
@@ -607,6 +846,20 @@ export type Database = {
             foreignKeyName: "clinic_languages_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_languages_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_languages_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -618,10 +871,98 @@ export type Database = {
             referencedColumns: ["clinic_id"]
           },
           {
+            foreignKeyName: "clinic_languages_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_languages_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clinic_languages_language_id_fkey"
             columns: ["language_id"]
             isOneToOne: false
             referencedRelation: "languages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_members: {
+        Row: {
+          clinic_id: string
+          created_at: string | null
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_members_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
             referencedColumns: ["id"]
           },
         ]
@@ -651,6 +992,20 @@ export type Database = {
             foreignKeyName: "clinic_premises_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_premises_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_premises_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -662,10 +1017,199 @@ export type Database = {
             referencedColumns: ["clinic_id"]
           },
           {
+            foreignKeyName: "clinic_premises_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_premises_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clinic_premises_premise_id_fkey"
             columns: ["premise_id"]
             isOneToOne: false
             referencedRelation: "premises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_profile_drafts: {
+        Row: {
+          basic_info: Json | null
+          clinic_id: string
+          doctors: Json | null
+          facilities: Json | null
+          gallery: Json | null
+          hours: Json | null
+          location: Json | null
+          pricing: Json | null
+          services: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          basic_info?: Json | null
+          clinic_id: string
+          doctors?: Json | null
+          facilities?: Json | null
+          gallery?: Json | null
+          hours?: Json | null
+          location?: Json | null
+          pricing?: Json | null
+          services?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          basic_info?: Json | null
+          clinic_id?: string
+          doctors?: Json | null
+          facilities?: Json | null
+          gallery?: Json | null
+          hours?: Json | null
+          location?: Json | null
+          pricing?: Json | null
+          services?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_reports: {
+        Row: {
+          clinic_id: string
+          contact: string | null
+          created_at: string | null
+          details: string | null
+          id: string
+          relationship: string | null
+          reporter: string | null
+          status: string | null
+        }
+        Insert: {
+          clinic_id: string
+          contact?: string | null
+          created_at?: string | null
+          details?: string | null
+          id?: string
+          relationship?: string | null
+          reporter?: string | null
+          status?: string | null
+        }
+        Update: {
+          clinic_id?: string
+          contact?: string | null
+          created_at?: string | null
+          details?: string | null
+          id?: string
+          relationship?: string | null
+          reporter?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
             referencedColumns: ["id"]
           },
         ]
@@ -722,6 +1266,20 @@ export type Database = {
             foreignKeyName: "booking_requests_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -731,6 +1289,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "booking_requests_doctor_id_fkey"
@@ -786,6 +1358,20 @@ export type Database = {
             foreignKeyName: "clinic_services_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -797,10 +1383,101 @@ export type Database = {
             referencedColumns: ["clinic_id"]
           },
           {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clinic_services_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_sources: {
+        Row: {
+          clinic_id: string
+          content_hash: string | null
+          first_seen_at: string
+          last_seen_at: string
+          src: string
+          src_id: string
+        }
+        Insert: {
+          clinic_id: string
+          content_hash?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+          src: string
+          src_id: string
+        }
+        Update: {
+          clinic_id?: string
+          content_hash?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+          src?: string
+          src_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_sources_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
             referencedColumns: ["id"]
           },
         ]
@@ -851,6 +1528,20 @@ export type Database = {
             foreignKeyName: "clinic_staff_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_staff_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_staff_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -860,6 +1551,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_staff_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_staff_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -894,6 +1599,20 @@ export type Database = {
             foreignKeyName: "clinic_translations_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_translations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_translations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -903,6 +1622,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_translations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_translations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -931,6 +1664,20 @@ export type Database = {
             foreignKeyName: "clinic_travel_services_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_travel_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_travel_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -940,6 +1687,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_travel_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_travel_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "clinic_travel_services_travel_service_id_fkey"
@@ -960,6 +1721,7 @@ export type Database = {
           created_at: string
           district: string | null
           document: unknown
+          extra_email: string | null
           id: string
           is_official_partner: boolean
           is_published: boolean
@@ -967,7 +1729,9 @@ export type Database = {
           latitude: number | null
           lng: number | null
           longitude: number | null
+          main_email: string | null
           map_embed_url: string | null
+          moderation_comment: string | null
           moderation_status: string
           name: string
           owner_id: string | null
@@ -975,6 +1739,7 @@ export type Database = {
           search: unknown
           slug: string
           status: string | null
+          time_zone: string | null
           verified_by_medtravel: boolean
         }
         Insert: {
@@ -986,6 +1751,7 @@ export type Database = {
           created_at?: string
           district?: string | null
           document?: unknown
+          extra_email?: string | null
           id?: string
           is_official_partner?: boolean
           is_published?: boolean
@@ -993,7 +1759,9 @@ export type Database = {
           latitude?: number | null
           lng?: number | null
           longitude?: number | null
+          main_email?: string | null
           map_embed_url?: string | null
+          moderation_comment?: string | null
           moderation_status?: string
           name: string
           owner_id?: string | null
@@ -1001,6 +1769,7 @@ export type Database = {
           search?: unknown
           slug: string
           status?: string | null
+          time_zone?: string | null
           verified_by_medtravel?: boolean
         }
         Update: {
@@ -1012,6 +1781,7 @@ export type Database = {
           created_at?: string
           district?: string | null
           document?: unknown
+          extra_email?: string | null
           id?: string
           is_official_partner?: boolean
           is_published?: boolean
@@ -1019,7 +1789,9 @@ export type Database = {
           latitude?: number | null
           lng?: number | null
           longitude?: number | null
+          main_email?: string | null
           map_embed_url?: string | null
+          moderation_comment?: string | null
           moderation_status?: string
           name?: string
           owner_id?: string | null
@@ -1027,6 +1799,7 @@ export type Database = {
           search?: unknown
           slug?: string
           status?: string | null
+          time_zone?: string | null
           verified_by_medtravel?: boolean
         }
         Relationships: [
@@ -1126,6 +1899,20 @@ export type Database = {
             foreignKeyName: "doctors_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "doctors_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "doctors_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1135,6 +1922,97 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "doctors_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "doctors_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          clinic_id: string
+          created_at: string | null
+          currency: string | null
+          id: string
+          status: string | null
+        }
+        Insert: {
+          amount: number
+          clinic_id: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          status?: string | null
+        }
+        Update: {
+          amount?: number
+          clinic_id?: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "invoices_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1200,6 +2078,80 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      patients: {
+        Row: {
+          clinic_id: string
+          created_at: string | null
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       premises: {
         Row: {
@@ -1301,6 +2253,20 @@ export type Database = {
             foreignKeyName: "reports_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1310,6 +2276,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reports_user_id_fkey"
@@ -1387,6 +2367,20 @@ export type Database = {
             foreignKeyName: "reviews_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1396,6 +2390,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reviews_user_id_fkey"
@@ -1472,6 +2480,83 @@ export type Database = {
         }
         Relationships: []
       }
+      transactions: {
+        Row: {
+          amount: number | null
+          clinic_id: string
+          created_at: string | null
+          currency: string | null
+          id: string
+          status: string | null
+        }
+        Insert: {
+          amount?: number | null
+          clinic_id: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          status?: string | null
+        }
+        Update: {
+          amount?: number | null
+          clinic_id?: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       travel_services: {
         Row: {
           id: number
@@ -1484,6 +2569,21 @@ export type Database = {
         Update: {
           id?: number
           name?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          role: string
+          user_id: string
+        }
+        Insert: {
+          role: string
+          user_id: string
+        }
+        Update: {
+          role?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1570,6 +2670,35 @@ export type Database = {
       }
     }
     Views: {
+      moderation_queue: {
+        Row: {
+          city: string | null
+          clinic_id: string | null
+          country: string | null
+          created_at: string | null
+          draft_status: string | null
+          draft_updated_at: string | null
+          is_published: boolean | null
+          moderation_status: string | null
+          name: string | null
+          slug: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      moderation_queue_v2: {
+        Row: {
+          city: string | null
+          clinic_id: string | null
+          country: string | null
+          draft_status: string | null
+          draft_updated_at: string | null
+          moderation_status: string | null
+          name: string | null
+          slug: string | null
+        }
+        Relationships: []
+      }
       mv_admin_reviews: {
         Row: {
           author: string | null
@@ -1583,28 +2712,18 @@ export type Database = {
       }
       mv_catalog_clinics: {
         Row: {
-          accreditations: string[] | null
-          category_id: number | null
+          address: string | null
           city: string | null
           country: string | null
           district: string | null
           id: string | null
-          languages: string[] | null
+          min_price: number | null
+          min_price_currency: string | null
           name: string | null
           province: string | null
-          rating: number | null
-          service_slugs: string[] | null
           slug: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "clinic_categories_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       mv_clinic_inquiries: {
         Row: {
@@ -1652,6 +2771,20 @@ export type Database = {
             foreignKeyName: "booking_requests_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1661,6 +2794,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "booking_requests_doctor_id_fkey"
@@ -1696,6 +2843,20 @@ export type Database = {
             foreignKeyName: "booking_requests_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1705,6 +2866,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1740,6 +2915,20 @@ export type Database = {
             foreignKeyName: "clinic_inquiries_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1749,6 +2938,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1770,6 +2973,20 @@ export type Database = {
             foreignKeyName: "reports_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1779,6 +2996,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1801,6 +3032,20 @@ export type Database = {
             foreignKeyName: "reviews_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1810,6 +3055,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1832,6 +3091,20 @@ export type Database = {
             foreignKeyName: "clinic_accreditations_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1842,7 +3115,32 @@ export type Database = {
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
           },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      v_clinic_dashboard: {
+        Row: {
+          bookings_done: number | null
+          bookings_new: number | null
+          clinic_id: string | null
+          reports_new: number | null
+          revenue_paid: number | null
+          reviews_pending: number | null
+        }
+        Relationships: []
       }
       v_clinic_services: {
         Row: {
@@ -1863,6 +3161,20 @@ export type Database = {
             foreignKeyName: "clinic_services_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1873,10 +3185,498 @@ export type Database = {
             referencedRelation: "mv_clinic_inquiries"
             referencedColumns: ["clinic_id"]
           },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_services_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_customer_bookings: {
+        Row: {
+          clinic_id: string | null
+          contact_method: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          phone: string | null
+          service: string | null
+          status: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          contact_method?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          phone?: string | null
+          service?: never
+          status?: string | null
+        }
+        Update: {
+          clinic_id?: string | null
+          contact_method?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          phone?: string | null
+          service?: never
+          status?: string | null
+        }
+        Relationships: []
+      }
+      v_customer_clinic_requests: {
+        Row: {
+          clinic_id: string | null
+          contact_method: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          phone: string | null
+          service: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "booking_requests_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_customer_patients: {
+        Row: {
+          actual_cost: number | null
+          clinic_id: string | null
+          created_at: string | null
+          patient_id: string | null
+          patient_name: string | null
+          phone: string | null
+          preliminary_cost: number | null
+          service: string | null
+          status: string | null
+        }
+        Insert: {
+          actual_cost?: never
+          clinic_id?: string | null
+          created_at?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          phone?: string | null
+          preliminary_cost?: never
+          service?: never
+          status?: string | null
+        }
+        Update: {
+          actual_cost?: never
+          clinic_id?: string | null
+          created_at?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          phone?: string | null
+          preliminary_cost?: never
+          service?: never
+          status?: string | null
+        }
+        Relationships: []
+      }
+      v_customer_reports: {
+        Row: {
+          clinic_id: string | null
+          contact: string | null
+          created_at: string | null
+          details: string | null
+          id: string | null
+          relationship: string | null
+          reporter: string | null
+          status: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          contact?: never
+          created_at?: string | null
+          details?: never
+          id?: string | null
+          relationship?: never
+          reporter?: never
+          status?: string | null
+        }
+        Update: {
+          clinic_id?: string | null
+          contact?: never
+          created_at?: string | null
+          details?: never
+          id?: string | null
+          relationship?: never
+          reporter?: never
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reports_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_customer_reviews: {
+        Row: {
+          clinic_id: string | null
+          comment: string | null
+          created_at: string | null
+          id: string | null
+          rating: number | null
+          reviewer: string | null
+          status: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          comment?: string | null
+          created_at?: string | null
+          id?: string | null
+          rating?: never
+          reviewer?: never
+          status?: string | null
+        }
+        Update: {
+          clinic_id?: string | null
+          comment?: string | null
+          created_at?: string | null
+          id?: string | null
+          rating?: never
+          reviewer?: never
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_customer_transactions: {
+        Row: {
+          clinic_id: string | null
+          created_at: string | null
+          currency: string | null
+          invoice_id: string | null
+          invoice_price: number | null
+          status: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          invoice_id?: string | null
+          invoice_price?: number | null
+          status?: never
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          invoice_id?: string | null
+          invoice_price?: number | null
+          status?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue_v2"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_public_clinics: {
+        Row: {
+          about: string | null
+          address: string | null
+          amenities: Json | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          district: string | null
+          document: unknown
+          extra_email: string | null
+          id: string | null
+          is_official_partner: boolean | null
+          is_published: boolean | null
+          lat: number | null
+          latitude: number | null
+          lng: number | null
+          longitude: number | null
+          main_email: string | null
+          map_embed_url: string | null
+          moderation_comment: string | null
+          moderation_status: string | null
+          name: string | null
+          owner_id: string | null
+          province: string | null
+          search: unknown
+          slug: string | null
+          status: string | null
+          time_zone: string | null
+          verified_by_medtravel: boolean | null
+        }
+        Insert: {
+          about?: string | null
+          address?: string | null
+          amenities?: Json | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          district?: string | null
+          document?: unknown
+          extra_email?: string | null
+          id?: string | null
+          is_official_partner?: boolean | null
+          is_published?: boolean | null
+          lat?: number | null
+          latitude?: number | null
+          lng?: number | null
+          longitude?: number | null
+          main_email?: string | null
+          map_embed_url?: string | null
+          moderation_comment?: string | null
+          moderation_status?: string | null
+          name?: string | null
+          owner_id?: string | null
+          province?: string | null
+          search?: unknown
+          slug?: string | null
+          status?: string | null
+          time_zone?: string | null
+          verified_by_medtravel?: boolean | null
+        }
+        Update: {
+          about?: string | null
+          address?: string | null
+          amenities?: Json | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          district?: string | null
+          document?: unknown
+          extra_email?: string | null
+          id?: string | null
+          is_official_partner?: boolean | null
+          is_published?: boolean | null
+          lat?: number | null
+          latitude?: number | null
+          lng?: number | null
+          longitude?: number | null
+          main_email?: string | null
+          map_embed_url?: string | null
+          moderation_comment?: string | null
+          moderation_status?: string | null
+          name?: string | null
+          owner_id?: string | null
+          province?: string | null
+          search?: unknown
+          slug?: string | null
+          status?: string | null
+          time_zone?: string | null
+          verified_by_medtravel?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinics_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Functions: {
+      blog_cat_id: { Args: { p_slug: string }; Returns: string }
       blog_index: {
         Args: {
           p_category_slug?: string
@@ -1928,11 +3728,23 @@ export type Database = {
           total_count: number
         }[]
       }
+      clinic_ids_for_user: { Args: { p_user: string }; Returns: string[] }
       has_any: { Args: { needles: string[]; src: string }; Returns: boolean }
       import_whatclinic_row: { Args: { p_id: number }; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
+      is_clinic_member: { Args: { c_id: string }; Returns: boolean }
+      is_customer: { Args: never; Returns: boolean }
       parse_amenities: { Args: { src: string }; Returns: Json }
+      publish_clinic_from_draft: {
+        Args: { p_clinic_id: string }
+        Returns: undefined
+      }
       raise_and_return_int: { Args: { msg: string }; Returns: number }
       raise_exception: { Args: { msg: string }; Returns: undefined }
+      reject_clinic_draft: {
+        Args: { p_clinic_id: string; p_reason: string }
+        Returns: undefined
+      }
       search_clinics_v1: {
         Args: { limit_count?: number; q: string }
         Returns: {
@@ -1941,6 +3753,19 @@ export type Database = {
           clinic_name: string
           clinic_slug: string
           image_url: string
+        }[]
+      }
+      seo_treatment_price_range: {
+        Args: {
+          p_category_slug: string
+          p_city?: string
+          p_country?: string
+          p_district?: string
+          p_service_slugs: string[]
+        }
+        Returns: {
+          max: number
+          min: number
         }[]
       }
       show_limit: { Args: never; Returns: number }

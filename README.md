@@ -200,25 +200,193 @@ invoices.status ∈ ('draft','awaiting_payment','paid','void')
 
 Этап 1. Схема БД (миграции)
 1.1. Клиники и модерация
+
+Если уже есть clinics, проверяем/добавляем:
+
+alter table public.clinics
+  add column if not exists owner_id uuid references auth.users(id) on delete set null,
+  add column if not exists moderation_status text check (moderation_status in ('pending','approved','rejected')) default 'pending',
+  add column if not exists moderation_comment text;
+
+create index if not exists clinics_owner_id_idx on public.clinics(owner_id);
+create index if not exists clinics_moderation_idx on public.clinics(moderation_status);
+
 1.2. Заявки/бронирования (Bookings)
+
+(если есть — сверяем поля)
+
+create table if not exists public.bookings (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics(id) on delete cascade,
+  patient_id uuid null references public.patients(id) on delete set null,
+  name text not null,
+  phone text not null,
+  contact_method text, -- 'phone','whatsapp','telegram','email'
+  service text,
+  status text check (status in ('new','in_progress','done','cancelled')) default 'new',
+  preliminary_cost numeric null,
+  actual_cost numeric null,
+  created_at timestamptz default now()
+);
+create index if not exists bookings_clinic_idx on public.bookings(clinic_id);
+
 1.3. Пациенты
+
+Можно хранить плоско (или агрегировать из bookings):
+
+create table if not exists public.patients (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics(id) on delete cascade,
+  name text not null,
+  phone text,
+  created_at timestamptz default now()
+);
+create index if not exists patients_clinic_idx on public.patients(clinic_id);
+
 1.4. Отзывы
+create table if not exists public.reviews (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics(id) on delete cascade,
+  reviewer text,
+  rating int check (rating between 1 and 5),
+  comment text,
+  status text check (status in ('pending','published','rejected')) default 'pending',
+  created_at timestamptz default now()
+);
+create index if not exists reviews_clinic_idx on public.reviews(clinic_id);
+create index if not exists reviews_status_idx on public.reviews(status);
+
 1.5. Транзакции/Счета
+create table if not exists public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics(id) on delete cascade,
+  amount numeric not null,
+  currency text default 'USD',
+  status text check (status in ('draft','awaiting_payment','paid','void')) default 'draft',
+  created_at timestamptz default now()
+);
+create index if not exists invoices_clinic_idx on public.invoices(clinic_id);
+
 1.6. Репорты (жалобы/сообщения)
+create table if not exists public.clinic_reports (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics(id) on delete cascade,
+  reporter text,
+  contact text,
+  relationship text,  -- e.g. 'patient','visitor'
+  details text,
+  status text check (status in ('new','in_review','resolved','rejected')) default 'new',
+  created_at timestamptz default now()
+);
+create index if not exists clinic_reports_clinic_idx on public.clinic_reports(clinic_id);
+
 1.7. Вьюхи под SEO/дашборды (есть часть уже)
+
+mv_catalog_clinics (с min_price) — уже обсудили ранее.
+
+Счётчики для Dashboard:
+
+create view public.v_clinic_dashboard as
+select
+  c.id as clinic_id,
+  count(distinct b.id) filter (where b.status = 'new') as bookings_new,
+  count(distinct b.id) filter (where b.status = 'done') as bookings_done,
+  count(distinct r.id) filter (where r.status = 'pending') as reviews_pending,
+  count(distinct cr.id) filter (where cr.status = 'new') as reports_new,
+  sum(i.amount) filter (where i.status = 'paid') as revenue_paid
+from clinics c
+left join bookings b on b.clinic_id = c.id
+left join reviews r on r.clinic_id = c.id
+left join clinic_reports cr on cr.clinic_id = c.id
+left join invoices i on i.clinic_id = c.id
+group by c.id;
 
 Этап 2. RLS-политики (Supabase Row-Level Security)
 
 Включаем RLS на таблицах и прописываем правила:
 
 2.1. Клиники
+alter table public.clinics enable row level security;
+
+-- Владельцы и члены видят ТОЛЬКО свои клиники
+create policy "clinic_owner_or_member_select"
+on public.clinics for select
+using (
+  owner_id = auth.uid()
+  or exists (select 1 from public.clinic_members m where m.clinic_id = clinics.id and m.user_id = auth.uid())
+);
+
+-- Создание клиник разрешено CUSTOMER
+create policy "customer_insert_clinic"
+on public.clinics for insert
+with check ( auth.uid() = owner_id );
+
+-- Обновлять может только владелец/менеджер (но НЕ менять moderation_status)
+create policy "clinic_owner_update"
+on public.clinics for update
+using (
+  owner_id = auth.uid()
+  or exists (select 1 from public.clinic_members m where m.clinic_id = clinics.id and m.user_id = auth.uid())
+)
+with check (
+  owner_id = auth.uid()
+  or exists (select 1 from public.clinic_members m where m.clinic_id = clinics.id and m.user_id = auth.uid())
+);
+
+
 Модерацию (moderation_status) меняем через админ-API (серверный ключ) — RLS на UPDATE для админов можно не писать, т.к. это будет идти от Service Role.
 
 2.2. Остальные таблицы (аналогично)
 
 Для каждой: bookings, patients, reviews, invoices, clinic_reports:
 
+alter table public.bookings enable row level security;
+
+create policy "bookings_select_own_clinic"
+on public.bookings for select
+using (
+  exists (select 1 from clinics c
+          where c.id = bookings.clinic_id
+            and (c.owner_id = auth.uid()
+                 or exists(select 1 from clinic_members m where m.clinic_id = c.id and m.user_id = auth.uid())))
+);
+
+create policy "bookings_ins_own_clinic"
+on public.bookings for insert
+with check (
+  exists (select 1 from clinics c
+          where c.id = bookings.clinic_id
+            and (c.owner_id = auth.uid()
+                 or exists(select 1 from clinic_members m where m.clinic_id = c.id and m.user_id = auth.uid())))
+);
+
+create policy "bookings_upd_own_clinic"
+on public.bookings for update
+using (
+  exists (select 1 from clinics c
+          where c.id = bookings.clinic_id
+            and (c.owner_id = auth.uid()
+                 or exists(select 1 from clinic_members m where m.clinic_id = c.id and m.user_id = auth.uid())))
+)
+with check (
+  exists (select 1 from clinics c
+          where c.id = bookings.clinic_id
+            and (c.owner_id = auth.uid()
+                 or exists(select 1 from clinic_members m where m.clinic_id = c.id and m.user_id = auth.uid())))
+);
+
+
+То же — для patients, reviews, invoices, clinic_reports.
+
 2.3. Публичный каталог
+
+Публичные страницы читают только approved:
+
+create or replace view public.v_public_clinics as
+select * from public.clinics where moderation_status = 'approved';
+
+
+(или фильтровать = 'approved' в селектах.)
 
 Этап 3. Модерация клиник (админ)
 
@@ -945,3 +1113,40 @@ J. Что ещё запланировано/зарезервировано
 Правила публикации: status → после ручной модерации published, тогда клиника становится доступной в публичном каталоге.
 
 Единая «история импорта»/лог в таблице import_runs (timestamp, source, rows_total, inserted, updated, skipped, duration_ms).
+
+
+
+--------------------
+
+⨯ Error: Not authenticated
+    at ensureClinicForOwner (app/(customer)/customer/clinic-profile/actions.ts:21:39)
+    at async saveDraftSection (app/(customer)/customer/clinic-profile/actions.ts:85:19)
+  19 |
+  20 |   const { data: userRes, error: userErr } = await sb.auth.getUser();
+> 21 |   if (userErr || !userRes?.user) throw new Error("Not authenticated");
+     |                                       ^
+  22 |   const user = userRes.user;
+  23 |
+  24 |   // есть ли уже членство? {
+  digest: '4225088468'
+}
+ POST /customer/clinic-profile 500 in 598ms
+
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+error-boundary-callbacks.ts:80 Error: Not authenticated
+    at ensureClinicForOwner (actions.ts:21:40)
+    at async saveDraftSection (actions.ts:85:20)
+    at resolveErrorDev (react-server-dom-turbopack-client.browser.development.js:1858:46)
+    at processFullStringRow (react-server-dom-turbopack-client.browser.development.js:2238:17)
+    at processFullBinaryRow (react-server-dom-turbopack-client.browser.development.js:2226:7)
+    at progress (react-server-dom-turbopack-client.browser.development.js:2472:17)
+
+The above error occurred in the <ClinicProfilePage> component. It was handled by the <ErrorBoundaryHandler> error boundary.
+onCaughtError @ error-boundary-callbacks.ts:80Understand this error
+2intercept-console-error.ts:40 Error: Not authenticated
+    at ensureClinicForOwner (actions.ts:21:40)
+    at async saveDraftSection (actions.ts:85:20)
+    at resolveErrorDev (react-server-dom-turbopack-client.browser.development.js:1858:46)
+    at processFullStringRow (react-server-dom-turbopack-client.browser.development.js:2238:17)
+    at processFullBinaryRow (react-server-dom-turbopack-client.browser.development.js:2226:7)
+    at progress (react-server-dom-turbopack-client.browser.development.js:2472:17)

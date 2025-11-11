@@ -1,9 +1,17 @@
-import { sbAdmin } from "@/lib/supabase/adminClient";
+// app/(customer)/customer/clinics/[id]/edit/page.tsx
+import { createAdminClient } from "@/lib/supabase/adminClient";
+import type { InputHTMLAttributes } from "react";
 
 type Params = { id: string };
 
-export default async function EditClinicPage({ params }: { params: Promise<Params> }) {
+export default async function EditClinicPage({
+  params,
+}: {
+  params: Promise<Params>;
+}) {
   const { id } = await params;
+
+  const sbAdmin = createAdminClient();
 
   const { data: clinic, error } = await sbAdmin
     .from("clinics")
@@ -37,17 +45,6 @@ export default async function EditClinicPage({ params }: { params: Promise<Param
         <Field label="District" name="district" defaultValue={clinic.district ?? ""} />
 
         <div className="md:col-span-2">
-          <label className="block">
-            <div className="mb-1 text-sm text-gray-600">About</div>
-            <textarea
-              name="about"
-              defaultValue={clinic.about ?? ""}
-              className="h-40 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring"
-            />
-          </label>
-        </div>
-
-        <div className="md:col-span-2">
           <span className="mr-3 text-sm text-gray-600">
             Moderation status: <b>{clinic.moderation_status ?? "pending"}</b>
           </span>
@@ -64,7 +61,7 @@ function Field({
   label,
   className = "",
   ...rest
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; className?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; className?: string }) {
   return (
     <label className={`block ${className}`}>
       <div className="mb-1 text-sm text-gray-600">{label}</div>

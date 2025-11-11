@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import clsx from "clsx";
+import { getDraft, saveDraftSection, saveDraftWhole, submitForReview, getCategories, uploadGallery } from "./actions";
 
 type SectionKey =
   | "basic"
@@ -20,8 +21,9 @@ const REQUIRED: SectionKey[] = ["basic", "services", "doctors", "location"];
 /* -------------------------------- Page -------------------------------- */
 
 export default function ClinicProfilePage() {
-  // current section (single page; right pane switches)
   const [active, setActive] = useState<SectionKey>("basic");
+  const [isPending, startTransition] = useTransition();
+  // current section (single page; right pane switches)
 
   // unified local draft (позже заменим на контекст + server actions)
   const [basic, setBasic] = useState({
@@ -36,8 +38,8 @@ export default function ClinicProfilePage() {
     description: "",
   });
 
-  const [services, setServices] = useState<Array<{ name: string; price?: string; category?: string; description?: string }>>([]);
-  const [doctors, setDoctors] = useState<Array<{ fullName: string; specialty?: string; exp?: string; qual?: string; photo?: string }>>([]);
+  const [services, setServices] = useState<Array<{ name: string; price?: string; currency: string; description?: string }>>([]);
+  const [doctors, setDoctors] = useState<Array<{ fullName: string; title?: string; specialty?: string; description?: string; photo?: string }>>([]);
   const [additional, setAdditional] = useState({
     premises: [] as string[],
     clinic_services: [] as string[],
@@ -56,7 +58,88 @@ export default function ClinicProfilePage() {
   ]);
   const [gallery, setGallery] = useState<Array<{ url: string; title?: string }>>([]);
   const [location, setLocation] = useState({ mapUrl: "", directions: "" });
-  const [payments, setPayments] = useState<Array<{ method: string; icon?: string; color?: string }>>([]);
+  const [payments, setPayments] = useState<string[]>([]);
+
+  const [cats, setCats] = useState<Array<{id:number; name:string; slug:string}>>([]);
+
+  // загрузка драфта один раз
+  useEffect(() => {
+    startTransition(async () => {
+      try {
+        const [draftRes, catsRes] = await Promise.allSettled([getDraft(), getCategories()]);
+
+        if (draftRes.status === "fulfilled") {
+          const draft = draftRes.value?.draft;
+
+          if (draft) {
+            // BASIC
+            setBasic((p) => (draft.basic_info ? { ...p, ...draft.basic_info } : p));
+
+            // SERVICES: приводим к виду { name, price?, currency, description? }
+            const srv = Array.isArray(draft.services)
+              ? draft.services.map((s: any) => ({
+                name: s?.name ?? "",
+                price: s?.price ?? "",
+                currency: s?.currency ?? "USD",      // дефолт
+                description: s?.description ?? s?.desc ?? "",
+              }))
+              : [];
+            setServices(srv);
+
+            // DOCTORS: { fullName, title?, specialty?, description?, photo? }
+            const docs = Array.isArray(draft.doctors)
+              ? draft.doctors.map((d: any) => ({
+                fullName: d?.fullName ?? d?.name ?? "",
+                title: d?.title ?? "",
+                specialty: d?.specialty ?? d?.spec ?? "",
+                description: d?.description ?? d?.bio ?? d?.qual ?? "",
+                photo: d?.photo ?? "",
+              }))
+              : [];
+            setDoctors(docs);
+
+            // ADDITIONAL/HOURS/GALLERY/LOCATION — как было
+            setAdditional(
+              draft.facilities ?? {
+                premises: [],
+                clinic_services: [],
+                travel_services: [],
+                languages_spoken: [],
+                accreditations: [],
+              }
+            );
+            setHours(
+              draft.hours ?? [
+                { day: "Monday", status: "Open", start: "09:00", end: "17:00" },
+                { day: "Tuesday", status: "Open", start: "09:00", end: "17:00" },
+                { day: "Wednesday", status: "Open", start: "09:00", end: "17:00" },
+                { day: "Thursday", status: "Open", start: "09:00", end: "17:00" },
+                { day: "Friday", status: "Open", start: "09:00", end: "17:00" },
+                { day: "Saturday", status: "Closed" },
+                { day: "Sunday", status: "Closed" },
+              ]
+            );
+            setGallery(draft.gallery ?? []);
+            setLocation(draft.location ?? { mapUrl: "", directions: "" });
+
+            // PAYMENTS: приводим к массиву строк
+            const paymentsFromDraft = Array.isArray(draft.pricing)
+              ? draft.pricing
+                .map((x: any) => (typeof x === "string" ? x : x?.method))
+                .filter((v: any): v is string => typeof v === "string" && v.trim().length > 0)
+              : [];
+            setPayments(paymentsFromDraft);
+          }
+        }
+
+        if (catsRes.status === "fulfilled") {
+          setCats(catsRes.value);
+        }
+      } catch {
+        // no-op
+      }
+    });
+  }, []);  
 
   // section statuses (минимальная логика для бейджей/прогресса)
   const sectionStatuses: Record<SectionKey, SectionStatus> = useMemo(() => {
@@ -69,7 +152,9 @@ export default function ClinicProfilePage() {
 
     const servicesOk = services.length > 0 && services.every((s) => s.name.trim());
     const doctorsOk = doctors.length > 0 && doctors.every((d) => d.fullName.trim());
-    const locationOk = location.mapUrl.trim() || (basic.country && basic.city && basic.address);
+    const locationOk = Boolean(
+      location.mapUrl.trim() || (basic.country && basic.city && basic.address)
+    );
 
     return {
       basic: basicOk ? "Complete" : "Required",
@@ -78,10 +163,10 @@ export default function ClinicProfilePage() {
       location: locationOk ? "Complete" : "Required",
       additional:
         additional.premises.length ||
-        additional.clinic_services.length ||
-        additional.travel_services.length ||
-        additional.languages_spoken.length ||
-        additional.accreditations?.length
+          additional.clinic_services.length ||
+          additional.travel_services.length ||
+          additional.languages_spoken.length ||
+          (additional.accreditations?.length ?? 0)
           ? "Complete"
           : "Empty",
       hours: hours.some((h) => h.status === "Open") ? "Complete" : "Empty",
@@ -138,13 +223,27 @@ export default function ClinicProfilePage() {
           {/* Publish */}
           <Card className="p-4 space-y-3">
             <button
-              disabled={publishDisabled}
+              disabled={publishDisabled || isPending}
+              onClick={() => {
+                startTransition(async () => {
+                  // на всякий случай сохраняем всё перед отправкой
+                  await saveDraftSection("basic_info", basic);
+                  await saveDraftSection("services", services);
+                  await saveDraftSection("doctors", doctors);
+                  await saveDraftSection("facilities", additional);
+                  await saveDraftSection("hours", hours);
+                  await saveDraftSection("gallery", gallery);
+                  await saveDraftSection("location", location);
+                  await saveDraftSection("pricing", payments);
+                  await submitForReview();
+                });
+              }}
               className={clsx(
                 "w-full rounded-md px-3 py-2 text-white font-medium transition",
                 publishDisabled ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
               )}
             >
-              Publish Clinic
+              {isPending ? "Publishing..." : "Publish Clinic"}
             </button>
             <p className="text-xs text-gray-500">Complete all sections to enable publishing</p>
           </Card>
@@ -194,6 +293,7 @@ export default function ClinicProfilePage() {
               value={basic}
               onChange={setBasic}
               completion={completion}
+              cats={cats}
             />
           )}
 
@@ -248,13 +348,51 @@ export default function ClinicProfilePage() {
 
           {/* footer actions (общие для секций) */}
           <div className="flex items-center justify-between">
-            <button className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Save as Draft
+            <button
+              onClick={() => {
+                const snapshot = {
+                  basic_info: basic,
+                  services,
+                  doctors,
+                  facilities: additional,
+                  hours,
+                  gallery,
+                  location,
+                  pricing: payments,
+                };
+                startTransition(async () => {
+                  await saveDraftWhole(snapshot);
+                });
+              }}
+              className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              disabled={isPending}
+            >
+              {isPending ? "Saving..." : "Save as Draft"}
             </button>
-            <button className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              Submit for Review
+
+            <button
+              onClick={() => {
+                startTransition(async () => {
+                  await saveDraftWhole({
+                    basic_info: basic,
+                    services,
+                    doctors,
+                    facilities: additional,
+                    hours,
+                    gallery,
+                    location,
+                    pricing: payments,
+                  });
+                  await submitForReview();
+                });
+              }}
+              className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"
+              disabled={publishDisabled || isPending}
+            >
+              {isPending ? "Submitting..." : "Submit for Review"}
             </button>
           </div>
+
         </Card>
       </div>
     </div>
@@ -415,23 +553,16 @@ function TagInput({
 /* ----------------------------- Sections ------------------------------ */
 
 function BasicInfo({
-  value,
-  onChange,
-  completion,
+  value, onChange, completion, cats,
 }: {
   value: {
-    name: string;
-    slug: string;
-    specialty: string;
-    country: string;
-    city: string;
-    province: string;
-    district: string;
-    address: string;
-    description: string;
+    name: string; slug: string; specialty: string;
+    country: string; city: string; province: string; district: string;
+    address: string; description: string;
   };
   onChange: (v: any) => void;
   completion: number;
+  cats: Array<{ id: number; name: string; slug: string }>;  // 👈 новое поле
 }) {
   return (
     <>
@@ -461,9 +592,9 @@ function BasicInfo({
           onChange={(v) => onChange({ ...value, specialty: v })}
           options={[
             { value: "", label: "Select specialty", disabled: true },
-            { value: "dentistry", label: "Dentistry" },
-            { value: "cosmetology", label: "Cosmetology" },
-            { value: "orthopedics", label: "Orthopedics" },
+            ...cats.map((c: { id: number; name: string; slug: string }) => ({
+              value: c.slug, label: c.name,
+            })),
           ]}
         />
 
@@ -497,31 +628,35 @@ function BasicInfo({
 }
 
 function ServicesSection({
-  rows,
-  onAdd,
-  onRemove,
+  rows, onAdd, onRemove,
 }: {
-  rows: Array<{ name: string; price?: string; category?: string; description?: string }>;
-  onAdd: (r: { name: string; price?: string; category?: string; description?: string }) => void;
+  rows: Array<{ name: string; price?: string; currency: string; description?: string }>;
+  onAdd: (r: { name: string; price?: string; currency: string; description?: string }) => void;
   onRemove: (idx: number) => void;
 }) {
-  const [draft, setDraft] = useState({ name: "", price: "", category: "", description: "" });
+  const [draft, setDraft] = useState({ name: "", price: "", currency: "USD", description: "" });
 
   return (
     <>
       <div className="text-lg font-semibold">Services</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Service Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} placeholder="Enter service name" />
+        <Field label="Service Name *" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} placeholder="Enter service name" />
         <Field label="Price" value={draft.price} onChange={(v) => setDraft({ ...draft, price: v })} placeholder="Enter price" />
-        <Field label="Category" value={draft.category} onChange={(v) => setDraft({ ...draft, category: v })} placeholder="Service category" />
+        <Select
+          label="Currency"
+          value={draft.currency}
+          onChange={(v) => setDraft({ ...draft, currency: v })}
+          options={[{value:"USD",label:"USD"},{value:"EUR",label:"EUR"},{value:"GBP",label:"GBP"},{value:"TRY",label:"TRY"}]}
+        />
         <Field label="Description" value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} placeholder="Enter description" />
       </div>
+
       <div className="flex items-center justify-between">
         <button
           onClick={() => {
             if (!draft.name.trim()) return;
             onAdd({ ...draft });
-            setDraft({ name: "", price: "", category: "", description: "" });
+            setDraft({ name: "", price: "", currency: "USD", description: "" });
           }}
           className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
         >
@@ -537,7 +672,9 @@ function ServicesSection({
             <div key={i} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
               <div>
                 <div className="font-medium">{r.name}</div>
-                <div className="text-gray-500">{[r.category, r.price && `Price: ${r.price}`, r.description].filter(Boolean).join(" • ")}</div>
+                <div className="text-gray-500">
+                  {[r.price && `${r.price} ${r.currency}`, r.description].filter(Boolean).join(" • ")}
+                </div>
               </div>
               <button onClick={() => onRemove(i)} className="text-gray-500 hover:text-rose-600">Delete</button>
             </div>
@@ -548,32 +685,31 @@ function ServicesSection({
   );
 }
 
+
 function DoctorsSection({
-  rows,
-  onAdd,
-  onRemove,
+  rows, onAdd, onRemove,
 }: {
-  rows: Array<{ fullName: string; specialty?: string; exp?: string; qual?: string; photo?: string }>;
-  onAdd: (r: { fullName: string; specialty?: string; exp?: string; qual?: string; photo?: string }) => void;
+  rows: Array<{ fullName: string; title?: string; specialty?: string; description?: string; photo?: string }>;
+  onAdd: (r: { fullName: string; title?: string; specialty?: string; description?: string; photo?: string }) => void;
   onRemove: (idx: number) => void;
 }) {
-  const [draft, setDraft] = useState({ fullName: "", specialty: "", exp: "", qual: "", photo: "" });
+  const [draft, setDraft] = useState({ fullName: "", title: "", specialty: "", description: "", photo: "" });
 
   return (
     <>
       <div className="text-lg font-semibold">Doctors & Medical Staff</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Full Name *" value={draft.fullName} onChange={(v) => setDraft({ ...draft, fullName: v })} placeholder="Dr. John Smith" />
-        <Field label="Specialty" value={draft.specialty} onChange={(v) => setDraft({ ...draft, specialty: v })} placeholder="Cardiology, Orthopedics, etc." />
-        <Field label="Experience" value={draft.exp} onChange={(v) => setDraft({ ...draft, exp: v })} placeholder="Years of experience or background" />
-        <Field label="Qualifications" value={draft.qual} onChange={(v) => setDraft({ ...draft, qual: v })} placeholder="Degrees, certifications" />
+        <Field label="Title/Position" value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} placeholder="Chief Surgeon" />
+        <Field label="Specialty" value={draft.specialty} onChange={(v) => setDraft({ ...draft, specialty: v })} placeholder="Orthopedics, etc." />
         <Field label="Photo URL" value={draft.photo} onChange={(v) => setDraft({ ...draft, photo: v })} placeholder="https://..." />
+        <Textarea className="md:col-span-2" label="Description" value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} placeholder="Short bio/qualifications" />
       </div>
       <button
         onClick={() => {
           if (!draft.fullName.trim()) return;
           onAdd({ ...draft });
-          setDraft({ fullName: "", specialty: "", exp: "", qual: "", photo: "" });
+          setDraft({ fullName: "", title: "", specialty: "", description: "", photo: "" });
         }}
         className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
       >
@@ -588,7 +724,7 @@ function DoctorsSection({
             <div key={i} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
               <div className="truncate">
                 <span className="font-medium">{d.fullName}</span>
-                {d.specialty ? <span className="text-gray-500"> — {d.specialty}</span> : null}
+                {d.title ? <span className="text-gray-500"> — {d.title}</span> : null}
               </div>
               <button onClick={() => onRemove(i)} className="text-gray-500 hover:text-rose-600">Delete</button>
             </div>
@@ -598,6 +734,7 @@ function DoctorsSection({
     </>
   );
 }
+
 
 function AdditionalSection({
   value,
@@ -767,19 +904,43 @@ function GallerySection({
         >
           + Add Image
         </button>
-        <button className="rounded-md border bg-white px-3 py-2 text-sm" disabled>
-          ⬆ Upload (later)
-        </button>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={async (e) => {
+            const files = Array.from(e.target.files || []);
+            if (!files.length) return;
+            const urls = await uploadGallery(files); // импортируй сервер-экшен
+            urls.forEach(url => onAdd({ url }));
+            e.currentTarget.value = '';
+          }}
+          className="hidden"
+          id="galleryUpload"
+        />
+        <label htmlFor="galleryUpload" className="rounded-md border bg-white px-3 py-2 text-sm cursor-pointer">
+          ⬆ Upload
+        </label>
       </div>
 
       {!rows.length ? (
         <p className="mt-2 text-sm text-gray-400">No images yet.</p>
       ) : (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((g, i) => (
-            <div key={i} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-              <div className="truncate">{g.url}</div>
-              <button onClick={() => onRemove(i)} className="text-gray-500 hover:text-rose-600">Delete</button>
+            <div key={i} className="rounded-lg border overflow-hidden">
+              <div className="aspect-[4/3] bg-gray-100">
+                {g.url && (
+                  <img src={g.url} alt={g.title || 'Image'} className="w-full h-full object-cover" />
+                )}
+              </div>
+              <div className="p-2 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="truncate text-sm text-gray-600" title={g.url}>{g.url}</div>
+                  {g.title && <div className="text-xs text-gray-400 truncate">{g.title}</div>}
+                </div>
+                <button onClick={() => onRemove(i)} className="text-gray-500 hover:text-rose-600 text-sm">Delete</button>
+              </div>
             </div>
           ))}
         </div>
@@ -805,39 +966,26 @@ function LocationSection({
 }
 
 function PaymentsSection({
-  rows,
-  onAdd,
-  onRemove,
+  rows, onAdd, onRemove,
 }: {
-  rows: Array<{ method: string; icon?: string; color?: string }>;
-  onAdd: (r: { method: string; icon?: string; color?: string }) => void;
+  rows: string[];
+  onAdd: (r: string) => void;
   onRemove: (i: number) => void;
 }) {
-  const [draft, setDraft] = useState({ method: "", icon: "credit-card", color: "Purple" });
+  const [draft, setDraft] = useState("");
 
   return (
     <>
       <div className="text-lg font-semibold">Payment Methods</div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Field label="Payment Method *" value={draft.method} onChange={(v) => setDraft({ ...draft, method: v })} placeholder="e.g., Credit Card, Cash, Insurance" />
-        <Select
-          label="Icon"
-          value={draft.icon}
-          onChange={(v) => setDraft({ ...draft, icon: v })}
-          options={[{ value: "credit-card", label: "credit-card" }, { value: "wallet", label: "wallet" }, { value: "banknote", label: "banknote" }]}
-        />
-        <Select
-          label="Color"
-          value={draft.color}
-          onChange={(v) => setDraft({ ...draft, color: v })}
-          options={[{ value: "Purple", label: "Purple" }, { value: "Blue", label: "Blue" }, { value: "Green", label: "Green" }]}
-        />
+        <Field label="Payment Method *" value={draft} onChange={setDraft} placeholder="e.g., Visa, Cash, Insurance" />
       </div>
       <button
         onClick={() => {
-          if (!draft.method.trim()) return;
-          onAdd(draft);
-          setDraft({ method: "", icon: "credit-card", color: "Purple" });
+          const v = draft.trim();
+          if (!v) return;
+          onAdd(v);
+          setDraft("");
         }}
         className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
       >
@@ -850,7 +998,7 @@ function PaymentsSection({
         <div className="mt-2 space-y-2">
           {rows.map((p, i) => (
             <div key={i} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-              <div className="font-medium">{p.method}</div>
+              <div className="font-medium">{p}</div>
               <button onClick={() => onRemove(i)} className="text-gray-500 hover:text-rose-600">Delete</button>
             </div>
           ))}

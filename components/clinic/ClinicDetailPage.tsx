@@ -17,10 +17,34 @@ type Props = { clinic: Clinic };
 type ReviewRow = { id: string; review: string | null; rating_overall: number | null; created_at: string | null };
 
 // --- helpers ---
-function buildMapEmbed(address?: string | null) {
-  if (!address) return null; // ← важно: не возвращаем пустую строку
-  const q = encodeURIComponent(address);
-  return `https://www.google.com/maps?q=${q}&output=embed`;
+function buildMapEmbedFromAny(input?: string | null, fallbackAddress?: string | null) {
+  const raw = (input ?? '').trim();
+  const address = (fallbackAddress ?? '').trim();
+
+  // 1) если пользователь вставил готовый <iframe ... src="..."> — выдернем src
+  const m = raw.match(/src\s*=\s*["']([^"']+)["']/i);
+  if (m?.[1]) return m[1];
+
+  // 2) короткие ссылки лучше не встраивать — строим по адресу
+  const isShort = /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl)\/.+/i.test(raw);
+  if (isShort && address) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+  }
+
+  // 3) “длинные” урлы Google Maps — большинство работает, но унифицируем
+  const looksLikeGmaps = /^https?:\/\/(www\.)?google\.[^/]+\/maps/i.test(raw);
+  if (looksLikeGmaps) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(raw)}&output=embed`;
+  }
+
+  // 4) просто текстовый адрес или пусто — используем адрес
+  if (raw) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(raw)}&output=embed`;
+  }
+  if (address) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+  }
+  return null;
 }
 
 function normLangs(val?: string | string[]) {
@@ -96,13 +120,20 @@ export default function ClinicDetailPage({ clinic }: Props) {
   }, [clinic]);
 
 
-  // ----- адрес и карта (без пустого src) -----
+  // адрес для отображения рядом с картой
   const address =
     clinic.location?.address ||
-    [clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ') ||
-    null;
+    [clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ') || null;
 
-  const mapSrc = clinic.location?.mapEmbedUrl ?? buildMapEmbed(address);
+  const mapSrc = useMemo(() => {
+    const link =
+      (clinic as any).map_embed_url ??
+      (clinic as any).mapEmbedUrl ??
+      clinic.location?.mapEmbedUrl ??
+      '';
+    return buildMapEmbedFromAny(link, address);
+  }, [clinic, address]);
+
 
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -119,7 +150,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
   // есть ли вообще цены/описания среди услуг
   const hasPrice = allServices.some(s => String(s?.price ?? '').trim() !== '');
-  const hasDesc = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
+  const hasDesc  = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
 
   const allDoctors = doctors; // уже рассчитан useMemo выше
   const visibleDoctors = showAllDoctors ? allDoctors : allDoctors.slice(0, 5);
@@ -165,7 +196,9 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
             <h1 className="flex flex-wrap items-center gap-3 text-3xl font-semibold">
               {clinic.name}
-              {clinic.verifiedByMedtravel && (
+            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+            {clinic.verifiedByMedtravel && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
                   ✓ Verified by medtravel.me
                 </span>
@@ -175,7 +208,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                   ✓ Official partner of medtravel.me
                 </span>
               )}
-            </h1>
+            </div>
 
             {clinic.about && <p className="text-gray-700">{clinic.about}</p>}
           </section>
@@ -196,18 +229,17 @@ export default function ClinicDetailPage({ clinic }: Props) {
                 <tbody className="divide-y text-sm">
                   {visibleServices.map((s: any) => {
                     const desc = s?.description ?? s?.duration ?? '';
+                    const priceText = s?.price
+                      ? `${s.price}${s.currency ? ` ${s.currency}` : ''}`
+                      : '—';
                     return (
                       <tr key={s.name}>
                         <td className="p-3">{s.name}</td>
-                        {hasPrice && <td className="p-3">{s.price ?? '—'}</td>}
+                        {hasPrice && <td className="p-3">{priceText}</td>}
                         {hasDesc && <td className="p-3">{desc || '—'}</td>}
                         <td className="p-3">
-                          <button
-                            className="rounded-md bg-primary px-3 py-2 text-white"
-                            onClick={() => { setClickedService(s.name); setOpen(true); }}
-                          >
-                            Request
-                          </button>
+                          <button className="rounded-md bg-primary px-3 py-2 text-white"
+                          onClick={() => { setClickedService(s.name); setOpen(true); }}>Request</button>
                         </td>
                       </tr>
                     );
@@ -397,9 +429,10 @@ export default function ClinicDetailPage({ clinic }: Props) {
               <div className="overflow-hidden rounded-lg border">
                 <div className="aspect-[16/9]">
                   <iframe
-                    src={mapSrc}
+                    src={mapSrc!}
                     className="h-full w-full"
                     loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
                   />
                 </div>
               </div>

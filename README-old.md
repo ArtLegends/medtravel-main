@@ -18,6 +18,9 @@ SEO и маркетинг:
 – Проверить доступность (a11y) и оптимизировать Lighthouse -->
 
 <!-- npx supabase gen types typescript --project-id oymahnxwcajvaggbydim --schema public > lib/supabase/types.ts -->
+"$(brew --prefix)/bin/supabase" gen types typescript \
+  --project-id oymahnxwcajvaggbydim \
+  --schema public > lib/supabase/types.ts
 
 # MedTravel - Digital Platform
 
