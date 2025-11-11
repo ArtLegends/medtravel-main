@@ -1150,3 +1150,27 @@ onCaughtError @ error-boundary-callbacks.ts:80Understand this error
     at processFullStringRow (react-server-dom-turbopack-client.browser.development.js:2238:17)
     at processFullBinaryRow (react-server-dom-turbopack-client.browser.development.js:2226:7)
     at progress (react-server-dom-turbopack-client.browser.development.js:2472:17)
+
+
+
+
+
+
+
+
+
+
+    The key fingerprint is:
+SHA256:gQVXSlZE/KM5DjIruSofhpMkJgcoX16wS7iq7WD/WgE norik.artemka@gmail.com
+The key's randomart image is:
++--[ED25519 256]--+
+|    . ..=*=      |
+|.  . o * ..      |
+|+ .E+ o o  .     |
+|.o =.o   .  o    |
+|oo+ o.  S  o .   |
+|==    + . +      |
+|*.o  o + o .     |
+|+=..+ .   .      |
+|.+=+++           |
++----[SHA256]-----+
