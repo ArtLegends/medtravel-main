@@ -1174,3 +1174,5 @@ The key's randomart image is:
 |+=..+ .   .      |
 |.+=+++           |
 +----[SHA256]-----+
+
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEFDua/zZ1u1Yq5q0/o1dwbrWAvJ2WuZvDaPRvMjFRbo norik.artemka@gmail.com

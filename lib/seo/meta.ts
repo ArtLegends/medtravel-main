@@ -71,7 +71,6 @@ function tplTreatmentDesc(
   max?: number | null,
   currency = '€'
 ) {
-  // База: всегда называем процедуру и локацию
   const base =
     lng === 'ru'
       ? `${treatment} в ${loc}. `
@@ -79,23 +78,37 @@ function tplTreatmentDesc(
         ? `${treatment} w ${loc}. `
         : `${treatment} in ${loc}. `
 
-  // Цены — по наличию min/max
   let pricePart = ''
-  if (min != null && max != null) {
-    pricePart =
-      lng === 'ru'
-        ? `Цены от ${min}${currency} до ${max}${currency}. `
-        : lng === 'pl'
-          ? `Ceny od ${min}${currency} do ${max}${currency}. `
-          : `Prices from ${min}${currency} to ${max}${currency}. `
-  } else if (min != null) {
+
+  // ✅ спец-случай: одно значение
+  if (min != null && max != null && Number(min) === Number(max)) {
     pricePart =
       lng === 'ru'
         ? `Цены от ${min}${currency}. `
         : lng === 'pl'
           ? `Ceny od ${min}${currency}. `
           : `Prices from ${min}${currency}. `
-  } else if (max != null) {
+  }
+  // обычный диапазон
+  else if (min != null && max != null) {
+    pricePart =
+      lng === 'ru'
+        ? `Цены от ${min}${currency} до ${max}${currency}. `
+        : lng === 'pl'
+          ? `Ceny od ${min}${currency} do ${max}${currency}. `
+          : `Prices from ${min}${currency} to ${max}${currency}. `
+  }
+  // только min
+  else if (min != null) {
+    pricePart =
+      lng === 'ru'
+        ? `Цены от ${min}${currency}. `
+        : lng === 'pl'
+          ? `Ceny od ${min}${currency}. `
+          : `Prices from ${min}${currency}. `
+  }
+  // только max
+  else if (max != null) {
     pricePart =
       lng === 'ru'
         ? `Цены до ${max}${currency}. `

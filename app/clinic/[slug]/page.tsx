@@ -86,6 +86,20 @@ export async function generateMetadata(
     if (row?.address) addr = row.address
   }
 
+  if (!addr && clinic) {
+    const parts = [
+      (clinic as any)?.address && String((clinic as any).address).trim(), // если внезапно строка
+      clinic.district && String(clinic.district).trim(),
+      clinic.city && String(clinic.city).trim(),
+      clinic.province && String(clinic.province).trim(),
+      clinic.country && String(clinic.country).trim(),
+    ].filter(Boolean) as string[]
+  
+    if (parts.length) {
+      addr = parts.join(', ')
+    }
+  }
+
   // 3) каноникал из реальной локации
   const canonical = clinic
     ? clinicPath({

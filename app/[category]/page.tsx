@@ -95,14 +95,13 @@ export async function generateMetadata(
   try {
     const { data } = await (await createServerClient())
       .rpc('seo_treatment_price_range', {
-        p_category_slug: slug,             // оставили для совместимости
-        p_service_slugs: rawServices,      // text[]
-        p_city:     effLoc.city     ?? null,
-        p_country:  effLoc.country  ?? null,
-        p_district: effLoc.district ?? null,
+        p_category_slug: slug,             // по сигнатуре, но игнорится
+        p_service_slugs: rawServices.length ? rawServices : null,
+        p_city:     null,
+        p_country:  null,
+        p_district: null,
       })
 
-    // функция должна вернуть ОДНУ строку с полями min/max
     const row = Array.isArray(data) ? data[0] : data
     if (row?.min != null) min = Math.round(Number(row.min))
     if (row?.max != null) max = Math.round(Number(row.max))
