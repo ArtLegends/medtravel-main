@@ -1,65 +1,50 @@
 // app/(auth)/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-const slugify = (s: string) =>
-  s.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+export const dynamic = "force-dynamic";        // не кешируем
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const as = (url.searchParams.get("as") || "").toLowerCase(); // ← lowercase
   const next = url.searchParams.get("next") ?? "/";
 
+  // ответ, к которому будем пришивать куки auth
   const res = NextResponse.redirect(new URL(next, req.url));
 
-  const cookieStore = await cookies();
+  // важно: читаем ВСЕ входящие куки (в т.ч. code_verifier),
+  // и обязательно прокидываем options при установке
+  const store = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookieStore.getAll().map((c: any) => ({ name: c.name, value: c.value })),
-        setAll: (all) => all.forEach((cookie) => res.cookies.set(cookie.name, cookie.value, cookie.options)),
+        getAll: () => store.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: (all) => {
+          for (const cookie of all) {
+            // Supabase отдаёт корректные options; обязательно их применяем
+            res.cookies.set(cookie.name, cookie.value, cookie.options);
+          }
+        },
       },
-    }
+    },
   );
 
-  if (!code) return NextResponse.redirect(new URL(`/`, req.url));
+  // без code мы не сможем обменять сессию
+  if (!code) return NextResponse.redirect(new URL("/", req.url));
+
   const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) return NextResponse.redirect(new URL(`/login?error=oauth`, req.url));
-
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if (!user) return NextResponse.redirect(new URL(`/login?error=session`, req.url));
-
-  const userId = user.id;
-  const email = user.email ?? "";
-  const handle = slugify(email.split("@")[0] || userId.slice(0, 8));
-
-  const wantsCustomer = as === "customer";
-
-  // profiles
-  await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        email,
-        role: wantsCustomer ? "customer" : undefined, // ← lowercase
-        locale: "en",
-      } as any,
-      { onConflict: "id" }
-    );
-
-  // user_roles
-  if (wantsCustomer) {
-    await supabase
-      .from("user_roles")
-      .upsert({ user_id: userId, role: "customer" } as any, { onConflict: "user_id" });
+  if (error) {
+    // чтобы видеть причину на клиенте
+    res.cookies.set("mt_auth_error", encodeURIComponent(error.message), { path: "/", httpOnly: false, maxAge: 60 });
+    return NextResponse.redirect(new URL("/login?error=oauth", req.url));
   }
 
-  // всегда ведём на дашборд без [handle]
-  return NextResponse.redirect(new URL(`/customer`, req.url));
+  // На этом этапе Supabase через setAll уже пришьёт:
+  //   sb-<ref>-auth-token  и  sb-<ref>-auth-token.sig
+  // ⇒ на следующем запросе провайдер увидит валидную сессию.
+  return res;
 }
