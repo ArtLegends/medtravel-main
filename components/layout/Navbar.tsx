@@ -42,14 +42,6 @@ const tSafe = (t: any, key: string, fallback: string) => {
   }
 };
 
-// упрощённый генератор хэндла «имя_пользователя»
-function makeHandle(session: any) {
-  const email: string | undefined = session?.user?.email ?? "";
-  if (!email) return `user-${(session?.user?.id ?? "").slice(0, 6)}`;
-  const base = email.split("@")[0]!.toLowerCase();
-  return base.replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "user";
-}
-
 /** Desktop item */
 const NavItemLink = React.memo(
   ({ item, active, t }: { item: any; active: boolean; t: any }) => (
@@ -116,9 +108,6 @@ function ProfileDropdownAuth({
   t: any;
 }) {
   const router = useRouter();
-  const handle =
-  (session?.user?.user_metadata?.username as string) ||
-  (session?.user?.email?.split("@")[0] ?? session?.user?.id);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -153,7 +142,8 @@ function ProfileDropdownAuth({
         <DropdownItem
           key="my-clinic"
           onPress={() => router.push("/customer")}
-          startContent={<Icon icon="solar:hospital-linear" width={16} />}>
+          startContent={<Icon icon="solar:hospital-linear" width={16} />}
+        >
           My clinic
         </DropdownItem>
 

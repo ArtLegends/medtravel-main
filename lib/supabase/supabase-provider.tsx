@@ -1,5 +1,6 @@
 // lib/supabase/supabase-provider.tsx
 "use client";
+
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
@@ -47,14 +48,29 @@ export function SupabaseProvider({
       else setRole(null);
     });
     return () => listener.subscription.unsubscribe();
-  }, [supabase]); // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   const fetchRole = async (uid: string) => {
-    // 1) user_roles
-    const { data: ur } = await supabase.from("user_roles").select("role").eq("user_id", uid).maybeSingle();
-    if (ur?.role) return setRole(mapRole(ur.role));
-    // 2) profiles fallback
-    const { data: pr } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+    // 1) user_roles — источник истины
+    const { data: ur } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    if (ur?.role) {
+      setRole(mapRole(ur.role));
+      return;
+    }
+
+    // 2) profiles (fallback)
+    const { data: pr } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", uid)
+      .maybeSingle();
+
     setRole(mapRole(pr?.role ?? "guest"));
   };
 

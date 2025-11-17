@@ -1,16 +1,14 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import { Roboto } from "next/font/google";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
 import "@/styles/globals.css";
 import { detectLocale } from "@/lib/i18n-server";
 import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
 import ThemeRoot from "@/components/ThemeRoot";
 import AppChrome from "@/components/layout/AppChrome";
-
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
 
 // Font
 const roboto = Roboto({
@@ -28,13 +26,7 @@ export const metadata: Metadata = {
   },
   description:
     "MedTravel connects patients with verified clinics worldwide. Compare treatments and book a consultation safely.",
-  keywords: [
-    "medical tourism",
-    "clinics",
-    "treatments",
-    "healthcare abroad",
-    "medtravel",
-  ],
+  keywords: ["medical tourism","clinics","treatments","healthcare abroad","medtravel"],
   authors: [{ name: "MedTravel Team" }],
   creator: "MedTravel",
   publisher: "MedTravel",
@@ -55,21 +47,16 @@ export const metadata: Metadata = {
     url: "https://medtravel.me",
     siteName: "MedTravel",
     title: "MedTravel — Medical Tourism Platform",
-    description:
-      "Find the best clinics and treatments abroad. Request a free consultation.",
+    description: "Find the best clinics and treatments abroad. Request a free consultation.",
   },
   twitter: {
     card: "summary_large_image",
     title: "MedTravel — Medical Tourism Platform",
-    description:
-      "Find the best clinics and treatments abroad. Request a free consultation.",
+    description: "Find the best clinics and treatments abroad. Request a free consultation.",
     creator: "@medtravel",
   },
   metadataBase: new URL("https://medtravel.me"),
-  alternates: {
-    canonical: "/",
-    languages: { "en-US": "/en", "ru-RU": "/ru" },
-  },
+  alternates: { canonical: "/", languages: { "en-US": "/en", "ru-RU": "/ru" } },
 };
 
 export const viewport: Viewport = {
@@ -83,11 +70,7 @@ export const viewport: Viewport = {
   ],
 };
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const headersList = await headers();
   const acceptLanguage = headersList.get("accept-language");
   const locale = detectLocale(acceptLanguage || undefined);
@@ -114,10 +97,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <style>{`:root{--site-header-h:64px}`}</style>
       </head>
-      <body
-        suppressHydrationWarning
-        className={`${roboto.className} bg-background text-foreground antialiased`}
-      >
+      <body suppressHydrationWarning className={`${roboto.className} bg-background text-foreground antialiased`}>
         <SupabaseProvider initialSession={data.session}>
           <ThemeRoot>
             <div id="app-root" className="relative z-0 flex min-h-screen flex-col">
