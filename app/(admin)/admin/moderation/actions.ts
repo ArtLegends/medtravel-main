@@ -1,29 +1,68 @@
 // app/(admin)/admin/moderation/actions.ts
-'use server';
+"use server";
 
-import { createAdminClient } from '@/lib/supabase/adminClient'; // 👈 сервис-ключ
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-export async function approveClinic(formData: FormData) {
-  const clinicId = String(formData.get('clinicId'));
-  const supabase = createAdminClient(); // 👈 было createServerClient()
+/** approve черновика → публикуем клинику (RPC: approve_clinic) */
+export async function approveClinicAction(draftId: string) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: () => {},
+      },
+    }
+  );
 
-  // (опционально) можно оставить мягкую проверку через VIEW, но безопаснее доверять функции
-  // const { data: v } = await supabase.from('moderation_queue_v2')
-  //   .select('draft_status').eq('clinic_id', clinicId).maybeSingle();
-  // if (v?.draft_status !== 'pending') throw new Error('Draft is not pending');
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "UNAUTHENTICATED" };
 
-  const { error } = await supabase.rpc('publish_clinic_from_draft', { p_clinic_id: clinicId });
-  if (error) throw error;
+    const { data, error } = await supabase.rpc("approve_clinic", { p_draft_id: draftId });
+    if (error) {
+      console.error("approve_clinic RPC error:", error);
+      return { ok: false, error: error.message || "RPC_ERROR" };
+    }
+    return { ok: true, clinicId: data as string };
+  } catch (e: any) {
+    console.error("approveClinicAction failed:", e);
+    return { ok: false, error: e?.message || "UNKNOWN" };
+  }
 }
 
-export async function rejectClinic(formData: FormData) {
-  const clinicId = String(formData.get('clinicId'));
-  const reason   = String(formData.get('reason') || '');
-  const supabase = createAdminClient(); // 👈 тоже сервис-ключ
+/** reject черновика (RPC: reject_clinic_draft) */
+export async function rejectClinicAction(draftId: string, reason: string) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: () => {},
+      },
+    }
+  );
 
-  const { error } = await supabase.rpc('reject_clinic_draft', {
-    p_clinic_id: clinicId,
-    p_reason: reason,
-  });
-  if (error) throw error;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "UNAUTHENTICATED" };
+
+    const { error } = await supabase.rpc("reject_clinic_draft", {
+      p_draft_id: draftId,
+      p_reason: reason ?? "",
+    });
+    if (error) {
+      console.error("reject_clinic_draft RPC error:", error);
+      return { ok: false, error: error.message || "RPC_ERROR" };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    console.error("rejectClinicAction failed:", e);
+    return { ok: false, error: e?.message || "UNKNOWN" };
+  }
 }
