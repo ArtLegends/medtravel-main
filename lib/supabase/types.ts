@@ -1735,6 +1735,7 @@ export type Database = {
           moderation_status: string
           name: string
           owner_id: string | null
+          payments: Json | null
           province: string | null
           search: unknown
           slug: string
@@ -1765,6 +1766,7 @@ export type Database = {
           moderation_status?: string
           name: string
           owner_id?: string | null
+          payments?: Json | null
           province?: string | null
           search?: unknown
           slug: string
@@ -1795,6 +1797,7 @@ export type Database = {
           moderation_status?: string
           name?: string
           owner_id?: string | null
+          payments?: Json | null
           province?: string | null
           search?: unknown
           slug?: string
@@ -2179,6 +2182,7 @@ export type Database = {
           locale: string
           phone: string | null
           role: string
+          updated_at: string | null
         }
         Insert: {
           created_at?: string
@@ -2190,6 +2194,7 @@ export type Database = {
           locale?: string
           phone?: string | null
           role?: string
+          updated_at?: string | null
         }
         Update: {
           created_at?: string
@@ -2201,6 +2206,7 @@ export type Database = {
           locale?: string
           phone?: string | null
           role?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -2610,7 +2616,6 @@ export type Database = {
           province: string | null
           services: Json | null
           slug: string | null
-          source_url: string | null
           specialty: string | null
           staff: Json | null
         }
@@ -2636,7 +2641,6 @@ export type Database = {
           province?: string | null
           services?: Json | null
           slug?: string | null
-          source_url?: string | null
           specialty?: string | null
           staff?: Json | null
         }
@@ -2662,7 +2666,6 @@ export type Database = {
           province?: string | null
           services?: Json | null
           slug?: string | null
-          source_url?: string | null
           specialty?: string | null
           staff?: Json | null
         }
@@ -3730,6 +3733,15 @@ export type Database = {
       }
       clinic_ids_for_user: { Args: { p_user: string }; Returns: string[] }
       has_any: { Args: { needles: string[]; src: string }; Returns: boolean }
+      import_whatclinic: {
+        Args: { p_limit?: number; p_raw_id?: number }
+        Returns: {
+          clinic: string
+          note: string
+          ok: boolean
+          raw_id: number
+        }[]
+      }
       import_whatclinic_row: { Args: { p_id: number }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_clinic_member: { Args: { c_id: string }; Returns: boolean }
@@ -3758,9 +3770,9 @@ export type Database = {
       seo_treatment_price_range: {
         Args: {
           p_category_slug: string
-          p_city?: string
-          p_country?: string
-          p_district?: string
+          p_city: string
+          p_country: string
+          p_district: string
           p_service_slugs: string[]
         }
         Returns: {
@@ -3779,6 +3791,15 @@ export type Database = {
         }[]
       }
       unaccent: { Args: { "": string }; Returns: string }
+      util_hours_split: { Args: { idx: number; s: string }; Returns: string }
+      util_parse_time_range: {
+        Args: { s: string }
+        Returns: Record<string, unknown>
+      }
+      util_price_numeric: { Args: { s: string }; Returns: number }
+      util_slugify: { Args: { txt: string }; Returns: string }
+      util_try_jsonb: { Args: { txt: string }; Returns: Json }
+      util_weekday_en: { Args: { day_name: string }; Returns: number }
     }
     Enums: {
       booking_origin: "homepage" | "service" | "doctor"

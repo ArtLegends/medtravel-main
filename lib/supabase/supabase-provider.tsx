@@ -16,8 +16,9 @@ export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
 
 const mapRole = (r?: string | null): UserRole => {
   const v = String(r || "GUEST").toUpperCase();
-  if (["GUEST","PATIENT","CUSTOMER","PARTNER","ADMIN"].includes(v)) return v as UserRole;
-  return "GUEST";
+  return (["GUEST","PATIENT","CUSTOMER","PARTNER","ADMIN"] as const).includes(v as any)
+    ? (v as UserRole)
+    : "GUEST";
 };
 
 export interface SupabaseContextType {
@@ -52,14 +53,27 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
-  const fetchRole = async (id: string) => {
-    const { data, error } = await supabase
+  const fetchRole = async (uid: string) => {
+    // 1) user_roles — источник истины
+    const { data: ur } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    if (ur?.role) {
+      setRole(mapRole(ur.role));
+      return;
+    }
+
+    // 2) fallback: profiles.role
+    const { data: pr } = await supabase
       .from("profiles")
       .select("role")
-      .eq("id", id)
+      .eq("id", uid)
       .maybeSingle();
-    if (error || !data) { setRole("GUEST"); return; }
-    setRole(mapRole((data as any).role));
+
+    setRole(mapRole(pr?.role ?? "GUEST"));
   };
 
   // Мемоизируем контекстное значение чтобы избежать ненужных перерендеров
