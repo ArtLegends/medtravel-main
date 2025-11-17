@@ -9,6 +9,9 @@ import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
 import ThemeRoot from "@/components/ThemeRoot";
 import AppChrome from "@/components/layout/AppChrome";
 
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+
 // Font
 const roboto = Roboto({
   subsets: ["latin", "cyrillic"],
@@ -89,6 +92,20 @@ export default async function RootLayout({
   const acceptLanguage = headersList.get("accept-language");
   const locale = detectLocale(acceptLanguage || undefined);
 
+  // server-side session
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: () => {}, // не меняем куки тут
+      },
+    }
+  );
+  const { data } = await supabase.auth.getSession();
+
   return (
     <html suppressHydrationWarning className={roboto.variable} lang={locale}>
       <head>
@@ -101,7 +118,7 @@ export default async function RootLayout({
         suppressHydrationWarning
         className={`${roboto.className} bg-background text-foreground antialiased`}
       >
-        <SupabaseProvider>
+        <SupabaseProvider initialSession={data.session}>
           <ThemeRoot>
             <div id="app-root" className="relative z-0 flex min-h-screen flex-col">
               <AppChrome>{children}</AppChrome>

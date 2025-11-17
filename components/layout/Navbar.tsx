@@ -152,17 +152,8 @@ function ProfileDropdownAuth({
 
         <DropdownItem
           key="my-clinic"
-          onPress={() => {
-            const email: string = session?.user?.email ?? "";
-            const handle = (email.split("@")[0] || "me")
-              .toLowerCase()
-              .normalize("NFKD")
-              .replace(/[^\p{L}\p{N}]+/gu, "-")
-              .replace(/^-+|-+$/g, "");
-            router.push(`/customer/${handle}`);
-          }}
-          startContent={<Icon icon="solar:hospital-linear" width={16} />}
-        >
+          onPress={() => router.push("/customer")}
+          startContent={<Icon icon="solar:hospital-linear" width={16} />}>
           My clinic
         </DropdownItem>
 

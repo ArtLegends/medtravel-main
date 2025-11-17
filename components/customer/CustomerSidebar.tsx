@@ -1,22 +1,40 @@
 // components/customer/CustomerSidebar.tsx
-import Link from "next/link";
+"use client";
 
-export default function CustomerSidebar({
-  handle,
-  nav,
-}: {
-  handle: string;
-  nav: { title: string; href: string; icon?: any }[];
-}) {
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NAV = [
+  { label: "Dashboard",      href: "/customer" },
+  { label: "Bookings",       href: "/customer/bookings" },
+  { label: "Patients",       href: "/customer/patients" },
+  { label: "Reviews",       href: "/customer/reviews" },
+  { label: "Clinic Profile", href: "/customer/clinic-profile" },
+  { label: "Transactions",   href: "/customer/transactions" },
+  { label: "Settings",       href: "/customer/settings" },
+  { label: "Reports",        href: "/customer/reports" },
+];
+
+export default function CustomerSidebar() {
+  const pathname = usePathname();
+
   return (
-    <aside className="w-64 border-r bg-white">
-      <nav className="p-4 space-y-1">
-        {nav.map((i) => (
-          <Link key={i.href} href={i.href} className="block rounded px-3 py-2 hover:bg-gray-50">
-            {i.title}
+    <nav className="space-y-1 text-sm">
+      {NAV.map((item) => {
+        const active = pathname === item.href || (item.href !== "/customer" && pathname?.startsWith(item.href));
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={
+              "block rounded-md px-3 py-2 " +
+              (active ? "bg-gray-900 text-white" : "hover:bg-gray-100")
+            }
+          >
+            {item.label}
           </Link>
-        ))}
-      </nav>
-    </aside>
+        );
+      })}
+    </nav>
   );
 }
