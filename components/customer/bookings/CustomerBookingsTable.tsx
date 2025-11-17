@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { updateCustomerRequestStatusAction, deleteCustomerRequestAction, deleteAllCustomerRequestsAction } from '@/app/(customer)/customer/bookings/actions';
+import { updateCustomerRequestStatusAction, deleteCustomerRequestAction, deleteAllCustomerRequestsAction } from '@/app/(customer)/customer/[handle]/bookings/actions';
 
 export type Row = {
   id: string;
