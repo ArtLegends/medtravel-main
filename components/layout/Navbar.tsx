@@ -116,7 +116,9 @@ function ProfileDropdownAuth({
   t: any;
 }) {
   const router = useRouter();
-  const handle = makeHandle(session);
+  const handle =
+  (session?.user?.user_metadata?.username as string) ||
+  (session?.user?.email?.split("@")[0] ?? session?.user?.id);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -150,9 +152,8 @@ function ProfileDropdownAuth({
 
         <DropdownItem
           key="myclinic"
-          onPress={() => router.push(`/customer/${handle}`)}
-          startContent={<Icon icon="solar:hospital-linear" width={16} />}
-        >
+          onPress={() => router.push(`/customer/${handle.toLowerCase()}`)}
+          startContent={<Icon icon="solar:building-3-linear" width={16} />}>
           My clinic
         </DropdownItem>
 

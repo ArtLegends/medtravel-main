@@ -34,7 +34,7 @@ export default function EmailForm({ onSuccess }: Props) {
     const { error } = await supabase.auth.signInWithOtp({
       email: data.email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?as=CUSTOMER`,
       },
     });
     if (error) setErrorMsg(error.message);

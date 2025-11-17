@@ -27,9 +27,7 @@ export default function LoginManager() {
         provider: "google",
         options: {
           // абсолютный URL на текущий origin + проброс next
-          redirectTo: `${getOrigin()}/auth/callback?next=${encodeURIComponent(
-            next
-          )}`,
+          redirectTo: `${window.location.origin}/auth/callback?as=CUSTOMER`,
         },
       });
       // дальше управление уйдёт в Google → /auth/callback
