@@ -14,6 +14,12 @@ import { createClient } from "@/lib/supabase/browserClient";
 
 export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
 
+const mapRole = (r?: string | null): UserRole => {
+  const v = String(r || "GUEST").toUpperCase();
+  if (["GUEST","PATIENT","CUSTOMER","PARTNER","ADMIN"].includes(v)) return v as UserRole;
+  return "GUEST";
+};
+
 export interface SupabaseContextType {
   supabase: ReturnType<typeof createClient>;
   session: Session | null;
@@ -52,17 +58,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       .select("role")
       .eq("id", id)
       .maybeSingle();
-
-    if (error) {
-      console.error('profiles select error', error);
-      setRole("GUEST");          // безопасный фолбек
-      return;
-    }
-    if (!data) {
-      setRole("GUEST");          // нет строки — считаем USER (триггер создаст позже)
-      return;
-    }
-    setRole((data as any)?.role ?? "GUEST");
+    if (error || !data) { setRole("GUEST"); return; }
+    setRole(mapRole((data as any).role));
   };
 
   // Мемоизируем контекстное значение чтобы избежать ненужных перерендеров

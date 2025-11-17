@@ -52,6 +52,38 @@ function normLangs(val?: string | string[]) {
   return Array.isArray(val) ? val : val.split(',').map(s => s.trim()).filter(Boolean);
 }
 
+function ClampText({
+  text,
+  lines = 3,
+  className = '',
+  minCharsToToggle = 140,
+}: { text: string; lines?: 2 | 3 | 4; className?: string; minCharsToToggle?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const clampClass =
+    lines === 2 ? 'line-clamp-2' :
+      lines === 4 ? 'line-clamp-4' :
+        'line-clamp-3';
+
+  const showToggle = (text?.trim()?.length ?? 0) > minCharsToToggle;
+
+  return (
+    <div className={className}>
+      <p className={expanded ? 'text-gray-700' : `text-gray-700 ${clampClass}`}>
+        {text}
+      </p>
+      {showToggle && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="mt-1 text-sm font-medium text-emerald-700 hover:underline"
+        >
+          {expanded ? 'Read less' : 'Read more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ClinicDetailPage({ clinic }: Props) {
   const base = clinicPath({
     slug: clinic.slug,
@@ -61,19 +93,6 @@ export default function ClinicDetailPage({ clinic }: Props) {
     district: clinic.district,
   }) || `/clinic/${clinic.slug}`
 
-  const sections = useMemo(
-    () => [
-      { id: 'about', label: 'About the clinic' },
-      { id: 'treatments', label: 'Treatments & Prices' },
-      { id: 'staff', label: 'Staff' },
-      { id: 'photos', label: 'Transformation photos' },
-      { id: 'accreditations', label: 'Accreditations' },
-      { id: 'hours', label: 'Operation Hours' },
-      { id: 'location', label: 'Location' },
-    ],
-    []
-  );
-
   // убираем пустые строки, чтобы <Image> не падал
   const imgs = (clinic.images ?? []).filter(Boolean);
 
@@ -82,10 +101,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
   // из данных клиники получаем список названий услуг:
   const servicesFromClinic = useMemo(
-    () =>
-      Array.from(
-        new Set((clinic?.services ?? []).map((s: any) => s?.name).filter(Boolean))
-      ),
+    () => Array.from(new Set((clinic?.services ?? []).map((s: any) => s?.name).filter(Boolean))),
     [clinic?.services]
   );
 
@@ -113,7 +129,6 @@ export default function ClinicDetailPage({ clinic }: Props) {
     const list: any[] = (clinic as any).accreditations ?? [];
     return list.map(a => ({
       name: a.name ?? a.title ?? '',
-      // было a.logo_url ?? a.logo — добавляем logoUrl
       logo: a.logoUrl ?? a.logo_url ?? a.logo ?? '',
       meta: a.description ?? a.country ?? a.desc ?? '',
     }));
@@ -134,26 +149,41 @@ export default function ClinicDetailPage({ clinic }: Props) {
     return buildMapEmbedFromAny(link, address);
   }, [clinic, address]);
 
+  const hasAbout = Boolean(clinic.about && clinic.about.trim());
+  const allServices = (clinic.services ?? []) as any[];
+  const hasTreatments = allServices.length > 0;
+  const hasDoctors = doctors.length > 0;
+  const hasPhotos = imgs.length > 0;
+  const hasAccreditations = accs.length > 0;
+  const hasHours = Array.isArray((clinic as any).hours) && (clinic as any).hours.length > 0;
+  const hasLocation = Boolean(mapSrc || address);
+
+  const sections = useMemo(() => {
+    const s: { id: string; label: string }[] = [];
+    if (hasAbout) s.push({ id: 'about', label: 'About the clinic' });
+    if (hasTreatments) s.push({ id: 'treatments', label: 'Treatments & Prices' });
+    if (hasDoctors) s.push({ id: 'staff', label: 'Staff' });
+    if (hasPhotos) s.push({ id: 'photos', label: 'Transformation photos' });
+    if (hasAccreditations) s.push({ id: 'accreditations', label: 'Accreditations' });
+    if (hasHours) s.push({ id: 'hours', label: 'Operation Hours' });
+    if (hasLocation) s.push({ id: 'location', label: 'Location' });
+    return s;
+  }, [hasAbout, hasTreatments, hasDoctors, hasPhotos, hasAccreditations, hasHours, hasLocation]);
 
   const [reportOpen, setReportOpen] = useState(false);
 
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const supabase = useMemo(() => createClient(), []);
 
-  // показывать весь список или только первые 5
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllDoctors, setShowAllDoctors] = useState(false);
 
-  // вью-массивы
-  const allServices = (clinic.services ?? []) as any[];
   const visibleServices = showAllServices ? allServices : allServices.slice(0, 5);
-
-  // есть ли вообще цены/описания среди услуг
   const hasPrice = allServices.some(s => String(s?.price ?? '').trim() !== '');
-  const hasDesc  = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
+  const hasDesc = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
 
-  const allDoctors = doctors; // уже рассчитан useMemo выше
-  const visibleDoctors = showAllDoctors ? allDoctors : allDoctors.slice(0, 5);
+  const allDoctorsArr = doctors;
+  const visibleDoctors = showAllDoctors ? allDoctorsArr : allDoctorsArr.slice(0, 5);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,29 +219,32 @@ export default function ClinicDetailPage({ clinic }: Props) {
         {/* ---------- MAIN ---------- */}
         <main className="min-w-0">
           {/* About */}
-          <section id="about" className="space-y-3 pt-2">
-            <div className="text-sm text-gray-500">
-              {[clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ')}
-            </div>
+          {hasAbout && (
+            <section id="about" className="space-y-3 pt-2">
+              <div className="text-sm text-gray-500">
+                {[clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ')}
+              </div>
 
-            <h1 className="flex flex-wrap items-center gap-3 text-3xl font-semibold">
-              {clinic.name}
-            </h1>
-            <div className="flex flex-wrap items-center gap-3">
-            {clinic.verifiedByMedtravel && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
-                  ✓ Verified by medtravel.me
-                </span>
-              )}
-              {clinic.isOfficialPartner && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
-                  ✓ Official partner of medtravel.me
-                </span>
-              )}
-            </div>
+              <h1 className="flex flex-wrap items-center gap-3 text-3xl font-semibold">
+                {clinic.name}
+              </h1>
 
-            {clinic.about && <p className="text-gray-700">{clinic.about}</p>}
-          </section>
+              <div className="flex flex-wrap items-center gap-3">
+                {clinic.verifiedByMedtravel && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
+                    ✓ Verified by medtravel.me
+                  </span>
+                )}
+                {clinic.isOfficialPartner && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                    ✓ Official partner of medtravel.me
+                  </span>
+                )}
+              </div>
+
+              <ClampText text={clinic.about!} lines={4} />
+            </section>
+          )}
 
           {/* Treatments & Prices */}
           <section id="treatments" className="space-y-3 pt-10">
@@ -232,14 +265,25 @@ export default function ClinicDetailPage({ clinic }: Props) {
                     const priceText = s?.price
                       ? `${s.price}${s.currency ? ` ${s.currency}` : ''}`
                       : '—';
+
                     return (
                       <tr key={s.name}>
-                        <td className="p-3">{s.name}</td>
-                        {hasPrice && <td className="p-3">{priceText}</td>}
-                        {hasDesc && <td className="p-3">{desc || '—'}</td>}
-                        <td className="p-3">
-                          <button className="rounded-md bg-primary px-3 py-2 text-white"
-                          onClick={() => { setClickedService(s.name); setOpen(true); }}>Request</button>
+                        <td className="p-3 align-top">{s.name}</td>
+                        {hasPrice && <td className="p-3 align-top">{priceText}</td>}
+                        {hasDesc && (
+                          <td className="p-3 align-top">
+                            {desc
+                              ? <ClampText text={desc} lines={3} minCharsToToggle={120} />
+                              : '—'}
+                          </td>
+                        )}
+                        <td className="p-3 align-top">
+                          <button
+                            className="rounded-md bg-primary px-3 py-2 text-white"
+                            onClick={() => { setClickedService(s.name); setOpen(true); }}
+                          >
+                            Request
+                          </button>
                         </td>
                       </tr>
                     );
@@ -267,67 +311,70 @@ export default function ClinicDetailPage({ clinic }: Props) {
               <div className="rounded-xl border p-6 text-sm text-gray-500">No staff listed</div>
             ) : (
               <div className="space-y-4">
-                {visibleDoctors.map((d, idx) => (
-                  <article
-                    key={`${d.name}-${idx}`}
-                    className="grid gap-4 rounded-xl border p-4 sm:grid-cols-[1fr_180px]"
-                  >
-                    <div>
-                      <h3 className="text-lg font-medium">{d.name}</h3>
-                      {d.title && <div className="text-sm text-gray-500">{d.title}</div>}
+                {visibleDoctors.map((d, idx) => {
+                  const hasPhoto = Boolean(d.photo);
+                  return (
+                    <article
+                      key={`${d.name}-${idx}`}
+                      className={`grid gap-4 rounded-xl border p-4 ${hasPhoto ? 'sm:grid-cols-[1fr_180px]' : ''}`}
+                    >
+                      <div>
+                        <h3 className="text-lg font-medium">{d.name}</h3>
+                        {d.title && <div className="text-sm text-gray-500">{d.title}</div>}
 
-                      <div className="mt-3 space-y-2 text-sm">
-                        {d.languages.length > 0 && (
-                          <div>
-                            <span className="font-semibold">Language Spoken:</span>
-                            <ul className="ml-4 mt-1 list-disc">
-                              {d.languages.map(l => <li key={l}>{l}</li>)}
-                            </ul>
+                        <div className="mt-3 space-y-2 text-sm">
+                          {d.languages.length > 0 && (
+                            <div>
+                              <span className="font-semibold">Language Spoken:</span>
+                              <ul className="ml-4 mt-1 list-disc">
+                                {d.languages.map(l => <li key={l}>{l}</li>)}
+                              </ul>
+                            </div>
+                          )}
+
+                          {d.bio && (
+                            <div>
+                              <span className="font-semibold">Biography:</span>
+                              <ClampText text={d.bio} lines={3} className="inline-block" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => { setClickedService(''); setOpen(true) }}
+                            className="rounded-md bg-primary px-3 py-2 text-white"
+                          >
+                            Request Appointment
+                          </button>
+                        </div>
+                      </div>
+
+                      {hasPhoto && (
+                        <div className="sm:justify-self-end">
+                          <div className="aspect-square w-[140px] overflow-hidden rounded-lg bg-gray-100 sm:w-[180px]">
+                            <Image
+                              src={d.photo}
+                              alt={d.name}
+                              width={360}
+                              height={360}
+                              className="h-full w-full object-cover"
+                            />
                           </div>
-                        )}
-
-                        {d.bio && (
-                          <div>
-                            <span className="font-semibold">Biography:</span>{' '}
-                            <span>{d.bio}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-3">
-                        <button
-                          type="button"
-                          onClick={() => { setClickedService(''); setOpen(true) }}
-                          className="rounded-md bg-primary px-3 py-2 text-white"
-                        >
-                          Request Appointment
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="sm:justify-self-end">
-                      <div className="aspect-square w-[140px] overflow-hidden rounded-lg bg-gray-100 sm:w-[180px]">
-                        {d.photo && (
-                          <Image
-                            src={d.photo}
-                            alt={d.name}
-                            width={360}
-                            height={360}
-                            className="h-full w-full object-cover"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                ))}
-                {allDoctors.length > 5 && (
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+                {allDoctorsArr.length > 3 && (
                   <div className="mt-2">
                     <button
                       type="button"
                       onClick={() => setShowAllDoctors(v => !v)}
                       className="text-sm px-3 py-2 rounded-md border hover:bg-gray-50"
                     >
-                      {showAllDoctors ? 'Show less' : `View all (${allDoctors.length})`}
+                      {showAllDoctors ? 'Show less' : `View all (${allDoctorsArr.length})`}
                     </button>
                   </div>
                 )}
@@ -336,11 +383,9 @@ export default function ClinicDetailPage({ clinic }: Props) {
           </section>
 
           {/* Photos */}
-          <section id="photos" className="space-y-4 pt-10">
-            <h2 className="text-2xl font-semibold">Transformation photos</h2>
-            {imgs.length === 0 ? (
-              <div className="rounded-xl border p-6 text-sm text-gray-500">No photos yet</div>
-            ) : (
+          {hasPhotos && (
+            <section id="photos" className="space-y-4 pt-10">
+              <h2 className="text-2xl font-semibold">Transformation photos</h2>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {imgs.map(src => (
                   <div key={src} className="relative aspect-[4/3] overflow-hidden rounded-lg">
@@ -354,8 +399,8 @@ export default function ClinicDetailPage({ clinic }: Props) {
                   </div>
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* Additional Services */}
           {(premises.length || clinicServices.length || travelServices.length || languagesSpoken.length) ? (
@@ -372,11 +417,9 @@ export default function ClinicDetailPage({ clinic }: Props) {
           ) : null}
 
           {/* Accreditations */}
-          <section id="accreditations" className="space-y-4 pt-10">
-            <h2 className="text-2xl font-semibold">Accreditations</h2>
-            {accs.length === 0 ? (
-              <div className="rounded-xl border p-6 text-sm text-gray-500">No accreditations listed</div>
-            ) : (
+          {hasAccreditations && (
+            <section id="accreditations" className="space-y-4 pt-10">
+              <h2 className="text-2xl font-semibold">Accreditations</h2>
               <ul className="divide-y rounded-xl border">
                 {accs.map((a, i) => (
                   <li key={`${a.name}-${i}`} className="flex items-center gap-4 p-4">
@@ -400,48 +443,48 @@ export default function ClinicDetailPage({ clinic }: Props) {
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* Hours */}
-          <section id="hours" className="space-y-4 pt-10">
-            <h2 className="text-2xl font-semibold">Operation Hours</h2>
-            <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {(clinic.hours ?? []).map((h: any, idx: number) => {
-                const isClosed = !h.open && !h.close; // день закрыт
-                return (
-                  <li key={h.day ?? idx} className="rounded-md bg-gray-50 px-4 py-2">
-                    <span className="font-semibold uppercase">
-                      {h.day ?? h.weekday ?? ''}:
-                    </span>{' '}
-                    {isClosed ? 'Closed' : `${h.open} - ${h.close}`}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          {hasHours && (
+            <section id="hours" className="space-y-4 pt-10">
+              <h2 className="text-2xl font-semibold">Operation Hours</h2>
+              <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {(clinic.hours ?? []).map((h: any, idx: number) => {
+                  const isClosed = !h.open && !h.close;
+                  return (
+                    <li key={h.day ?? idx} className="rounded-md bg-gray-50 px-4 py-2">
+                      <span className="font-semibold uppercase">
+                        {h.day ?? h.weekday ?? ''}:
+                      </span>{' '}
+                      {isClosed ? 'Closed' : `${h.open} - ${h.close}`}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {/* Location */}
-          <section id="location" className="space-y-3 pt-10">
-            <h2 className="text-2xl font-semibold">Location</h2>
-            {address && <div className="text-sm">{address}</div>}
-            {mapSrc ? (
-              <div className="overflow-hidden rounded-lg border">
-                <div className="aspect-[16/9]">
-                  <iframe
-                    src={mapSrc!}
-                    className="h-full w-full"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
+          {hasLocation && (
+            <section id="location" className="space-y-3 pt-10">
+              <h2 className="text-2xl font-semibold">Location</h2>
+              {address && <div className="text-sm">{address}</div>}
+              {mapSrc ? (
+                <div className="overflow-hidden rounded-lg border">
+                  <div className="aspect-[16/9]">
+                    <iframe
+                      src={mapSrc!}
+                      className="h-full w-full"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border p-4 text-sm text-gray-500">
-                Map is not available for this clinic.
-              </div>
-            )}
-          </section>
+              ) : null}
+            </section>
+          )}
 
           {/* Reports */}
           <div className="pt-4">
@@ -488,12 +531,11 @@ export default function ClinicDetailPage({ clinic }: Props) {
         </main>
 
         {/* ---------- SIDEBAR ---------- */}
-        <aside className="space-y-4">
+        <aside className="space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto">
           <div className="rounded-2xl border p-4">
             <div className="mb-3 w-full rounded-md px-4 py-3 text-primary text-center font-semibold text-lg">
-              Start Your<br></br> Personalized Treatment Plan Today
+              Start Your<br /> Personalized Treatment Plan Today
             </div>
-
             <Link
               href={clinicHref(clinic, 'inquiry')}
               className="block w-full rounded-md bg-emerald-600 px-4 py-3 text-center font-medium text-white hover:bg-emerald-700"

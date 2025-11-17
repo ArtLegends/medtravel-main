@@ -47,7 +47,7 @@ function tplCategoryDesc(lng: Locale, catLabel: string, loc: string) {
     case 'pl':
       return `Odkryj najlepsze ${catLabel} w ${loc} z opiniami pacjentów. ✔️ Przejrzyste ceny, anglojęzyczni specjaliści i 100% darmowe konsultacje.`
     default:
-      return `Discover best ${catLabel} in ${loc} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
+      return `Discover Best ${catLabel} in ${loc} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
   }
 }
 

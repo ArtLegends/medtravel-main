@@ -78,6 +78,7 @@ type DBClinic = {
   slug: string
   name: string
   country: string | null
+  province: string | null
   city: string | null
   district: string | null
   about: string | null
@@ -130,6 +131,13 @@ function toClinic(row: DBClinic, parts: {
   staff: DBStaff[] | null
   accreditations: DBAccr[] | null
 }): Clinic {
+  const clean = (v?: string | null) => (v && v.trim() ? v.trim() : undefined)
+
+  const address =
+  clean(row.address) ??
+  clean([row.country, row.city, row.district].filter(Boolean).join(', ')) ??
+  undefined
+
   const images = (parts.images ?? [])
     .map(i => (i?.url || '').trim())
     .filter(Boolean) as string[]
@@ -178,11 +186,6 @@ function toClinic(row: DBClinic, parts: {
       description: a?.description ?? ''
     }
   })
-
-  const address =
-    (row.address?.trim() || undefined) ||
-    [row.country, row.city, row.district].filter(Boolean).join(', ') ||
-    undefined
 
   return {
   id: row.id,

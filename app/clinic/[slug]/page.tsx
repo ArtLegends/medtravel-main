@@ -37,67 +37,69 @@ export async function generateMetadata(
   }
 
   // 2.2 адрес: пробуем набор возможных полей + профили
-  let addr: string | null =
-    (clinic as any)?.address ??
-    (clinic as any)?.full_address ??
-    (clinic as any)?.address_en ??
-    (clinic as any)?.address_ru ??
-    (clinic as any)?.street_address ??
-    null
+  const pick = (v?: string | null) => (v && v.trim() ? v.trim() : null);
 
-  // ← ДОБАВИТЬ: живой профиль (часто именно тут хранится адрес кастомер-клиник)
+  let addr: string | null =
+    pick((clinic as any)?.address) ??
+    pick((clinic as any)?.full_address) ??
+    pick((clinic as any)?.address_en) ??
+    pick((clinic as any)?.address_ru) ??
+    pick((clinic as any)?.street_address) ??
+    pick((clinic as any)?.location?.address) ?? // <-- берём адрес из JSON location, если есть
+    null;
+
+  // живой профиль
   if (!addr && clinic?.id) {
     const { data: prof } = await sb
-      .from('clinic_profiles')                 // если у вас другое имя — подставьте
+      .from('clinic_profiles')
       .select('address, address_en, address_ru, full_address, street')
       .eq('clinic_id', clinic.id)
-      .maybeSingle()
+      .maybeSingle();
     addr =
-      prof?.address ??
-      prof?.full_address ??
-      prof?.address_en ??
-      prof?.address_ru ??
-      prof?.street ?? null
+      pick(prof?.address) ??
+      pick(prof?.full_address) ??
+      pick(prof?.address_en) ??
+      pick(prof?.address_ru) ??
+      pick(prof?.street) ??
+      addr;
   }
 
-  // ← ОПЦИОНАЛЬНО: если у вас используется черновик профиля
+  // черновик профиля (если есть)
   if (!addr && clinic?.id) {
     const { data: draft } = await sb
-      .from('clinic_profile_draft')            // если таблица есть
+      .from('clinic_profile_draft')
       .select('address, address_en, address_ru, full_address, street')
       .eq('clinic_id', clinic.id)
-      .maybeSingle()
+      .maybeSingle();
     addr =
-      addr ??
-      draft?.address ??
-      draft?.full_address ??
-      draft?.address_en ??
-      draft?.address_ru ??
-      draft?.street ?? null
+      pick(draft?.address) ??
+      pick(draft?.full_address) ??
+      pick(draft?.address_en) ??
+      pick(draft?.address_ru) ??
+      pick(draft?.street) ??
+      addr;
   }
 
-  // как и было:
+  // view как запасной вариант
   if (!addr && clinic?.slug) {
     const { data: row } = await sb
       .from('mv_catalog_clinics')
       .select('address')
       .eq('slug', clinic.slug)
-      .maybeSingle()
-    if (row?.address) addr = row.address
+      .maybeSingle();
+    addr = pick(row?.address) ?? addr;
   }
 
+  // самый последний fallback — только когда реального строки адреса нет
   if (!addr && clinic) {
     const parts = [
-      (clinic as any)?.address && String((clinic as any).address).trim(), // если внезапно строка
-      clinic.district && String(clinic.district).trim(),
-      clinic.city && String(clinic.city).trim(),
-      clinic.province && String(clinic.province).trim(),
-      clinic.country && String(clinic.country).trim(),
-    ].filter(Boolean) as string[]
-  
-    if (parts.length) {
-      addr = parts.join(', ')
-    }
+      pick((clinic as any)?.address), // вдруг строкой вернётся
+      pick(clinic.district),
+      pick(clinic.city),
+      pick(clinic.province),
+      pick(clinic.country),
+    ].filter(Boolean) as string[];
+    if (parts.length) addr = parts.join(', ');
   }
 
   // 3) каноникал из реальной локации
