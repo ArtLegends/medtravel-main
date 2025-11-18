@@ -3679,6 +3679,7 @@ export type Database = {
       }
     }
     Functions: {
+      approve_clinic: { Args: { p_draft_id: string }; Returns: string }
       blog_cat_id: { Args: { p_slug: string }; Returns: string }
       blog_index: {
         Args: {

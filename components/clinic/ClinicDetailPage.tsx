@@ -93,10 +93,43 @@ export default function ClinicDetailPage({ clinic }: Props) {
     district: clinic.district,
   }) || `/clinic/${clinic.slug}`
 
-  // убираем пустые строки, чтобы <Image> не падал
-  const imgs = (clinic.images ?? []).filter(Boolean);
+  // нормализуем картинки из разных полей (images / gallery)
+  const extra = clinic as any;
 
-  const [open, setOpen] = useState(false)
+  const rawImages: any[] = [
+    ...(Array.isArray(extra.images) ? extra.images : []),
+    ...(Array.isArray(extra.gallery) ? extra.gallery : []),
+  ];
+
+  const imgs: string[] = rawImages
+    .map((v) => {
+      if (typeof v === 'string') return v;
+      if (v && typeof v.url === 'string') return v.url;
+      if (v && typeof v.image === 'string') return v.image;
+      if (v && typeof v.src === 'string') return v.src;
+      return null;
+    })
+    .filter((v): v is string => !!v && v.trim().length > 0);
+
+    const paymentMethods: string[] = Array.isArray(extra.payments)
+    ? Array.from(
+        new Set(
+          extra.payments
+            .map((p: any) => {
+              if (typeof p === 'string') return p;
+              if (p && typeof p.method === 'string') return p.method;
+              if (p && typeof p.name === 'string') return p.name;
+              return null;
+            })
+            .filter(
+              (v: unknown): v is string =>
+                typeof v === 'string' && v.trim().length > 0
+            ),
+        ),
+      )
+    : [];
+  
+    const [open, setOpen] = useState(false)
   const [clickedService, setClickedService] = useState<string>('')
 
   // из данных клиники получаем список названий услуг:
@@ -302,7 +335,29 @@ export default function ClinicDetailPage({ clinic }: Props) {
                 </button>
               </div>
             )}
+
+            {/* Accepted payment methods под таблицей */}
+            {paymentMethods.length > 0 && (
+              <div className="pt-4">
+                <div className="mb-2 text-sm font-semibold">
+                  Accepted payment methods
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {paymentMethods.map((m) => (
+                    <span
+                      key={m}
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs md:text-sm"
+                    >
+                      {/* здесь можно позже навесить иконки по ключевым словам */}
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
+
+
 
           {/* Doctors */}
           <section id="staff" className="space-y-4 pt-10">
@@ -543,19 +598,6 @@ export default function ClinicDetailPage({ clinic }: Props) {
               Claim Your Free Quote
             </Link>
           </div>
-
-          {clinic.payments?.length ? (
-            <div className="rounded-2xl border p-4">
-              <div className="mb-2 text-sm font-semibold">Accepted payment methods</div>
-              <div className="flex flex-wrap gap-2">
-                {clinic.payments.map((p: string) => (
-                  <span key={p} className="rounded-full border px-2.5 py-1 text-xs">
-                    {p}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </aside>
       </div>
 

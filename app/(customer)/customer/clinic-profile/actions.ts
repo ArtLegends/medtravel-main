@@ -1,15 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/serverClient";
-import { createAdminClient } from "@/lib/supabase/adminClient";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const DEV_BYPASS = process.env.DEV_BYPASS_AUTH === "1";
-
-// единая точка получения клиента одного типа
 async function getSupa(): Promise<SupabaseClient> {
-  return DEV_BYPASS ? createAdminClient() : await createServerClient();
+  return await createServerClient();
 }
 
 function makeSlug(base = "dev-draft-clinic") {
@@ -17,94 +12,48 @@ function makeSlug(base = "dev-draft-clinic") {
   return `${base}-${rand}`;
 }
 
-/** Возвращает clinic_id «текущего пользователя».
- * Если логина нет и DEV_BYPASS=1 — создаёт/читает dev-клинику по httpOnly cookie.
- */
+/** Возвращает clinic_id «текущего пользователя». */
 export async function ensureClinicForOwner(): Promise<string> {
   const sb = await createServerClient();
   const { data: userRes } = await sb.auth.getUser();
 
-  // === нормальный путь (будет логин) ===
-  if (userRes?.user) {
-    const user = userRes.user;
-
-    const { data: membership } = await sb
-      .from("clinic_members")
-      .select("clinic_id, role")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (membership?.clinic_id) return membership.clinic_id;
-
-    const { data: clinic, error: cErr } = await sb
-      .from("clinics")
-      .insert({
-        owner_id: user.id,
-        moderation_status: "pending",
-        name: "Draft Clinic",
-        slug: makeSlug("draft-clinic"),
-      })
-      .select("id")
-      .single();
-    if (cErr) throw cErr;
-
-    const { error: iErr } = await sb.from("clinic_members").insert({
-      clinic_id: clinic.id,
-      user_id: user.id,
-      role: "owner",
-    });
-    if (iErr) throw iErr;
-
-    return clinic.id;
+  if (!userRes?.user) {
+    throw new Error("Not authenticated");
   }
 
-  // === DEV-байпас без авторизации ===
-  if (DEV_BYPASS) {
-    const admin = createAdminClient();
-    const jar = await cookies();
-    const COOKIE = "mt_dev_clinic_id";
-    let devClinicId = jar.get(COOKIE)?.value || null;
+  const user = userRes.user;
 
-    if (devClinicId) {
-      const { data: exists } = await admin
-        .from("clinics")
-        .select("id")
-        .eq("id", devClinicId)
-        .maybeSingle();
-      if (exists?.id) return devClinicId;
-      devClinicId = null;
-    }
+  // 1) ищем существующее членство
+  const { data: membership } = await sb
+    .from("clinic_members")
+    .select("clinic_id, role")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
 
-    const name = "DEV Draft Clinic";
-    const slugBase = "dev-draft-clinic";
-    const slug = `${slugBase}-${Math.random().toString(36).slice(2, 8)}`;
+  if (membership?.clinic_id) return membership.clinic_id;
 
-    const { data: clinic, error: cErr } = await admin
-      .from("clinics")
-      .insert({
-        owner_id: null,
-        name,
-        slug,
-        is_published: false,
-        moderation_status: "draft",
-        status: "draft",
-      })
-      .select("id")
-      .single();
-    if (cErr) throw cErr;
+  // 2) создаём новую клинику-чёрновик
+  const { data: clinic, error: cErr } = await sb
+    .from("clinics")
+    .insert({
+      owner_id: user.id,
+      moderation_status: "pending",
+      name: "Draft Clinic",
+      slug: makeSlug("draft-clinic"),
+    })
+    .select("id")
+    .single();
+  if (cErr) throw cErr;
 
-    jar.set({
-      name: COOKIE,
-      value: clinic.id,
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-    });
-    return clinic.id;
-  }
+  const { error: iErr } = await sb.from("clinic_members").insert({
+    clinic_id: clinic.id,
+    user_id: user.id,
+    role: "owner",
+  });
+  if (iErr) throw iErr;
 
-  throw new Error("Not authenticated");
+  return clinic.id;
 }
 
 /** Получить черновик */
@@ -164,7 +113,7 @@ export async function saveDraftSection(
 /** Отправить на ревью */
 export async function submitForReview() {
   const clinicId = await ensureClinicForOwner();
-  const admin = createAdminClient(); // сервис-ключ (DEV/сервер)
+  const admin = await getSupa();
 
   // 1) тянем черновик
   const { data: draft, error: dErr } = await admin
@@ -195,6 +144,22 @@ export async function submitForReview() {
       : [],
   };
 
+  // собрать payments: jsonb [{ method: "Cash" }, ...]
+  const payments =
+    Array.isArray(draft?.pricing)
+      ? draft.pricing
+          .map((x: any) => {
+            if (typeof x === "string") return x;
+            if (x && typeof x.method === "string") return x.method;
+            return null;
+          })
+          .filter(
+            (v: unknown): v is string =>
+              typeof v === "string" && v.trim().length > 0
+          )
+          .map((method: string) => ({ method }))
+      : null;
+
   const safe = (v: unknown) => (typeof v === "string" ? v.trim() : null);
 
   // mapUrl из location → map_embed_url в clinics
@@ -223,6 +188,7 @@ export async function submitForReview() {
       about, // текст
       amenities, // jsonb
       map_embed_url, // ссылка карты
+      payments, // jsonb [{method:"..."}] или null
       moderation_status: "pending",
       is_published: false,
       status: "draft",
@@ -262,7 +228,6 @@ export async function publishClinic(clinicId: string) {
 
 export async function uploadGallery(files: File[]) {
   const supa = await getSupa();
-  // если не нужен юзер — вызов ниже можно убрать
   await supa.auth.getUser();
 
   const urls: string[] = [];
@@ -304,7 +269,6 @@ export async function saveDraftWhole(payload: {
   const clinicId = await ensureClinicForOwner();
   const client = await getSupa();
 
-  // гарантируем наличие строки драфта
   const { data: existing, error: getErr } = await client
     .from("clinic_profile_drafts")
     .select("*")

@@ -68,7 +68,7 @@ export type Clinic = {
     languages_spoken?: string[]
   }
 
-  payments?: string[]
+  payments: { method: string }[] | null;
   location?: { address?: string; mapEmbedUrl?: string }
 }
 

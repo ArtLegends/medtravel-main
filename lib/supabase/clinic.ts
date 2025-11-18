@@ -41,7 +41,7 @@ export async function getClinicViewBySlug(slug: string): Promise<ClinicView | nu
   const { data, error } = await (await supabase)
     .from('clinics')
     .select(`
-    id, slug, name, country, city, district, about,
+    id, slug, name, country, city, district, about, payments,
     address, map_embed_url,
     verified_by_medtravel, is_official_partner,
 
