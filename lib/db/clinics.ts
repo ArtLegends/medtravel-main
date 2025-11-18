@@ -89,6 +89,7 @@ type DBClinic = {
   official_partner?: boolean | null
   address?: string | null
   map_embed_url?: string | null
+  payments?: any | null
 }
 
 type DBImage = { url: string | null; title?: string | null; sort?: number | null } | null
@@ -187,6 +188,26 @@ function toClinic(row: DBClinic, parts: {
     }
   })
 
+  // --- НОРМАЛИЗУЕМ PAYMENTS ИЗ clinics.payments (jsonb) ---
+  let payments: { method: string }[] | null = null
+  const raw = (row as any).payments
+
+  if (Array.isArray(raw)) {
+    payments = raw
+      .map((p: any) => {
+        if (typeof p === 'string') return { method: p }
+        if (p && typeof p.method === 'string') return { method: p.method }
+        if (p && typeof p.name === 'string') return { method: p.name }
+        return null
+      })
+      .filter(
+        (x: { method: string } | null): x is { method: string } =>
+          !!x && x.method.trim().length > 0
+      )
+  } else {
+    payments = null
+  }
+
   return {
   id: row.id,
   slug: row.slug,
@@ -207,7 +228,8 @@ function toClinic(row: DBClinic, parts: {
 
   additionalServices: row.amenities ?? undefined,
 
-  payments: [],
+  payments,
+
   location: (address || row.map_embed_url) ? {
     address,
     mapEmbedUrl: row.map_embed_url ?? undefined
