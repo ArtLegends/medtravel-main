@@ -149,7 +149,7 @@ export default async function ModerationPage({ searchParams }: ModerationPagePro
                   <div className="font-medium">
                     <Link
                       className="text-blue-600 hover:underline"
-                      href={`/admin/moderation/${r.clinic_id}`}
+                      href={`/admin/moderation/detail?id=${r.clinic_id}`}
                     >
                       {r.name || "(no name)"}
                     </Link>
