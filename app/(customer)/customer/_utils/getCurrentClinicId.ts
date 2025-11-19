@@ -1,46 +1,55 @@
 // app/(customer)/customer/_utils/getCurrentClinicId.ts
 import { cookies } from 'next/headers';
-import { supabaseServer } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/serverClient';
 
 /**
  * Возвращает clinic_id, привязанный к текущему пользователю.
  *
- * 1) Нормальный путь: auth → clinic_members.clinic_id
- * 2) Legacy-fallback: mt_customer_clinic_id из cookie (для отладки / старых ссылок)
+ * 1) Нормальный путь: Supabase auth → clinic_members.clinic_id
+ * 2) Fallback: mt_customer_clinic_id из cookie (для старых/dev-сценариев)
  */
 export async function getCurrentClinicId(): Promise<string | null> {
-  // 1) Пробуем по авторизации
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabaseServer.auth.getUser();
+  // 1) Путь через авторизацию
+  try {
+    const sb = await createServerClient();
 
-  if (userErr) {
-    console.error('getCurrentClinicId: auth error', userErr);
-  }
+    const {
+      data: { user },
+      error: userErr,
+    } = await sb.auth.getUser();
 
-  if (user) {
-    const { data: membership, error: mErr } = await supabaseServer
-      .from('clinic_members')
-      .select('clinic_id, role')
-      .eq('user_id', user.id)
-      .order('role', { ascending: true }) // owner / manager / staff — неважно, берём первую
-      .limit(1)
-      .maybeSingle();
-
-    if (mErr) {
-      console.error('getCurrentClinicId: clinic_members error', mErr);
+    if (userErr) {
+      console.error('getCurrentClinicId: auth error', userErr);
     }
 
-    if (membership?.clinic_id) {
-      return membership.clinic_id;
+    if (user) {
+      const { data: membership, error: mErr } = await sb
+        .from('clinic_members')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (mErr) {
+        console.error('getCurrentClinicId: clinic_members error', mErr);
+      }
+
+      if (membership?.clinic_id) {
+        return membership.clinic_id;
+      }
     }
+  } catch (e) {
+    console.error('getCurrentClinicId: auth branch failed', e);
   }
 
-  // 2) fallback для старых dev-куки (можно убрать, если совсем не нужен)
-  const jar = await cookies();
-  const fromCookie = jar.get('mt_customer_clinic_id')?.value ?? null;
-  if (fromCookie) return fromCookie;
+  // 2) Fallback по куке (для legacy/dev, можно потом убрать совсем)
+  try {
+    const jar = await cookies();
+    const fromCookie = jar.get('mt_customer_clinic_id')?.value ?? null;
+    if (fromCookie) return fromCookie;
+  } catch (e) {
+    console.error('getCurrentClinicId: cookie branch failed', e);
+  }
 
   return null;
 }
