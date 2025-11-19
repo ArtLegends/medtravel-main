@@ -37,7 +37,7 @@ export default async function BookingsPage() {
   // читаем clinic_id из cookie (временно вместо auth)
   const clinicId = await getCurrentClinicId();
   if (!clinicId) {
-    return <div className="p-6 text-rose-600">Please set clinic cookie to view bookings.</div>;
+    return <div className="p-6 text-rose-600">No clinic is linked to this account yet. Please contact MedTravel support.</div>;
   }
 
   // выборка из вьюхи

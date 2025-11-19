@@ -19,7 +19,7 @@ type Row = {
 
 export default async function ReviewsPage() {
   const clinicId = await getCurrentClinicId();
-  if (!clinicId) return <div className="p-6 text-rose-600">Please set clinic cookie to view reviews.</div>;
+  if (!clinicId) return <div className="p-6 text-rose-600">No clinic is linked to this account yet. Please contact MedTravel support.</div>;
 
   const { data } = await supabaseServer
     .from('v_customer_reviews' as any)

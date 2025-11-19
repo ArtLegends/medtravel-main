@@ -290,7 +290,7 @@ export default function SettingsPage() {
               >
                 <option value="en">English</option>
                 <option value="ru">Russian</option>
-                <option value="tr">Turkish</option>
+                <option value="pl">Poland</option>
               </select>
             </div>
           </div>

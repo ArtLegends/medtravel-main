@@ -26,7 +26,7 @@ const STATUS_OPTIONS = ["New","Processed","Rejected"] as const;
 export default async function CustomerReports() {
   const clinicId = await getCurrentClinicId();
   if (!clinicId) {
-    return <div className="p-6 text-rose-600">Please set clinic cookie to view reports.</div>;
+    return <div className="p-6 text-rose-600">No clinic is linked to this account yet. Please contact MedTravel support.</div>;
   }
 
   const { data, error } = await supabaseServer
