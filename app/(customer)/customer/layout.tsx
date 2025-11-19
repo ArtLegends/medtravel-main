@@ -23,7 +23,6 @@ const MENU = [
   { title: "Reviews",       href: "/customer/reviews",        icon: Users },
   { title: "Clinic Profile", href: "/customer/clinic-profile",  icon: FileText },
   { title: "Transactions",   href: "/customer/transactions",    icon: DollarSign },
-  { title: "Settings",       href: "/customer/settings",        icon: Settings },
   { title: "Reports",        href: "/customer/reports",         icon: BarChart2 },
 ];
 
