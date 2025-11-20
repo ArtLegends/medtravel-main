@@ -44,7 +44,7 @@ export default async function LoginPage({ searchParams }: Props) {
     : "Access your MedTravel clinic dashboard using Google or email.";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex items-center justify-center px-4">
+    <main className="min-h-screen bg-gradient-to-b flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">

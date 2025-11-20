@@ -52,8 +52,8 @@ export default function EmailForm({ as, next, onSuccess }: Props) {
     <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
       <Input
         isRequired
-        label="Work email"
         placeholder="you@clinic.com"
+        className="h-full"
         type="email"
         variant="bordered"
         errorMessage={errors.email?.message}

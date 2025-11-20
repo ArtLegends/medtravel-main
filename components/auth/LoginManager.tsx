@@ -60,13 +60,6 @@ export default function LoginManager() {
           Use another email
         </button>
 
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="w-full text-xs text-default-500 hover:text-default-700 underline underline-offset-2"
-        >
-          ← Back to MedTravel home
-        </button>
       </div>
     );
   }
