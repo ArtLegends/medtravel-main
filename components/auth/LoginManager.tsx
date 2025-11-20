@@ -1,18 +1,20 @@
 // components/auth/LoginManager.tsx
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 import EmailForm from "./EmailForm";
-import OtpForm from "./OtpForm";
 
 type RoleKind = "CUSTOMER" | "PARTNER" | "PATIENT" | "ADMIN";
 
 export default function LoginManager() {
   const sp = useSearchParams();
+  const router = useRouter();
+
   const next = sp?.get("next") || "/";
-  const asParam = ((sp?.get("as") || "CUSTOMER") as RoleKind).toUpperCase() as RoleKind;
+  const asParam = ((sp?.get("as") || "CUSTOMER").toUpperCase() ||
+    "CUSTOMER") as RoleKind;
 
   const supabase = createClient();
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export default function LoginManager() {
     try {
       const origin = window.location.origin;
       const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
-        asParam
+        asParam,
       )}&next=${encodeURIComponent(next)}`;
 
       await supabase.auth.signInWithOAuth({
@@ -39,22 +41,37 @@ export default function LoginManager() {
     }
   }
 
+  // шаг после отправки magic link
   if (emailSentTo) {
     return (
-      <div className="space-y-4">
-        <p className="text-small text-default-500">
-          We sent a 6-digit code to <b>{emailSentTo}</b>.
+      <div className="space-y-4 text-center">
+        <h2 className="text-lg font-semibold">Check your email</h2>
+        <p className="text-sm text-default-500">
+          We just sent a secure sign-in link to{" "}
+          <span className="font-semibold">{emailSentTo}</span>. <br />
+          Open the email and click the link to continue.
         </p>
-        <OtpForm
-          email={emailSentTo}
-          as={asParam}
-          next={next}
-          onBack={() => setEmailSentTo(null)}
-        />
+
+        <button
+          type="button"
+          onClick={() => setEmailSentTo(null)}
+          className="w-full rounded-md border border-default-200 px-4 py-2 text-sm hover:bg-default-50"
+        >
+          Use another email
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="w-full text-xs text-default-500 hover:text-default-700 underline underline-offset-2"
+        >
+          ← Back to MedTravel home
+        </button>
       </div>
     );
   }
 
+  // основной экран логина
   return (
     <div className="flex flex-col gap-4">
       <button

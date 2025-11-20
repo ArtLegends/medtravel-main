@@ -6,22 +6,20 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input, Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useTranslation } from "react-i18next";
 import { createClient } from "@/lib/supabase/browserClient";
 
 const supabase = createClient();
 
 type Props = {
-  as: string;          // "CUSTOMER" и т.п.
-  next: string;        // куда отправлять после логина
+  as: string; // "CUSTOMER" / "ADMIN" / ...
+  next: string;
   onSuccess?: (email: string) => void;
 };
 
-const schema = z.object({ email: z.string().email() });
+const schema = z.object({ email: z.string().email("Enter a valid email") });
 type FormValues = z.infer<typeof schema>;
 
 export default function EmailForm({ as, next, onSuccess }: Props) {
-  const { t } = useTranslation();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
@@ -35,14 +33,13 @@ export default function EmailForm({ as, next, onSuccess }: Props) {
 
     const origin = window.location.origin;
     const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
-      as
+      as,
     )}&next=${encodeURIComponent(next)}`;
 
     const { error } = await supabase.auth.signInWithOtp({
       email: data.email,
       options: {
         emailRedirectTo: redirectTo,
-        // можно также передать requested_role, если используешь в callback
         data: { requested_role: as },
       },
     });
@@ -55,11 +52,11 @@ export default function EmailForm({ as, next, onSuccess }: Props) {
     <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
       <Input
         isRequired
-        errorMessage={errors.email?.message}
-        label={t("auth.emailLabel")}
-        placeholder={t("auth.emailPlaceholder")}
+        label="Work email"
+        placeholder="you@clinic.com"
         type="email"
         variant="bordered"
+        errorMessage={errors.email?.message}
         {...register("email")}
       />
       {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
@@ -69,7 +66,7 @@ export default function EmailForm({ as, next, onSuccess }: Props) {
         startContent={<Icon className="text-2xl" icon="solar:letter-bold" />}
         type="submit"
       >
-        {t("auth.continueWithEmail")}
+        Continue with email
       </Button>
     </form>
   );
