@@ -14,11 +14,18 @@ function slugify(s: string) {
     .replace(/(^-|-$)+/g, '');
 }
 
+const Amenities = z.object({
+  premises: z.array(z.string()).default([]),
+  clinic_services: z.array(z.string()).default([]),
+  travel_services: z.array(z.string()).default([]),
+  languages_spoken: z.array(z.string()).default([]),
+});
+
 const Body = z.object({
   clinic: z.object({
     name: z.string().min(1),
     about: z.string().min(1),
-    specialty: z.string().min(1), // используем для categories
+    specialty: z.string().min(1), // используется для categories
     slug: z.string().trim().optional(),
     status: z.enum(['Pending', 'Published', 'Hidden']),
     country: z.string().min(1),
@@ -26,36 +33,82 @@ const Body = z.object({
     city: z.string().min(1),
     district: z.string().nullable().optional(),
     address: z.string().min(1),
+
+    // старые поля – можно оставить, они optional
     lat: z.string().nullable().optional(),
     lng: z.string().nullable().optional(),
-    payments: z.array(z.string()).default([]),
+
+    // НОВОЕ: google maps URL
+    map_embed_url: z.string().url().nullable().optional(),
+
+    // НОВОЕ: payments как [{ method: "..." }]
+    payments: z
+      .array(
+        z.object({
+          method: z.string().min(1),
+        }),
+      )
+      .default([]),
+
+    // НОВОЕ: amenities jsonb
+    amenities: Amenities.default({
+      premises: [],
+      clinic_services: [],
+      travel_services: [],
+      languages_spoken: [],
+    }),
   }),
-  services: z.array(z.object({
-    name: z.string().min(1),
-    desc: z.string().optional(),
-    price: z.string().optional(),
-    currency: z.string().min(1),
-  })).default([]),
-  images: z.array(z.object({
-    url: z.string().url(),
-    title: z.string().optional(),
-  })).default([]),
-  doctors: z.array(z.object({
-    name: z.string().min(1),
-    title: z.string().optional(),
-    spec: z.string().optional(),
-    photo: z.string().url().optional(),
-    bio: z.string().optional(),
-  })).default([]),
-  hours: z.array(z.object({
-    day: z.string().min(1),
-    time: z.string().optional(),
-  })).default([]),
-  accreditations: z.array(z.object({
-    name: z.string().min(1),
-    logo_url: z.string().url().optional(),
-    description: z.string().optional(),
-  })).default([]),
+
+  services: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        desc: z.string().optional(),
+        price: z.string().optional(),
+        currency: z.string().min(1),
+      }),
+    )
+    .default([]),
+
+  images: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        title: z.string().optional(),
+      }),
+    )
+    .default([]),
+
+  doctors: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        title: z.string().optional(),
+        spec: z.string().optional(),
+        photo: z.string().url().optional(),
+        bio: z.string().optional(),
+      }),
+    )
+    .default([]),
+
+  hours: z
+    .array(
+      z.object({
+        day: z.string().min(1),
+        time: z.string().optional(),
+      }),
+    )
+    .default([]),
+
+  accreditations: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        logo_url: z.string().url().optional(),
+        description: z.string().optional(),
+      }),
+    )
+    .default([]),
 });
 
 /** map weekday tokens → [1..7] */
@@ -119,6 +172,13 @@ function parseTimeSpan(s?: string): { open: string | null; close: string | null;
 
 /* ===== handler ===== */
 
+function isAcctsSlugConflict(err: any): boolean {
+  if (!err) return false;
+  const code = err.code;
+  const msg = `${err.message ?? ''} ${err.details ?? ''}`;
+  return code === '23505' && msg.includes('accts_slug_uq');
+}
+
 export async function POST(req: Request) {
   try {
     const parsed = Body.parse(await req.json());
@@ -139,20 +199,49 @@ export async function POST(req: Request) {
         city: parsed.clinic.city,
         province: parsed.clinic.region ?? null,
         district: parsed.clinic.district ?? null,
+  
+        // lat/lng – если ты их не используешь, можно потом выпилить
         lat: parsed.clinic.lat ? Number(parsed.clinic.lat) : null,
         lng: parsed.clinic.lng ? Number(parsed.clinic.lng) : null,
+  
+        // НОВОЕ: google maps url → колонка clinics.map_embed_url
+        map_embed_url: parsed.clinic.map_embed_url ?? null,
+  
+        // НОВОЕ: jsonb поля
+        amenities: parsed.clinic.amenities,
+        payments: parsed.clinic.payments,
+  
         status,
         is_published: isPublished,
-        verified_by_medtravel: false,
-        is_official_partner: false,
+        verified_by_medtravel: true,
+        is_official_partner: true,
+
+        moderation_status: 'approved',
       }])
       .select('id')
       .single();
 
-    if (clinicErr || !clinicRow) {
-      return NextResponse.json({ error: clinicErr?.message ?? 'Insert clinic failed' }, { status: 400 });
-    }
-    const clinicId = clinicRow.id as string;
+      if (clinicErr || !clinicRow) {
+        // если именно дубликат accts_slug_uq — пробуем найти клинику по slug и считаем это мягким успехом
+        if (isAcctsSlugConflict(clinicErr)) {
+          const { data: existingClinic } = await sb
+            .from('clinics')
+            .select('id')
+            .eq('slug', parsed.clinic.slug || slugify(parsed.clinic.name))
+            .maybeSingle();
+      
+          if (existingClinic?.id) {
+            return NextResponse.json({ ok: true, id: existingClinic.id }, { status: 201 });
+          }
+        }
+      
+        return NextResponse.json(
+          { error: clinicErr?.message ?? 'Insert clinic failed' },
+          { status: 400 }
+        );
+      }
+      
+      const clinicId = clinicRow.id as string;
 
     // ---- 2) category link (НОВОЕ) ----
     // Берём specialty как имя категории. Находим по slug, иначе создаём.
@@ -166,24 +255,30 @@ export async function POST(req: Request) {
         .eq('slug', catSlug)
         .maybeSingle();
 
-      if (catSelErr) {
-        return NextResponse.json({ error: catSelErr.message }, { status: 400 });
-      }
-
-      if (existing?.id) {
-        categoryId = existing.id as number;
-      } else {
-        const { data: created, error: catInsErr } = await sb
-          .from('categories')
-          .insert([{ name: parsed.clinic.specialty, slug: catSlug }])
-          .select('id')
-          .single();
-
-        if (catInsErr || !created) {
-          return NextResponse.json({ error: catInsErr?.message ?? 'Create category failed' }, { status: 400 });
+        if (catSelErr && !isAcctsSlugConflict(catSelErr)) {
+          return NextResponse.json({ error: catSelErr.message }, { status: 400 });
         }
-        categoryId = created.id as number;
-      }
+        
+        if (existing?.id) {
+          categoryId = existing.id as number;
+        } else {
+          const { data: created, error: catInsErr } = await sb
+            .from('categories')
+            .insert([{ name: parsed.clinic.specialty, slug: catSlug }])
+            .select('id')
+            .single();
+        
+          if (catInsErr && !isAcctsSlugConflict(catInsErr)) {
+            return NextResponse.json(
+              { error: catInsErr?.message ?? 'Create category failed' },
+              { status: 400 }
+            );
+          }
+        
+          if (created?.id) {
+            categoryId = created.id as number;
+          }
+        }
     }
 
     // upsert связь в clinic_categories

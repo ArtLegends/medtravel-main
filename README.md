@@ -1176,3 +1176,152 @@ The key's randomart image is:
 +----[SHA256]-----+
 
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEFDua/zZ1u1Yq5q0/o1dwbrWAvJ2WuZvDaPRvMjFRbo norik.artemka@gmail.com
+
+
+
+
+-----------------------------------------------------------------------------------
+
+3. Как лучше строить систему ролей (review)
+
+Суммирую твоё требование:
+
+Один user (одна почта / один Google аккаунт) может иметь несколько ролей: CUSTOMER, PARTNER, PATIENT, ADMIN.
+
+На странице логина пользователь выбирает, как он входит сейчас (какой портал): клиника, партнёр, пациент.
+
+Пользователь может в процессе «дорастать» до новых ролей, не теряя старые: был клиникой → стал ещё и партнёром → потом ещё и пациентом.
+
+Между порталами можно свободно переключаться, не вылетая из других.
+
+3.1. Где хранить роли
+
+Лучший вариант:
+
+В Supabase в auth.users.app_metadata.roles: string[].
+
+Примеры:
+
+// обычный клинический пользователь
+{
+  "roles": ["CUSTOMER"]
+}
+
+// админ, который ещё и клиент
+{
+  "roles": ["ADMIN", "CUSTOMER"]
+}
+
+// пользователь со всеми ролями
+{
+  "roles": ["CUSTOMER", "PARTNER", "PATIENT"]
+}
+
+
+Почему app_metadata, а не user_metadata:
+
+app_metadata редактируется только через сервис-ключ / админку Supabase (пользователь сам не может себе дописать ADMIN);
+
+эти данные попадают в JWT и доступны в middleware/серверных хендлерах без отдельного запроса в БД.
+
+3.2. Профили по ролям
+
+Для данных каждой роли — отдельные таблицы:
+
+customer_profiles (id, user_id, handle, clinic_name, …)
+
+partner_profiles (id, user_id, company_name, …)
+
+patient_profiles (id, user_id, full_name, …)
+
+В каждой:
+
+user_id — uuid → auth.users.id, unique (1 профиль роли на 1 пользователя).
+
+Доп. поля, специфичные для роли.
+
+Поток:
+
+Пользователь логинится с as=CUSTOMER.
+
+/auth/callback (серверный route):
+
+берёт user из Supabase.
+
+смотрит as и requested_role из user_metadata (мы уже туда кладём).
+
+если CUSTOMER ещё не в app_metadata.roles → через сервис-клиент:
+
+создаёт запись в customer_profiles;
+
+делает auth.admin.updateUser(user.id, { app_metadata: { roles: [...old, "CUSTOMER"] }}).
+
+редиректит на /customer/<handle>.
+
+Аналогично для PARTNER и PATIENT — только другие таблицы/роуты.
+
+3.3. Навбар и переключение ролей
+
+В шапке приложения получаешь session и roles из app_metadata.
+
+Рисуешь дропдаун «Your portals»:
+
+если в roles есть CUSTOMER → ссылка /customer (или /customer/<handle>).
+
+если есть PARTNER → /partner.
+
+если есть PATIENT → /patient.
+
+Ниже можно показывать действия «Become a partner» / «Become a patient», если соответствующей роли ещё нет.
+
+Эти пункты ведут на тот же /auth/login?as=PARTNER&next=/partner/onboarding и т.д.
+
+Пользователь не разлогинивается, просто добавляет себе ещё одну роль.
+
+Отдельный глобальный «current role» хранить не нужно — она implicit по URL (/customer/..., /partner/...).
+
+3.4. Разделение прав
+
+Админ-портал: доступ только если в roles есть ADMIN.
+
+Фронт: проверка в middleware (мы это сделали).
+
+Бэк: в критичных API (например /api/admin/*) дополнительно проверять is_admin по JWT (поле app_metadata.roles приходит в req.headers['x-supabase-auth'] → можно дернуть supabase.auth.getUser() и посмотреть роли).
+
+Customer/Partner/Patient-порталы:
+
+Middleware ограничивает доступ по префиксу и роли:
+
+/customer/** → требуется CUSTOMER.
+
+/partner/** → PARTNER.
+
+/patient/** → PATIENT.
+
+Внутри API, которые привязаны к конкретной роли, дополнительно проверяем, что user.id совпадает с profile.user_id.
+
+3.5. Логин-страница с выбором роли (на будущее)
+
+Сейчас мы сделали страницу под as=CUSTOMER. Когда появятся другие:
+
+делаем табы/кнопки вверху:
+
+"Clinic",
+
+"Partner",
+
+"Patient".
+
+при переключении таба меняешь query as=CUSTOMER|PARTNER|PATIENT (router.replace).
+
+Весь остальной код (Google + Email) уже завязан на as, так что появится только новый текст и другой next по умолчанию.
+
+Пример:
+
+// /auth/login?as=PARTNER&next=/partner
+// /auth/login?as=PATIENT&next=/patient
+
+
+Если хочешь, дальше можем:
+
+дописать /auth/callback под эту схему (создание профиля + обновление app_metadata.roles);

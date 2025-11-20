@@ -7,27 +7,30 @@ import { createClient } from "@/lib/supabase/browserClient";
 import EmailForm from "./EmailForm";
 import OtpForm from "./OtpForm";
 
+type RoleKind = "CUSTOMER" | "PARTNER" | "PATIENT" | "ADMIN";
+
 export default function LoginManager() {
   const sp = useSearchParams();
   const next = sp?.get("next") || "/";
-  const supabase = createClient();
+  const asParam = ((sp?.get("as") || "CUSTOMER") as RoleKind).toUpperCase() as RoleKind;
 
+  const supabase = createClient();
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  function getOrigin() {
-    // в браузере – всегда текущий origin; на сервере компонент не рендерится
-    return typeof window !== "undefined" ? window.location.origin : "";
-  }
 
   async function signInWithGoogle() {
     setLoading(true);
     try {
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+        asParam
+      )}&next=${encodeURIComponent(next)}`;
+
       await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // абсолютный URL на текущий origin + проброс next
-          redirectTo: `${window.location.origin}/auth/callback?as=CUSTOMER`,
+          redirectTo,
+          queryParams: { prompt: "select_account" },
         },
       });
       // дальше управление уйдёт в Google → /auth/callback
@@ -42,7 +45,12 @@ export default function LoginManager() {
         <p className="text-small text-default-500">
           We sent a 6-digit code to <b>{emailSentTo}</b>.
         </p>
-        <OtpForm email={emailSentTo} onBack={() => setEmailSentTo(null)} />
+        <OtpForm
+          email={emailSentTo}
+          as={asParam}
+          next={next}
+          onBack={() => setEmailSentTo(null)}
+        />
       </div>
     );
   }
@@ -52,7 +60,7 @@ export default function LoginManager() {
       <button
         onClick={signInWithGoogle}
         disabled={loading}
-        className="w-full rounded-md bg-primary px-4 py-2 text-white disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
       >
         {loading ? "Redirecting…" : "Continue with Google"}
       </button>
@@ -63,7 +71,11 @@ export default function LoginManager() {
         <div className="flex-grow border-t border-divider" />
       </div>
 
-      <EmailForm onSuccess={(email) => setEmailSentTo(email)} />
+      <EmailForm
+        as={asParam}
+        next={next}
+        onSuccess={(email) => setEmailSentTo(email)}
+      />
     </div>
   );
 }

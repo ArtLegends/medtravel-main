@@ -7,13 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { InputOtp, Button, Link } from "@heroui/react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/browserClient";
 
 const supabase = createClient();
 
 type Props = {
   email: string;
+  as?: string;    // CUSTOMER / PARTNER / PATIENT / ADMIN
+  next?: string;  // куда редиректить после успешного ввода
   onBack?: () => void;
 };
 
@@ -26,7 +27,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function OtpForm({ email, onBack }: Props) {
+export default function OtpForm({ email, as = "CUSTOMER", next = "/", onBack }: Props) {
   const { t } = useTranslation();
   const router = useRouter();
   const {
@@ -42,16 +43,21 @@ export default function OtpForm({ email, onBack }: Props) {
     const timer = setInterval(() => {
       setSeconds((s) => (s > 0 ? s - 1 : 0));
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
   const resend = async () => {
     if (seconds === 0) {
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+        as
+      )}&next=${encodeURIComponent(next)}`;
+
       await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectTo,
+          data: { requested_role: as },
         },
       });
       setSeconds(60);
@@ -70,7 +76,7 @@ export default function OtpForm({ email, onBack }: Props) {
     if (error) {
       setErrorMsg(error.message);
     } else {
-      router.replace("/");
+      router.replace(next || "/");
       router.refresh();
     }
   };
@@ -84,6 +90,9 @@ export default function OtpForm({ email, onBack }: Props) {
         placeholder="0"
         {...register("token")}
       />
+      {errors.token && (
+        <p className="text-danger text-small">{errors.token.message}</p>
+      )}
       {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
       <p className="text-tiny text-default-500">
         Didn&apos;t receive code?{" "}

@@ -1,6 +1,5 @@
 // components/auth/EmailForm.tsx
 "use client";
-import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -12,15 +11,17 @@ import { createClient } from "@/lib/supabase/browserClient";
 
 const supabase = createClient();
 
-type Props = { onSuccess?: (email: string) => void; };
+type Props = {
+  as: string;          // "CUSTOMER" и т.п.
+  next: string;        // куда отправлять после логина
+  onSuccess?: (email: string) => void;
+};
 
 const schema = z.object({ email: z.string().email() });
 type FormValues = z.infer<typeof schema>;
 
-export default function EmailForm({ onSuccess }: Props) {
+export default function EmailForm({ as, next, onSuccess }: Props) {
   const { t } = useTranslation();
-  const sp = useSearchParams();
-  const next = sp?.get("next") || "/";
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
@@ -31,12 +32,21 @@ export default function EmailForm({ onSuccess }: Props) {
 
   const onSubmit = async (data: FormValues) => {
     setErrorMsg(null);
+
+    const origin = window.location.origin;
+    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+      as
+    )}&next=${encodeURIComponent(next)}`;
+
     const { error } = await supabase.auth.signInWithOtp({
       email: data.email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?as=CUSTOMER`,
+        emailRedirectTo: redirectTo,
+        // можно также передать requested_role, если используешь в callback
+        data: { requested_role: as },
       },
     });
+
     if (error) setErrorMsg(error.message);
     else onSuccess?.(data.email);
   };
