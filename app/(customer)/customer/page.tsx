@@ -63,12 +63,11 @@ export default function CustomerDashboard() {
         const userId = user.id;
 
         // 2. Ищем clinic_id для этого пользователя
-        // 2.1. Сначала через staff-связку
-        // TODO: если у тебя другие названия — поправь:
-        // таблица: clinic_staff, поля: clinic_id, user_id
         let clinicId: string | null = null;
 
-        {
+        // 2.1. (опционально) пробуем найти связь через staff,
+        // но если поля user_id нет (ошибка 42703) — просто игнорируем.
+        try {
           const { data: staffRow, error: staffError } = await supabase
             .from("clinic_staff")
             .select("clinic_id")
@@ -76,16 +75,24 @@ export default function CustomerDashboard() {
             .limit(1)
             .maybeSingle();
 
-          if (staffError && staffError.code !== "PGRST116") {
-            // PGRST116 = no rows
+          if (!staffError && staffRow) {
+            clinicId = (staffRow as any).clinic_id ?? null;
+          } else if (
+            staffError &&
+            staffError.code !== "PGRST116" && // no rows / multiple rows
+            staffError.code !== "42703" // column does not exist
+          ) {
+            // только реально неожиданные ошибки пробрасываем наверх
             throw staffError;
           }
-          clinicId = (staffRow as any)?.clinic_id ?? null;
+        } catch (e) {
+          // На всякий случай глушим любые неожиданные ошибки staff-ветки,
+          // чтобы не ломать дэшборд.
+          console.warn("clinic_staff link lookup failed:", e);
         }
 
-        // 2.2. Если не нашли — пробуем взять клинику, где пользователь владелец
+        // 2.2. Если не нашли через staff — берём клинику, где пользователь владелец
         if (!clinicId) {
-          // TODO: таблица clinics, поля id, owner_id, status (published)
           const { data: clinicRow, error: clinicError } = await supabase
             .from("clinics")
             .select("id")
@@ -94,7 +101,10 @@ export default function CustomerDashboard() {
             .limit(1)
             .maybeSingle();
 
-          if (clinicError && clinicError.code !== "PGRST116") {
+          if (
+            clinicError &&
+            clinicError.code !== "PGRST116" // нет строки
+          ) {
             throw clinicError;
           }
 
@@ -110,13 +120,11 @@ export default function CustomerDashboard() {
 
         // 3. Грузим докторов и заявки параллельно
         const [doctorsRes, bookingsRes] = await Promise.all([
-          // TODO: таблица clinic_staff, только доктора
           supabase
             .from("clinic_staff")
             .select("id, full_name, specialty, email, clinic_id, role")
             .eq("clinic_id", clinicId)
             .eq("role", "doctor"),
-          // TODO: таблица customer_bookings, поля id, status, clinic_id
           supabase
             .from("customer_bookings")
             .select("id, status, clinic_id")
@@ -211,6 +219,7 @@ export default function CustomerDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Revenue — как и раньше, мини-чарт-заглушка */}
         <MiniLineChart title="Revenue" />
+
         {/* Статусы — реальная статистика по заявкам */}
         <div className="rounded-xl border bg-white p-4 space-y-4">
           <div className="flex items-center justify-between">
