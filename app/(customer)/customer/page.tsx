@@ -62,54 +62,22 @@ export default function CustomerDashboard() {
 
         const userId = user.id;
 
-        // 2. Ищем clinic_id для этого пользователя
-        let clinicId: string | null = null;
+        // 2. Ищем клинику, которой владеет пользователь
+        // clinics: id, owner_id, status = 'published'
+        const { data: clinicRow, error: clinicError } = await supabase
+          .from("clinics")
+          .select("id")
+          .eq("owner_id", userId)
+          .eq("status", "published")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        // 2.1. (опционально) пробуем найти связь через staff,
-        // но если поля user_id нет (ошибка 42703) — просто игнорируем.
-        try {
-          const { data: staffRow, error: staffError } = await supabase
-            .from("clinic_staff")
-            .select("clinic_id")
-            .eq("user_id", userId)
-            .limit(1)
-            .maybeSingle();
-
-          if (!staffError && staffRow) {
-            clinicId = (staffRow as any).clinic_id ?? null;
-          } else if (
-            staffError &&
-            staffError.code !== "PGRST116" && // no rows / multiple rows
-            staffError.code !== "42703" // column does not exist
-          ) {
-            // только реально неожиданные ошибки пробрасываем наверх
-            throw staffError;
-          }
-        } catch (e) {
-          // На всякий случай глушим любые неожиданные ошибки staff-ветки,
-          // чтобы не ломать дэшборд.
-          console.warn("clinic_staff link lookup failed:", e);
+        if (clinicError && clinicError.code !== "PGRST116") {
+          throw clinicError;
         }
 
-        // 2.2. Если не нашли через staff — берём клинику, где пользователь владелец
-        if (!clinicId) {
-          const { data: clinicRow, error: clinicError } = await supabase
-            .from("clinics")
-            .select("id")
-            .eq("owner_id", userId)
-            .eq("status", "published")
-            .limit(1)
-            .maybeSingle();
-
-          if (
-            clinicError &&
-            clinicError.code !== "PGRST116" // нет строки
-          ) {
-            throw clinicError;
-          }
-
-          clinicId = (clinicRow as any)?.id ?? null;
-        }
+        const clinicId = (clinicRow as any)?.id as string | undefined;
 
         if (!clinicId) {
           setError(
@@ -120,14 +88,15 @@ export default function CustomerDashboard() {
 
         // 3. Грузим докторов и заявки параллельно
         const [doctorsRes, bookingsRes] = await Promise.all([
+          // clinic_staff: id, clinic_id, name, title, ...
           supabase
             .from("clinic_staff")
-            .select("id, full_name, specialty, email, clinic_id, role")
-            .eq("clinic_id", clinicId)
-            .eq("role", "doctor"),
+            .select("id, clinic_id, name, title")
+            .eq("clinic_id", clinicId),
+          // v_customer_clinic_requests: id, clinic_id, status, ...
           supabase
-            .from("customer_bookings")
-            .select("id, status, clinic_id")
+            .from("v_customer_clinic_requests")
+            .select("id, clinic_id, status")
             .eq("clinic_id", clinicId),
         ]);
 
@@ -142,9 +111,9 @@ export default function CustomerDashboard() {
         setDoctors(
           doctorsData.map((d) => ({
             id: d.id,
-            full_name: d.full_name ?? d.name ?? null,
-            specialty: d.specialty ?? d.specialisation ?? null,
-            email: d.email ?? null,
+            full_name: d.name ?? null,
+            specialty: d.title ?? null,
+            email: null, // в clinic_staff нет email
           }))
         );
 
@@ -154,7 +123,7 @@ export default function CustomerDashboard() {
         }));
         setBookings(bookingRows);
 
-        // 4. Считаем статусы
+        // 4. Считаем статусы заявок
         const counts: StatusCounts = {
           confirmed: 0,
           pending: 0,
@@ -205,15 +174,11 @@ export default function CustomerDashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <CustomerStat title="Doctors" value={doctorsCount} loading={loading} />
+        <CustomerStat title="Doctors" value={doctorsCount} />
         {/* пока Patients заглушка */}
-        <CustomerStat title="Patients" value={0} loading={loading} />
-        <CustomerStat
-          title="Bookings"
-          value={bookingsCount}
-          loading={loading}
-        />
-        <CustomerStat title="Revenue" value={"$0"} loading={loading} />
+        <CustomerStat title="Patients" value={0} />
+        <CustomerStat title="Bookings" value={bookingsCount} />
+        <CustomerStat title="Revenue" value={"$0"} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -285,9 +250,7 @@ export default function CustomerDashboard() {
           <div className="mb-4 flex items-center justify-between">
             <div className="text-lg font-semibold">Doctors List</div>
             {!loading && doctorsCount > 0 && (
-              <div className="text-xs text-gray-500">
-                Total: {doctorsCount}
-              </div>
+              <div className="text-xs text-gray-500">Total: {doctorsCount}</div>
             )}
           </div>
 
@@ -303,19 +266,15 @@ export default function CustomerDashboard() {
                 <thead>
                   <tr className="border-b bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase">
                     <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Specialty</th>
+                    <th className="px-3 py-2">Position</th>
                     <th className="px-3 py-2">Email</th>
                   </tr>
                 </thead>
                 <tbody>
                   {doctors.map((doc) => (
                     <tr key={doc.id} className="border-b last:border-0">
-                      <td className="px-3 py-2">
-                        {doc.full_name || "—"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {doc.specialty || "—"}
-                      </td>
+                      <td className="px-3 py-2">{doc.full_name || "—"}</td>
+                      <td className="px-3 py-2">{doc.specialty || "—"}</td>
                       <td className="px-3 py-2 text-gray-500">
                         {doc.email || "—"}
                       </td>
