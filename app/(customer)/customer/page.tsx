@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import CustomerStat from "@/components/customer/CustomerStat";
-// MiniLineChart оставлю только для Revenue, статус покажем текстом
 import MiniLineChart from "@/components/customer/MiniLineChart";
 import StatusLegend from "@/components/customer/StatusLegend";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
@@ -309,7 +308,7 @@ export default function CustomerDashboard() {
                         {doc.specialty || "—"}
                       </td>
                       <td className="px-3 py-2 text-gray-500">
-                          {doc.email || "—"}
+                        {doc.email || "—"}
                       </td>
                     </tr>
                   ))}
