@@ -10,7 +10,6 @@ type DoctorRow = {
   id: string;
   full_name: string | null;
   specialty: string | null;
-  email: string | null;
 };
 
 type BookingRow = {
@@ -112,7 +111,7 @@ export default function CustomerDashboard() {
             id: d.id,
             full_name: d.name ?? null,
             specialty: d.title ?? d.position ?? null,
-            email: null, // в clinic_staff нет email
+
           }))
         );
 
@@ -267,7 +266,6 @@ export default function CustomerDashboard() {
                   <tr className="border-b bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase">
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">Position</th>
-                    <th className="px-3 py-2">Email</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -275,9 +273,6 @@ export default function CustomerDashboard() {
                     <tr key={doc.id} className="border-b last:border-0">
                       <td className="px-3 py-2">{doc.full_name || "—"}</td>
                       <td className="px-3 py-2">{doc.specialty || "—"}</td>
-                      <td className="px-3 py-2 text-gray-500">
-                        {doc.email || "—"}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
