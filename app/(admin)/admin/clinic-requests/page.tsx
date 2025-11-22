@@ -23,17 +23,18 @@ export default async function Page({
   const startParam = sp.start?.trim()
   const endParam = sp.end?.trim()
 
+  // даты-фильтры
   let startISO: string | undefined
   let endISOExclusive: string | undefined
-  if (startParam) startISO = new Date(`${startParam}T00:00:00`).toISOString()
+  if (startParam) startISO = new Date(`${startParam}T00:00:00Z`).toISOString()
   if (endParam) endISOExclusive = new Date(`${endParam}T23:59:59.999Z`).toISOString()
 
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
-  // основная выборка + название клиники + название услуги
+  // основная выборка: заявки + название клиники
   let q = supabaseServer
-    .from('clinic_requests' as any)
+    .from('clinic_requests')
     .select(
       `
         id,
@@ -45,8 +46,7 @@ export default async function Page({
         contact_method,
         status,
         created_at,
-        clinics:clinics!inner(id,name),
-        service:public_services(id,name)
+        clinics:clinics!inner(id,name)
       `,
       { count: 'exact' }
     )
@@ -58,10 +58,75 @@ export default async function Page({
 
   const { data, error, count } = await q
 
-  const rows = (data ?? []) as unknown as Row[]
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Clinic Requests</h1>
+          <p className="text-sm text-gray-500">Requests sent from clinic pages</p>
+        </div>
+
+        <ClinicRequestsToolbar start={startParam} end={endParam} />
+
+        <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-700">
+          Failed to load: {error.message}
+        </div>
+      </div>
+    )
+  }
+
+  const baseRows = (data ?? []) as Row[]
+
+  // ---- тянем имена услуг из таблицы services ----
+  type ServiceRow = { id: number; name: string | null }
+
+  // собираем все уникальные service_id на текущей странице
+  const serviceIds = Array.from(
+    new Set(
+      baseRows
+        .map((r) =>
+          typeof r.service_id === 'number' ? (r.service_id as number) : null
+        )
+        .filter((v): v is number => v !== null)
+    )
+  )
+
+  let rowsWithNames: Row[] = baseRows
+
+  if (serviceIds.length > 0) {
+    const { data: servicesData, error: servicesError } = await supabaseServer
+      .from('services' as any)            // 👈 правильная таблица
+      .select('id,name')
+      .in('id', serviceIds)
+
+    if (!servicesError && servicesData) {
+      const map = new Map<number, string>()
+      for (const s of servicesData as unknown as ServiceRow[]) {
+        if (typeof s.id === 'number' && s.name) {
+          map.set(s.id, s.name)
+        }
+      }
+
+      // добавляем поле serviceName
+      rowsWithNames = baseRows.map((r) => {
+        const sid = r.service_id
+        const serviceName =
+          typeof sid === 'number' ? map.get(sid) ?? null : null
+
+        return {
+          ...r,
+          serviceName,
+        }
+      })
+    }
+    // если была ошибка по services — просто тихо показываем id,
+    // красный алерт не нужен
+  }
+
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  // серверные обёртки для Server Actions
   const onChangeStatus = async (id: string, status: Row['status']) => {
     'use server'
     await updateClinicRequestStatusAction(id, status ?? 'New')
@@ -92,87 +157,74 @@ export default async function Page({
 
       <ClinicRequestsToolbar start={startParam} end={endParam} />
 
-      {error ? (
-        <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-700">
-          Failed to load: {error.message}
+      <ClinicRequestsTable
+        rows={rowsWithNames}
+        total={total}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onChangeStatus={onChangeStatus}
+        onDelete={onDelete}
+        onDeleteAll={onDeleteAll}
+      />
+
+      {/* пагинация как была */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-gray-500">
+          Total: {total} • Page {page} / {totalPages}
         </div>
-      ) : (
-        <>
-          <ClinicRequestsTable
-            rows={rows}
-            total={total}
-            page={page}
-            pageSize={PAGE_SIZE}
-            onChangeStatus={onChangeStatus}
-            onDelete={onDelete}
-            onDeleteAll={onDeleteAll}
-          />
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm text-gray-500">
-              Total: {total} • Page {page} / {totalPages}
-            </div>
+        <div className="flex items-center gap-2">
+          <Link
+            aria-disabled={page <= 1}
+            className={`rounded-md border px-3 py-1.5 ${
+              page <= 1 ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50'
+            }`}
+            href={mkHref(Math.max(1, page - 1))}
+          >
+            Prev
+          </Link>
 
-            <div className="flex items-center gap-2">
-              <Link
-                aria-disabled={page <= 1}
-                className={`rounded-md border px-3 py-1.5 ${
-                  page <= 1 ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50'
-                }`}
-                href={mkHref(Math.max(1, page - 1))}
-              >
-                Prev
-              </Link>
-
-              <div className="hidden sm:flex items-center gap-1">
-                {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
-                  const p = i + 1
-                  return (
-                    <Link
-                      key={p}
-                      href={mkHref(p)}
-                      className={`rounded-md px-3 py-1.5 border ${
-                        p === page
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      {p}
-                    </Link>
-                  )
-                })}
-                {totalPages > 7 && (
-                  <>
-                    <span className="px-1">…</span>
-                    <Link
-                      href={mkHref(totalPages)}
-                      className={`rounded-md px-3 py-1.5 border ${
-                        page === totalPages
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      {totalPages}
-                    </Link>
-                  </>
-                )}
-              </div>
-
-              <Link
-                aria-disabled={page >= totalPages}
-                className={`rounded-md border px-3 py-1.5 ${
-                  page >= totalPages
-                    ? 'pointer-events-none opacity-50'
-                    : 'hover:bg-gray-50'
-                }`}
-                href={mkHref(Math.min(totalPages, page + 1))}
-              >
-                Next
-              </Link>
-            </div>
+          <div className="hidden sm:flex items-center gap-1">
+            {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
+              const p = i + 1
+              return (
+                <Link
+                  key={p}
+                  href={mkHref(p)}
+                  className={`rounded-md px-3 py-1.5 border ${
+                    p === page ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  {p}
+                </Link>
+              )
+            })}
+            {totalPages > 7 && (
+              <>
+                <span className="px-1">…</span>
+                <Link
+                  href={mkHref(totalPages)}
+                  className={`rounded-md px-3 py-1.5 border ${
+                    page === totalPages ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  {totalPages}
+                </Link>
+              </>
+            )}
           </div>
-        </>
-      )}
+
+          <Link
+            aria-disabled={page >= totalPages}
+            className={`rounded-md border px-3 py-1.5 ${
+              page >= totalPages ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50'
+            }`}
+            href={mkHref(Math.min(totalPages, page + 1))}
+          >
+            Next
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
