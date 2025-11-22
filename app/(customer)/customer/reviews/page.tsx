@@ -25,39 +25,37 @@ type Row = {
 const STATUS_OPTIONS = ["new", "published", "rejected"] as const;
 const PAGE_SIZE = 10;
 
-type SearchParams = {
-  status?: string | string[];
-  start?: string | string[];
-  end?: string | string[];
-  page?: string | string[];
-};
+// универсальный хелпер: достаёт строку из searchParams
+function getParam(raw: any, key: string): string {
+  if (!raw) return "";
+  // новый формат: ReadonlyURLSearchParams
+  if (typeof raw.get === "function") {
+    return raw.get(key) ?? "";
+  }
+  const v = raw[key];
+  if (Array.isArray(v)) return v[0] ?? "";
+  return v ?? "";
+}
 
-export default async function ReviewsPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function ReviewsPage(props: any) {
   const clinicId = await getCurrentClinicId();
   if (!clinicId) {
     return (
       <div className="p-6 text-rose-600">
-        No clinic is linked to this account yet. Please contact MedTravel
-        support.
+        No clinic is linked to this account yet. Please contact MedTravel support.
       </div>
     );
   }
 
-  const statusParam =
-    typeof searchParams.status === "string" ? searchParams.status : "";
-  const startParam =
-    typeof searchParams.start === "string" ? searchParams.start : "";
-  const endParam =
-    typeof searchParams.end === "string" ? searchParams.end : "";
-  const pageParam =
-    typeof searchParams.page === "string" ? searchParams.page : "1";
+  // Next 15: searchParams — это Promise<ReadonlyURLSearchParams>
+  const rawSearchParams = await props?.searchParams;
+
+  const statusParam = getParam(rawSearchParams, "status");
+  const startParam = getParam(rawSearchParams, "start");
+  const endParam = getParam(rawSearchParams, "end");
+  const pageParam = getParam(rawSearchParams, "page") || "1";
 
   const currentPage = Math.max(1, parseInt(pageParam || "1", 10) || 1);
-
   const from = (currentPage - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
@@ -71,7 +69,6 @@ export default async function ReviewsPage({
   }
 
   if (startParam) {
-    // startParam в формате YYYY-MM-DD
     const startIso = new Date(startParam + "T00:00:00.000Z").toISOString();
     query = query.gte("created_at", startIso);
   }
@@ -115,11 +112,11 @@ export default async function ReviewsPage({
           <h1 className="text-2xl font-bold">Reviews</h1>
           <p className="text-gray-500">Manage clinic reviews</p>
         </div>
-        {/* только верхняя Delete All с подтверждением */}
+        {/* только верхняя Delete All с подтверждением (клиентский компонент) */}
         <DeleteAllReviewsButton />
       </div>
 
-      {/* Filters card (как в bookings/reports, но под отзывы) */}
+      {/* Filters card — такой же стиль, как в bookings/reports */}
       <div className="rounded-xl border bg-white p-4">
         <form
           method="get"
