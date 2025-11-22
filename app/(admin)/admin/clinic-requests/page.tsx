@@ -58,7 +58,57 @@ export default async function Page({
 
   const { data, error, count } = await q
 
-  const rows = (data ?? []) as Row[]
+  // ⚠️ тут data ещё без названий услуг
+  const baseRows = (data ?? []) as Row[]
+
+  // ---- подтягиваем названия услуг из public_services ----
+  type ServiceRow = { id: number; name: string | null }
+
+  const serviceIds = Array.from(
+    new Set(
+      baseRows
+        .map((r) =>
+          typeof (r as any).service_id === 'number'
+            ? ((r as any).service_id as number)
+            : null
+        )
+        .filter((v): v is number => v !== null)
+    )
+  )
+
+  let rowsWithNames: Row[] = baseRows
+
+  if (serviceIds.length > 0) {
+    const { data: servicesData, error: servicesError } = await supabaseServer
+      .from('public_services' as any)
+      .select('id,name')
+
+      // только нужные id
+      .in('id', serviceIds)
+
+    if (!servicesError && servicesData) {
+      const map = new Map<number, string>()
+      for (const s of servicesData as unknown as ServiceRow[]) {
+        if (typeof s.id === 'number' && s.name) {
+          map.set(s.id, s.name)
+        }
+      }
+
+      // обогащаем строки полем serviceName
+      rowsWithNames = baseRows.map((r) => {
+        const sid = (r as any).service_id as number | null | undefined
+        const serviceName =
+          typeof sid === 'number' ? map.get(sid) ?? null : null
+
+        return {
+          ...r,
+          // новое поле, которое мы добавим в Row
+          serviceName,
+        } as Row
+      })
+    }
+  }
+
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -100,7 +150,7 @@ export default async function Page({
       ) : (
         <>
           <ClinicRequestsTable
-            rows={rows}
+            rows={rowsWithNames}
             total={total}
             page={page}
             pageSize={PAGE_SIZE}
@@ -109,7 +159,7 @@ export default async function Page({
             onDeleteAll={onDeleteAll}
           />
 
-          {/* простая пагинация */}
+          {/* пагинация как была */}
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-gray-500">
               Total: {total} • Page {page} / {totalPages}
@@ -134,7 +184,9 @@ export default async function Page({
                       key={p}
                       href={mkHref(p)}
                       className={`rounded-md px-3 py-1.5 border ${
-                        p === page ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-50'
+                        p === page
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'hover:bg-gray-50'
                       }`}
                     >
                       {p}
@@ -147,7 +199,9 @@ export default async function Page({
                     <Link
                       href={mkHref(totalPages)}
                       className={`rounded-md px-3 py-1.5 border ${
-                        page === totalPages ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-50'
+                        page === totalPages
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'hover:bg-gray-50'
                       }`}
                     >
                       {totalPages}
@@ -159,7 +213,9 @@ export default async function Page({
               <Link
                 aria-disabled={page >= totalPages}
                 className={`rounded-md border px-3 py-1.5 ${
-                  page >= totalPages ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50'
+                  page >= totalPages
+                    ? 'pointer-events-none opacity-50'
+                    : 'hover:bg-gray-50'
                 }`}
                 href={mkHref(Math.min(totalPages, page + 1))}
               >

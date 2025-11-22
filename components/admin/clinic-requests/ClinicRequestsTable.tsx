@@ -14,6 +14,7 @@ export type Row = {
   status: string | null
   created_at: string
   clinics?: { id: string; name: string } | null
+  serviceName?: string | null
 }
 
 const STATUSES = ['New', 'In review', 'Contacted', 'Scheduled', 'Done', 'Rejected'] as const
@@ -67,12 +68,14 @@ export default function ClinicRequestsTable({
                 {/* название клиники из join */}
                 <td className="p-3">{r.clinics?.name ?? '—'}</td>
 
-                {/* именно ID услуги */}
-                <td className="p-3">{r.service_id ?? '—'}</td>
+                {/* Name услуги */}
+                <td className="p-3">
+                  {r.serviceName ?? (r.service_id ?? '—')}
+                </td>
 
                 <td className="p-3">
                   <select
-                    value={r.status ?? 'New'} // select всегда получает string
+                    value={r.status ?? 'New'}
                     onChange={async (e) => {
                       const val = e.target.value as Row['status']
                       setBusy(r.id)
