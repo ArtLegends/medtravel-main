@@ -23,7 +23,6 @@ export default async function Page({
   const startParam = sp.start?.trim()
   const endParam = sp.end?.trim()
 
-  // даты-фильтры
   let startISO: string | undefined
   let endISOExclusive: string | undefined
   if (startParam) startISO = new Date(`${startParam}T00:00:00`).toISOString()
@@ -32,9 +31,9 @@ export default async function Page({
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
-  // основная выборка + название клиники
+  // основная выборка + название клиники + название услуги
   let q = supabaseServer
-    .from('clinic_requests')
+    .from('clinic_requests' as any)
     .select(
       `
         id,
@@ -46,7 +45,8 @@ export default async function Page({
         contact_method,
         status,
         created_at,
-        clinics:clinics!inner(id,name)
+        clinics:clinics!inner(id,name),
+        service:public_services(id,name)
       `,
       { count: 'exact' }
     )
@@ -58,61 +58,10 @@ export default async function Page({
 
   const { data, error, count } = await q
 
-  // ⚠️ тут data ещё без названий услуг
-  const baseRows = (data ?? []) as Row[]
-
-  // ---- подтягиваем названия услуг из public_services ----
-  type ServiceRow = { id: number; name: string | null }
-
-  const serviceIds = Array.from(
-    new Set(
-      baseRows
-        .map((r) =>
-          typeof (r as any).service_id === 'number'
-            ? ((r as any).service_id as number)
-            : null
-        )
-        .filter((v): v is number => v !== null)
-    )
-  )
-
-  let rowsWithNames: Row[] = baseRows
-
-  if (serviceIds.length > 0) {
-    const { data: servicesData, error: servicesError } = await supabaseServer
-      .from('public_services' as any)
-      .select('id,name')
-
-      // только нужные id
-      .in('id', serviceIds)
-
-    if (!servicesError && servicesData) {
-      const map = new Map<number, string>()
-      for (const s of servicesData as unknown as ServiceRow[]) {
-        if (typeof s.id === 'number' && s.name) {
-          map.set(s.id, s.name)
-        }
-      }
-
-      // обогащаем строки полем serviceName
-      rowsWithNames = baseRows.map((r) => {
-        const sid = (r as any).service_id as number | null | undefined
-        const serviceName =
-          typeof sid === 'number' ? map.get(sid) ?? null : null
-
-        return {
-          ...r,
-          // новое поле, которое мы добавим в Row
-          serviceName,
-        } as Row
-      })
-    }
-  }
-
+  const rows = (data ?? []) as Row[]
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  // серверные обёртки (чтобы типы совпадали и это были Server Actions)
   const onChangeStatus = async (id: string, status: Row['status']) => {
     'use server'
     await updateClinicRequestStatusAction(id, status ?? 'New')
@@ -150,7 +99,7 @@ export default async function Page({
       ) : (
         <>
           <ClinicRequestsTable
-            rows={rowsWithNames}
+            rows={rows}
             total={total}
             page={page}
             pageSize={PAGE_SIZE}
@@ -159,7 +108,6 @@ export default async function Page({
             onDeleteAll={onDeleteAll}
           />
 
-          {/* пагинация как была */}
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-gray-500">
               Total: {total} • Page {page} / {totalPages}

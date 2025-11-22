@@ -14,8 +14,8 @@ export type Row = {
   status: string | null
   created_at: string
   clinics?: { id: string; name: string } | null
-  // сюда как раз прилетает имя услуги из page.tsx
-  serviceName?: string | null
+  // связь с таблицей/вьюхой услуг (alias service)
+  service?: { id: number; name: string | null } | null
 }
 
 const STATUSES = ['New', 'In review', 'Contacted', 'Scheduled', 'Done', 'Rejected'] as const
@@ -68,8 +68,10 @@ export default function ClinicRequestsTable({
                 {/* название клиники из join */}
                 <td className="p-3">{r.clinics?.name ?? '—'}</td>
 
-                {/* 🔹 имя услуги, а если его нет — показываем ID */}
-                <td className="p-3">{r.serviceName || r.service_id || '—'}</td>
+                {/* имя услуги; если вдруг нет — показываем id */}
+                <td className="p-3">
+                  {r.service?.name ?? r.service_id ?? '—'}
+                </td>
 
                 <td className="p-3">
                   <select
@@ -91,7 +93,9 @@ export default function ClinicRequestsTable({
                   </select>
                 </td>
 
-                <td className="p-3">{new Date(r.created_at).toLocaleString()}</td>
+                <td className="p-3">
+                  {new Date(r.created_at).toLocaleString()}
+                </td>
 
                 <td className="p-3 text-right">
                   <button
