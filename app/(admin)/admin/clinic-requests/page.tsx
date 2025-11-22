@@ -58,7 +58,7 @@ export default async function Page({
 
   const { data, error, count } = await q
 
-  const rows = (data ?? []) as Row[]
+  const rows = (data ?? []) as unknown as Row[]
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
