@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import clsx from "clsx";
-import { getDraft, saveDraftSection, saveDraftWhole, submitForReview, getCategories, uploadGallery } from "./actions";
+import { getDraft, saveDraftSection, saveDraftWhole, submitForReview, getCategories, uploadGallery, copyImageFromUrl } from "./actions";
 
 type SectionKey =
   | "basic"
@@ -693,40 +693,165 @@ function DoctorsSection({
   onAdd: (r: { fullName: string; title?: string; specialty?: string; description?: string; photo?: string }) => void;
   onRemove: (idx: number) => void;
 }) {
-  const [draft, setDraft] = useState({ fullName: "", title: "", specialty: "", description: "", photo: "" });
+  const [draft, setDraft] = useState({
+    fullName: "",
+    title: "",
+    specialty: "",
+    description: "",
+    photo: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleAddDoctor() {
+    if (!draft.fullName.trim()) return;
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      let photo = draft.photo.trim();
+
+      // если пользователь ввёл внешний URL — забираем его и заливаем в наш Storage
+      if (photo && (photo.startsWith("http://") || photo.startsWith("https://"))) {
+        try {
+          photo = await copyImageFromUrl(photo);
+        } catch (e: any) {
+          console.error(e);
+          setError("Failed to import image from URL. You can still save doctor without photo.");
+        }
+      }
+
+      onAdd({
+        ...draft,
+        photo,
+      });
+
+      setDraft({
+        fullName: "",
+        title: "",
+        specialty: "",
+        description: "",
+        photo: "",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUploadFromDevice(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const urls = await uploadGallery(files); // используем существующий экшен
+      if (urls && urls[0]) {
+        setDraft((prev) => ({ ...prev, photo: urls[0] }));
+      }
+    } catch (e: any) {
+      console.error(e);
+      setError("Failed to upload image. Please try again.");
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  }
 
   return (
     <>
-      <div className="text-lg font-semibold">Doctors & Medical Staff</div>
+      <div className="text-lg font-semibold">Doctors &amp; Medical Staff</div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Full Name *" value={draft.fullName} onChange={(v) => setDraft({ ...draft, fullName: v })} placeholder="Dr. John Smith" />
-        <Field label="Title/Position" value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} placeholder="Chief Surgeon" />
-        <Field label="Specialty" value={draft.specialty} onChange={(v) => setDraft({ ...draft, specialty: v })} placeholder="Orthopedics, etc." />
-        <Field label="Photo URL" value={draft.photo} onChange={(v) => setDraft({ ...draft, photo: v })} placeholder="https://..." />
-        <Textarea className="md:col-span-2" label="Description" value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} placeholder="Short bio/qualifications" />
+        <Field
+          label="Full Name *"
+          value={draft.fullName}
+          onChange={(v) => setDraft({ ...draft, fullName: v })}
+          placeholder="Dr. John Smith"
+        />
+        <Field
+          label="Title/Position"
+          value={draft.title}
+          onChange={(v) => setDraft({ ...draft, title: v })}
+          placeholder="Chief Surgeon"
+        />
+        <Field
+          label="Specialty"
+          value={draft.specialty}
+          onChange={(v) => setDraft({ ...draft, specialty: v })}
+          placeholder="Orthopedics, etc."
+        />
+        <Field
+          label="Photo URL"
+          value={draft.photo}
+          onChange={(v) => setDraft({ ...draft, photo: v })}
+          placeholder="https://...  (optional)"
+        />
+
+        {/* upload with file input */}
+        <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+          <input
+            id="doctorPhotoUpload"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUploadFromDevice}
+          />
+          <label
+            htmlFor="doctorPhotoUpload"
+            className="rounded-md border bg-white px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+          >
+            ⬆ Upload photo from device
+          </label>
+          <span className="text-xs text-gray-500">
+            or paste an external image URL above – we&apos;ll copy it to MedTravel storage.
+          </span>
+        </div>
+
+        <Textarea
+          className="md:col-span-2"
+          label="Description"
+          value={draft.description}
+          onChange={(v) => setDraft({ ...draft, description: v })}
+          placeholder="Short bio/qualifications"
+        />
       </div>
+
       <button
-        onClick={() => {
-          if (!draft.fullName.trim()) return;
-          onAdd({ ...draft });
-          setDraft({ fullName: "", title: "", specialty: "", description: "", photo: "" });
-        }}
-        className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
+        onClick={handleAddDoctor}
+        className="mt-2 rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
+        disabled={busy || !draft.fullName.trim()}
       >
-        + Add Doctor
+        {busy ? "Saving..." : "+ Add Doctor"}
       </button>
+
+      {error && (
+        <p className="mt-2 text-xs text-red-600">{error}</p>
+      )}
 
       {!rows.length ? (
         <p className="mt-2 text-sm text-gray-400">No doctors added yet.</p>
       ) : (
         <div className="mt-2 space-y-2">
           {rows.map((d, i) => (
-            <div key={i} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+            <div
+              key={i}
+              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
+            >
               <div className="truncate">
                 <span className="font-medium">{d.fullName}</span>
-                {d.title ? <span className="text-gray-500"> — {d.title}</span> : null}
+                {d.title ? (
+                  <span className="text-gray-500"> — {d.title}</span>
+                ) : null}
               </div>
-              <button onClick={() => onRemove(i)} className="text-gray-500 hover:text-rose-600">Delete</button>
+              <button
+                onClick={() => onRemove(i)}
+                className="text-gray-500 hover:text-rose-600"
+              >
+                Delete
+              </button>
             </div>
           ))}
         </div>

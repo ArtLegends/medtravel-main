@@ -255,6 +255,47 @@ export async function uploadGallery(files: File[]) {
   return urls;
 }
 
+export async function copyImageFromUrl(url: string) {
+  const supa = await getSupa();
+  // убеждаемся, что пользователь залогинен (RLS и т.д.)
+  await supa.auth.getUser();
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error("Failed to download image from URL");
+  }
+
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+
+  const ext =
+    contentType.includes("png") ? "png" :
+    contentType.includes("webp") ? "webp" :
+    contentType.includes("gif") ? "gif" :
+    "jpg";
+
+  const key = `u/staff/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}.${ext}`;
+
+  const blob = await res.blob();
+
+  const { error: upErr } = await supa.storage
+    .from("clinic-images")
+    .upload(key, blob, {
+      cacheControl: "31536000",
+      upsert: false,
+      contentType,
+    });
+
+  if (upErr) throw upErr;
+
+  const { data: pub } = supa.storage
+    .from("clinic-images")
+    .getPublicUrl(key);
+
+  return pub.publicUrl;
+}
+
 /** Сохранить весь драфт одним апдейтом (без стирания других полей) */
 export async function saveDraftWhole(payload: {
   basic_info: any;
