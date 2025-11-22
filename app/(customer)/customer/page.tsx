@@ -63,7 +63,6 @@ export default function CustomerDashboard() {
         const userId = user.id;
 
         // 2. Ищем клинику, которой владеет пользователь
-        // clinics: id, owner_id, status = 'published'
         const { data: clinicRow, error: clinicError } = await supabase
           .from("clinics")
           .select("id")
@@ -74,6 +73,7 @@ export default function CustomerDashboard() {
           .maybeSingle();
 
         if (clinicError && clinicError.code !== "PGRST116") {
+          // PGRST116 = no rows
           throw clinicError;
         }
 
@@ -88,35 +88,52 @@ export default function CustomerDashboard() {
 
         // 3. Грузим докторов и заявки параллельно
         const [doctorsRes, bookingsRes] = await Promise.all([
-          // clinic_staff: id, clinic_id, name, title, ...
           supabase
             .from("clinic_staff")
-            .select("id, clinic_id, name, title")
+            .select("id, clinic_id, name, title, position")
             .eq("clinic_id", clinicId),
-          // v_customer_clinic_requests: id, clinic_id, status, ...
           supabase
             .from("v_customer_clinic_requests")
             .select("id, clinic_id, status")
             .eq("clinic_id", clinicId),
         ]);
 
-        if (doctorsRes.error) throw doctorsRes.error;
         if (bookingsRes.error) throw bookingsRes.error;
 
-        const doctorsData = (doctorsRes.data || []) as any[];
+        let doctorsData = (doctorsRes.data || []) as any[];
+
+        // если в clinic_staff пусто, попробуем взять из public_clinic_staff
+        if (!doctorsRes.error && doctorsData.length === 0) {
+          const { data: publicDoctors, error: publicError } = await supabase
+            .from("public_clinic_staff")
+            .select("id, clinic_id, name, title, position")
+            .eq("clinic_id", clinicId);
+
+          if (!publicError && publicDoctors) {
+            doctorsData = publicDoctors as any[];
+          }
+        }
+
+        if (doctorsRes.error) {
+          // Если прямо ошибка по таблице clinic_staff — покажем её
+          throw doctorsRes.error;
+        }
+
         const bookingsData = (bookingsRes.data || []) as any[];
 
         if (cancelled) return;
 
+        // Маппинг докторов
         setDoctors(
           doctorsData.map((d) => ({
             id: d.id,
             full_name: d.name ?? null,
-            specialty: d.title ?? null,
-            email: null, // в clinic_staff нет email
+            specialty: d.position ?? d.title ?? null,
+            email: null, // в clinic_staff / public_clinic_staff нет email
           }))
         );
 
+        // Маппинг заявок
         const bookingRows: BookingRow[] = bookingsData.map((b) => ({
           id: b.id,
           status: b.status,
