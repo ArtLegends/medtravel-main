@@ -62,7 +62,7 @@ export default function CustomerDashboard() {
 
         const userId = user.id;
 
-        // 2. Ищем клинику, которой владеет пользователь
+        // 2. Клиника, которой владеет пользователь (published)
         const { data: clinicRow, error: clinicError } = await supabase
           .from("clinics")
           .select("id")
@@ -73,7 +73,6 @@ export default function CustomerDashboard() {
           .maybeSingle();
 
         if (clinicError && clinicError.code !== "PGRST116") {
-          // PGRST116 = no rows
           throw clinicError;
         }
 
@@ -86,8 +85,9 @@ export default function CustomerDashboard() {
           return;
         }
 
-        // 3. Грузим докторов и заявки параллельно
+        // 3. Доктора и заявки по этой клинике
         const [doctorsRes, bookingsRes] = await Promise.all([
+          // 👈 правильная таблица: clinic_staff
           supabase
             .from("clinic_staff")
             .select("id, clinic_id, name, title, position")
@@ -98,49 +98,32 @@ export default function CustomerDashboard() {
             .eq("clinic_id", clinicId),
         ]);
 
+        if (doctorsRes.error) throw doctorsRes.error;
         if (bookingsRes.error) throw bookingsRes.error;
 
-        let doctorsData = (doctorsRes.data || []) as any[];
-
-        // если в clinic_staff пусто, попробуем взять из public_clinic_staff
-        if (!doctorsRes.error && doctorsData.length === 0) {
-          const { data: publicDoctors, error: publicError } = await supabase
-            .from("public_clinic_staff")
-            .select("id, clinic_id, name, title, position")
-            .eq("clinic_id", clinicId);
-
-          if (!publicError && publicDoctors) {
-            doctorsData = publicDoctors as any[];
-          }
-        }
-
-        if (doctorsRes.error) {
-          // Если прямо ошибка по таблице clinic_staff — покажем её
-          throw doctorsRes.error;
-        }
-
+        const doctorsData = (doctorsRes.data || []) as any[];
         const bookingsData = (bookingsRes.data || []) as any[];
 
         if (cancelled) return;
 
-        // Маппинг докторов
+        // маппим докторов
         setDoctors(
           doctorsData.map((d) => ({
             id: d.id,
             full_name: d.name ?? null,
-            specialty: d.position ?? d.title ?? null,
-            email: null, // в clinic_staff / public_clinic_staff нет email
+            specialty: d.title ?? d.position ?? null,
+            email: null, // в clinic_staff нет email
           }))
         );
 
-        // Маппинг заявок
+        // маппим заявки
         const bookingRows: BookingRow[] = bookingsData.map((b) => ({
           id: b.id,
           status: b.status,
         }));
         setBookings(bookingRows);
 
-        // 4. Считаем статусы заявок
+        // 4. Статусы заявок
         const counts: StatusCounts = {
           confirmed: 0,
           pending: 0,
@@ -199,10 +182,10 @@ export default function CustomerDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Revenue — как и раньше, мини-чарт-заглушка */}
+        {/* Revenue — мини-чарт-заглушка */}
         <MiniLineChart title="Revenue" />
 
-        {/* Статусы — реальная статистика по заявкам */}
+        {/* Статусы заявок */}
         <div className="rounded-xl border bg-white p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-lg font-semibold">Status</div>
@@ -303,7 +286,7 @@ export default function CustomerDashboard() {
           )}
         </div>
 
-        {/* Patients пока заглушка, как и было */}
+        {/* Patients пока заглушка */}
         <div className="rounded-xl border bg-white p-4">
           <div className="mb-4 text-lg font-semibold">Patients List</div>
           <div className="text-center py-6 text-gray-500">
