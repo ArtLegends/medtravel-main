@@ -4,43 +4,42 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { Trash2 } from "lucide-react";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import {
-  updateReportStatusAction,
-  deleteReportAction,
-  deleteAllReportsAction,
+  updateReviewStatusAction,
+  deleteReviewAction,
+  deleteAllReviewsAction,
 } from "./actions";
 
-type ReportRow = {
+type ReviewRow = {
   id: string;
-  clinic_id: string;
-  created_at: string;
-  reporter: string | null;
-  contact: string | null;
-  relationship: string | null;
-  details: string | null;
+  clinic_id: string | null;
+  created_at: string | null;
+  reviewer: string | null;
+  rating: number | string | null;
+  comment: string | null;
   status: string | null;
 };
 
-const STATUS_OPTIONS = ["New", "Processed", "Rejected"] as const;
+const STATUS_OPTIONS = ["new", "published", "rejected"] as const;
 type StatusOption = (typeof STATUS_OPTIONS)[number];
 
 const PAGE_SIZE = 10;
 
 function normalizeStatus(raw: string | null | undefined): StatusOption {
   const s = (raw ?? "").toLowerCase();
-  if (s === "processed") return "Processed";
-  if (s === "rejected") return "Rejected";
-  return "New";
+  if (s === "published") return "published";
+  if (s === "rejected") return "rejected";
+  return "new";
 }
 
-export default function ReportsClient() {
+export default function ReviewsClient() {
   const { supabase } = useSupabase();
 
   const [clinicId, setClinicId] = useState<string | null>(null);
-  const [rows, setRows] = useState<ReportRow[]>([]);
+  const [rows, setRows] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // фильтры
+  // фильтры (динамичные, без Apply)
   const [statusFilter, setStatusFilter] = useState<StatusOption | "">("");
   const [startDate, setStartDate] = useState(""); // YYYY-MM-DD
   const [endDate, setEndDate] = useState(""); // YYYY-MM-DD
@@ -48,12 +47,13 @@ export default function ReportsClient() {
   const [page, setPage] = useState(1);
   const [isPending, startTransition] = useTransition();
 
-  const loadReports = useCallback(
+  const loadReviews = useCallback(
     async (cid: string, silent = false) => {
       if (!silent) setLoading(true);
       setError(null);
+
       const { data, error } = await supabase
-        .from("v_customer_reports" as any)
+        .from("v_customer_reviews" as any)
         .select("*")
         .eq("clinic_id", cid)
         .order("created_at", { ascending: false });
@@ -61,14 +61,15 @@ export default function ReportsClient() {
       if (error) {
         setError(error.message);
       } else {
-        setRows((data ?? []) as ReportRow[]);
+        setRows((data ?? []) as ReviewRow[]);
       }
+
       if (!silent) setLoading(false);
     },
     [supabase]
   );
 
-  // первый запрос: узнаём пользователя → его клинику → репорты
+  // init: user -> clinic -> reviews
   useEffect(() => {
     let active = true;
 
@@ -81,7 +82,6 @@ export default function ReportsClient() {
           data: { user },
           error: userError,
         } = await supabase.auth.getUser();
-
         if (userError) throw userError;
         if (!user) {
           if (!active) return;
@@ -110,11 +110,11 @@ export default function ReportsClient() {
 
         if (!active) return;
         setClinicId(cid);
-        await loadReports(cid);
+        await loadReviews(cid);
       } catch (e: any) {
         if (!active) return;
         console.error(e);
-        setError(e?.message ?? "Failed to load reports.");
+        setError(e?.message ?? "Failed to load reviews.");
       } finally {
         if (!active) return;
         setLoading(false);
@@ -125,25 +125,24 @@ export default function ReportsClient() {
     return () => {
       active = false;
     };
-  }, [supabase, loadReports]);
+  }, [supabase, loadReviews]);
 
-  // realtime: любые INSERT/UPDATE/DELETE по reports для этой клиники → мягко перезагружаем список
+  // realtime subscription как в reports/bookings
   useEffect(() => {
     if (!clinicId) return;
 
     const channel = supabase
-      .channel(`customer-reports-${clinicId}`)
+      .channel(`customer-reviews-${clinicId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "reports",
+          table: "reviews",
           filter: `clinic_id=eq.${clinicId}`,
         },
         () => {
-          // без спиннера — тихое обновление
-          loadReports(clinicId, true);
+          loadReviews(clinicId, true);
         }
       )
       .subscribe();
@@ -151,9 +150,9 @@ export default function ReportsClient() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, clinicId, loadReports]);
+  }, [supabase, clinicId, loadReviews]);
 
-  // сбрасываем страницу при изменении фильтров
+  // при изменении фильтров — на первую страницу
   useEffect(() => {
     setPage(1);
   }, [statusFilter, startDate, endDate]);
@@ -177,11 +176,12 @@ export default function ReportsClient() {
   const total = filteredRows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
 
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredRows.slice(start, start + PAGE_SIZE);
-  }, [filteredRows, currentPage]);
+  const paginatedRows = useMemo(
+    () => filteredRows.slice(startIndex, startIndex + PAGE_SIZE),
+    [filteredRows, startIndex]
+  );
 
   function resetFilters() {
     setStatusFilter("");
@@ -194,35 +194,32 @@ export default function ReportsClient() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-gray-500">
-            User-submitted reports for your clinic
-          </p>
+          <h1 className="text-3xl font-bold">Reviews</h1>
+          <p className="text-gray-500">Manage clinic reviews</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {/* единственная кнопка Delete All с подтверждением */}
-          <button
-            onClick={() => {
-              if (
-                !window.confirm(
-                  "Are you sure you want to delete ALL reports? This action cannot be undone."
-                )
-              ) {
-                return;
-              }
-              startTransition(async () => {
-                await deleteAllReportsAction();
-                setRows([]);
-              });
-            }}
-            className="inline-flex items-center gap-2 rounded-md bg-rose-500 px-3 py-2 text-sm text-white hover:bg-rose-600 disabled:opacity-60"
-            disabled={isPending || rows.length === 0}
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete All
-          </button>
-        </div>
+        {/* Delete All с подтверждением */}
+        <button
+          type="button"
+          onClick={() => {
+            if (
+              !window.confirm(
+                "Are you sure you want to delete ALL reviews? This action cannot be undone."
+              )
+            ) {
+              return;
+            }
+            startTransition(async () => {
+              await deleteAllReviewsAction();
+              setRows([]);
+            });
+          }}
+          disabled={isPending || rows.length === 0}
+          className="inline-flex items-center gap-2 rounded-md bg-rose-500 px-3 py-2 text-sm text-white hover:bg-rose-600 disabled:opacity-60"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete All
+        </button>
       </div>
 
       {/* Error */}
@@ -232,9 +229,10 @@ export default function ReportsClient() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filters — стиль как в bookings (динамичные, без Apply) */}
       <div className="rounded-xl border bg-white p-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px,1fr,1fr,auto]">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px,1fr,1fr,auto] items-end">
+          {/* Status */}
           <div className="space-y-1">
             <label className="text-sm font-medium">All Statuses</label>
             <select
@@ -253,6 +251,7 @@ export default function ReportsClient() {
             </select>
           </div>
 
+          {/* Start date */}
           <div className="space-y-1">
             <label className="text-sm font-medium">Start Date</label>
             <input
@@ -263,6 +262,7 @@ export default function ReportsClient() {
             />
           </div>
 
+          {/* End date */}
           <div className="space-y-1">
             <label className="text-sm font-medium">End Date</label>
             <input
@@ -273,6 +273,7 @@ export default function ReportsClient() {
             />
           </div>
 
+          {/* Reset */}
           <div className="flex items-end justify-end">
             <button
               type="button"
@@ -294,7 +295,8 @@ export default function ReportsClient() {
             {total !== rows.length ? ` (filtered from ${rows.length})` : ""}
           </div>
           <div>
-            Page {currentPage} of {totalPages}
+            Page {total === 0 ? 0 : currentPage} of{" "}
+            {total === 0 ? 0 : totalPages}
           </div>
         </div>
 
@@ -303,10 +305,9 @@ export default function ReportsClient() {
             <thead className="bg-gray-50 text-left">
               <tr>
                 <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Reporter</th>
-                <th className="px-4 py-3">Contact</th>
-                <th className="px-4 py-3">Relationship</th>
-                <th className="px-4 py-3">Details</th>
+                <th className="px-4 py-3">Reviewer</th>
+                <th className="px-4 py-3">Rating</th>
+                <th className="px-4 py-3">Comment</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -315,24 +316,24 @@ export default function ReportsClient() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="p-6 text-center text-gray-400 text-sm"
                   >
-                    Loading reports…
+                    Loading reviews…
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="p-6 text-center text-gray-500 text-sm"
                   >
-                    No reports found.
+                    No reviews yet.
                   </td>
                 </tr>
               ) : (
                 paginatedRows.map((r) => (
-                  <ReportRowItem
+                  <ReviewRowItem
                     key={r.id}
                     row={r}
                     onDeleted={() =>
@@ -350,7 +351,6 @@ export default function ReportsClient() {
           <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-gray-600">
             <div>
               {(() => {
-                const startIndex = (currentPage - 1) * PAGE_SIZE;
                 const from = startIndex + 1;
                 const to = Math.min(startIndex + PAGE_SIZE, total);
                 return `Showing ${from}–${to} of ${total}`;
@@ -383,11 +383,11 @@ export default function ReportsClient() {
   );
 }
 
-function ReportRowItem({
+function ReviewRowItem({
   row,
   onDeleted,
 }: {
-  row: ReportRow;
+  row: ReviewRow;
   onDeleted: () => void;
 }) {
   const [status, setStatus] = useState<StatusOption>(
@@ -402,14 +402,13 @@ function ReportRowItem({
   return (
     <tr>
       <td className="px-4 py-3 whitespace-nowrap">{created}</td>
-      <td className="px-4 py-3">{row.reporter ?? "—"}</td>
-      <td className="px-4 py-3">{row.contact ?? "—"}</td>
-      <td className="px-4 py-3">{row.relationship ?? "—"}</td>
+      <td className="px-4 py-3">{row.reviewer ?? "—"}</td>
+      <td className="px-4 py-3">{row.rating ?? "—"}</td>
       <td
-        className="px-4 py-3 max-w-[420px] truncate"
-        title={row.details ?? undefined}
+        className="px-4 py-3 max-w-[520px] truncate"
+        title={row.comment ?? undefined}
       >
-        {row.details ?? "—"}
+        {row.comment ?? "—"}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
@@ -431,7 +430,7 @@ function ReportRowItem({
             disabled={isPending}
             onClick={() => {
               startTransition(async () => {
-                await updateReportStatusAction(row.id, status);
+                await updateReviewStatusAction(row.id, status);
               });
             }}
             className="rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
@@ -446,13 +445,13 @@ function ReportRowItem({
           onClick={() => {
             if (
               !window.confirm(
-                "Delete this report? This action cannot be undone."
+                "Delete this review? This action cannot be undone."
               )
             ) {
               return;
             }
             startTransition(async () => {
-              await deleteReportAction(row.id);
+              await deleteReviewAction(row.id);
               onDeleted();
             });
           }}
