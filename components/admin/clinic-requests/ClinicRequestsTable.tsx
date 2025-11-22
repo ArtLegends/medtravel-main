@@ -14,6 +14,7 @@ export type Row = {
   status: string | null
   created_at: string
   clinics?: { id: string; name: string } | null
+  // сюда как раз прилетает имя услуги из page.tsx
   serviceName?: string | null
 }
 
@@ -42,7 +43,6 @@ export default function ClinicRequestsTable({
 
   return (
     <div className="rounded-xl border">
-
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y text-sm">
           <thead className="bg-gray-50 text-left">
@@ -68,10 +68,8 @@ export default function ClinicRequestsTable({
                 {/* название клиники из join */}
                 <td className="p-3">{r.clinics?.name ?? '—'}</td>
 
-                {/* Name услуги */}
-                <td className="p-3">
-                  {r.serviceName ?? (r.service_id ?? '—')}
-                </td>
+                {/* 🔹 имя услуги, а если его нет — показываем ID */}
+                <td className="p-3">{r.serviceName || r.service_id || '—'}</td>
 
                 <td className="p-3">
                   <select
