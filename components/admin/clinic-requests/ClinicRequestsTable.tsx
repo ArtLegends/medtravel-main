@@ -14,8 +14,8 @@ export type Row = {
   status: string | null
   created_at: string
   clinics?: { id: string; name: string } | null
-  // связь с таблицей/вьюхой услуг (alias service)
-  service?: { id: number; name: string | null } | null
+  // сюда кладём имя услуги, которое посчитаем на сервере
+  serviceName?: string | null
 }
 
 const STATUSES = ['New', 'In review', 'Contacted', 'Scheduled', 'Done', 'Rejected'] as const
@@ -38,8 +38,6 @@ export default function ClinicRequestsTable({
   onDeleteAll: () => Promise<void>
 }) {
   const [busy, setBusy] = useState<string | null>(null)
-
-  const pages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <div className="rounded-xl border">
@@ -70,7 +68,7 @@ export default function ClinicRequestsTable({
 
                 {/* имя услуги; если вдруг нет — показываем id */}
                 <td className="p-3">
-                  {r.service?.name ?? r.service_id ?? '—'}
+                  {r.serviceName ?? r.service_id ?? '—'}
                 </td>
 
                 <td className="p-3">

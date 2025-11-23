@@ -80,13 +80,10 @@ export default async function Page({
   // ---- тянем имена услуг из таблицы services ----
   type ServiceRow = { id: number; name: string | null }
 
-  // собираем все уникальные service_id на текущей странице
   const serviceIds = Array.from(
     new Set(
       baseRows
-        .map((r) =>
-          typeof r.service_id === 'number' ? (r.service_id as number) : null
-        )
+        .map((r) => (typeof r.service_id === 'number' ? r.service_id : null))
         .filter((v): v is number => v !== null)
     )
   )
@@ -95,32 +92,28 @@ export default async function Page({
 
   if (serviceIds.length > 0) {
     const { data: servicesData, error: servicesError } = await supabaseServer
-      .from('services' as any)            // 👈 правильная таблица
+      .from('services' as any)
       .select('id,name')
       .in('id', serviceIds)
 
     if (!servicesError && servicesData) {
-      const map = new Map<number, string>()
-      for (const s of servicesData as unknown as ServiceRow[]) {
-        if (typeof s.id === 'number' && s.name) {
-          map.set(s.id, s.name)
-        }
+      const services = servicesData as unknown as ServiceRow[]
+
+      const map = new Map<number, string | null>()
+      for (const s of services) {
+        map.set(s.id, s.name ?? null)
       }
 
-      // добавляем поле serviceName
       rowsWithNames = baseRows.map((r) => {
         const sid = r.service_id
-        const serviceName =
-          typeof sid === 'number' ? map.get(sid) ?? null : null
+        const service =
+          typeof sid === 'number'
+            ? { id: sid, name: map.get(sid) ?? null }
+            : null
 
-        return {
-          ...r,
-          serviceName,
-        }
+        return { ...r, service }
       })
     }
-    // если была ошибка по services — просто тихо показываем id,
-    // красный алерт не нужен
   }
 
   const total = count ?? 0
