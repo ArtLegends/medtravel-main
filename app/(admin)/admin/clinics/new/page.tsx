@@ -26,13 +26,14 @@ type ClinicState = {
 
   // NEW: amenities -> clinics.amenities jsonb
   amenities: {
-    premises: string[];
-    clinic_services: string[];
-    travel_services: string[];
-    languages_spoken: string[];
+    premises: AmenityItem[];
+    clinic_services: AmenityItem[];
+    travel_services: AmenityItem[];
+    languages_spoken: AmenityItem[];
   };
 };
 
+type AmenityItem = { label: string; icon: string };
 type ServiceRow = { name: string; desc?: string; price?: string; currency: string };
 type ImageRow   = { url: string; title?: string };
 type DoctorRow  = { name: string; title?: string; spec?: string; photo?: string; bio?: string };
@@ -253,20 +254,63 @@ export default function AdminClinicNewPage() {
 
         <div className="p-4">
           {tab === 'basic' && <BasicInfo clinic={clinic} setClinic={setClinic} />}
-          {tab === 'services' && <Services onAdd={(row) => setServices((a) => [...a, row])} rows={services} />}
-          {tab === 'gallery' && <Gallery onAdd={(row) => setImages((a) => [...a, row])} rows={images} />}
+          {tab === 'services' && (
+            <Services
+              rows={services}
+              onAdd={(row) => setServices((a) => [...a, row])}
+              onRemove={(index) =>
+                setServices((a) => a.filter((_, i) => i !== index))
+              }
+            />
+          )}
+
+          {tab === 'gallery' && (
+            <Gallery
+              rows={images}
+              onAdd={(row) => setImages((a) => [...a, row])}
+              onRemove={(index) =>
+                setImages((a) => a.filter((_, i) => i !== index))
+              }
+            />
+          )}
+
+          {tab === 'doctors' && (
+            <Doctors
+              rows={doctors}
+              onAdd={(row) => setDoctors((a) => [...a, row])}
+              onRemove={(index) =>
+                setDoctors((a) => a.filter((_, i) => i !== index))
+              }
+            />
+          )}
           {tab === 'location' && <Location clinic={clinic} setClinic={setClinic} />}
-          {tab === 'doctors' && <Doctors onAdd={(row) => setDoctors((a) => [...a, row])} rows={doctors} />}
           {tab === 'additional' && (
             <Additional
               clinic={clinic}
               setClinic={setClinic}
-              onAddHour={(r) => setHours((a) => [...a, r])}
-              onAddPayment={(r) => setClinic((c) => ({ ...c, payments: [...c.payments, r.pay] }))}
-              onAddAcc={(r) => setAccs((a) => [...a, r])}
               hours={hours}
               payments={clinic.payments}
               accs={accs}
+              onAddHour={(r) => setHours((a) => [...a, r])}
+              onRemoveHour={(index) =>
+                setHours((a) => a.filter((_, i) => i !== index))
+              }
+              onAddPayment={(r) =>
+                setClinic((c) => ({
+                  ...c,
+                  payments: [...c.payments, r.pay],
+                }))
+              }
+              onRemovePayment={(index) =>
+                setClinic((c) => ({
+                  ...c,
+                  payments: c.payments.filter((_, i) => i !== index),
+                }))
+              }
+              onAddAcc={(r) => setAccs((a) => [...a, r])}
+              onRemoveAcc={(index) =>
+                setAccs((a) => a.filter((_, i) => i !== index))
+              }
             />
           )}
         </div>
@@ -320,7 +364,7 @@ function EmptyOrList<T>({
 }: {
   rows: T[];
   emptyText: string;
-  render: (r: T) => React.ReactNode;
+  render: (r: T, index: number) => React.ReactNode;
 }) {
   if (!rows.length) {
     return (
@@ -329,7 +373,127 @@ function EmptyOrList<T>({
       </div>
     );
   }
-  return <div className="space-y-2">{rows.map((r, i) => <div key={i}>{render(r)}</div>)}</div>;
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={i}>{render(r, i)}</div>
+      ))}
+    </div>
+  );
+}
+
+const AMENITY_ICON_OPTIONS = [
+  { value: 'check', label: 'Check' },
+  { value: 'bed', label: 'Bed / room' },
+  { value: 'tooth', label: 'Tooth / dental' },
+  { value: 'airplane', label: 'Airplane / travel' },
+  { value: 'car', label: 'Car / transfer' },
+  { value: 'hotel', label: 'Hotel / stay' },
+  { value: 'language', label: 'Languages' },
+  { value: 'globe', label: 'Global / international' },
+];
+
+function AmenityGroup({
+  label,
+  items,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  items: AmenityItem[];
+  placeholder?: string;
+  onChange: (next: AmenityItem[]) => void;
+}) {
+  const [name, setName] = useState('');
+  const [icon, setIcon] = useState('check');
+
+  const add = () => {
+    const v = name.trim();
+    if (!v) return;
+    onChange([...items, { label: v, icon }]);
+    setName('');
+  };
+
+  const remove = (index: number) => {
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  const changeIcon = (index: number, value: string) => {
+    onChange(
+      items.map((it, i) => (i === index ? { ...it, icon: value } : it)),
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-medium text-slate-700">{label}</div>
+      <div className="flex gap-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={placeholder}
+        />
+        <select
+          value={icon}
+          onChange={(e) => setIcon(e.target.value)}
+          className="rounded border border-slate-300 px-2 py-2 text-xs"
+        >
+          {AMENITY_ICON_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={add}
+          className="rounded-md border bg-white px-3 py-2 text-xs hover:bg-slate-50"
+        >
+          Add
+        </button>
+      </div>
+
+      {!items.length ? (
+        <div className="text-xs text-slate-400 mt-1">No items yet.</div>
+      ) : (
+        <div className="mt-2 space-y-1">
+          {items.map((it, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-full bg-slate-100 px-3 py-1 text-xs"
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-600">
+                  {it.icon.slice(0, 2).toUpperCase()}
+                </span>
+                <span>{it.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={it.icon}
+                  onChange={(e) => changeIcon(i, e.target.value)}
+                  className="rounded border border-slate-300 px-2 py-1 text-[11px]"
+                >
+                  {AMENITY_ICON_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  className="text-slate-500 hover:text-rose-600"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TagInput({
@@ -474,59 +638,121 @@ function BasicInfo({
   );
 }
 
-function Services({ onAdd, rows }: { onAdd: (row: ServiceRow) => void; rows: ServiceRow[] }) {
-  const [name, setName] = useState(''); const [desc, setDesc] = useState(''); const [price, setPrice] = useState(''); const [currency, setCurrency] = useState('USD');
+function Services({
+  rows,
+  onAdd,
+  onRemove,
+}: {
+  rows: ServiceRow[];
+  onAdd: (row: ServiceRow) => void;
+  onRemove: (index: number) => void;
+}) {
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState('USD'); // дефолт
+
   return (
     <div className="space-y-4">
-      <SectionTitle title="Clinic Services" desc="Add treatments and services provided by the clinic." />
+      <SectionTitle
+        title="Clinic Services"
+        desc="Add treatments and services provided by the clinic."
+      />
+
       <div className="rounded-md border p-4">
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Service Name*"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Dental Cleaning" /></Field>
-          <Field label="Description"><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Brief description of the service" /></Field>
-          <Field label="Price"><Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g., 100" /></Field>
+          <Field label="Service Name*">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Dental Cleaning"
+            />
+          </Field>
+          <Field label="Description">
+            <Input
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="Brief description of the service"
+            />
+          </Field>
+          <Field label="Price">
+            <Input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="e.g., 100"
+            />
+          </Field>
           <Field label="Currency">
             <Input
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              placeholder="USD"
+              placeholder="e.g., USD"
             />
           </Field>
         </div>
+
         <button
           type="button"
-          onClick={() => { if (!name.trim()) return; onAdd({ name, desc, price, currency }); setName(''); setDesc(''); setPrice(''); }}
+          onClick={() => {
+            if (!name.trim()) return;
+            onAdd({ name, desc, price, currency });
+            setName('');
+            setDesc('');
+            setPrice('');
+            setCurrency('USD');
+          }}
           className="mt-3 rounded-md border bg-sky-50 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100"
         >
           + Add Service
         </button>
       </div>
-      <EmptyOrList emptyText="No services added yet. Add services using the form above." rows={rows} render={(r) => (
-        <div className="flex justify-between rounded border px-3 py-2 text-sm">
-          <div>{r.name}</div>
-          <div className="text-slate-500">{r.price ? `${r.price} ${r.currency}` : '—'}</div>
-        </div>
-      )} />
+
+      <EmptyOrList
+        emptyText="No services added yet. Add services using the form above."
+        rows={rows}
+        render={(r, i) => (
+          <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+            <div>
+              <div className="font-medium">{r.name}</div>
+              <div className="text-xs text-slate-500">
+                {r.price
+                  ? `${r.price} ${r.currency || ''}`.trim()
+                  : '—'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              className="text-xs text-rose-600 hover:text-rose-700"
+            >
+              Remove
+            </button>
+          </div>
+        )}
+      />
     </div>
   );
 }
 
-function Gallery({ onAdd, rows }: { onAdd: (row: ImageRow) => void; rows: ImageRow[] }) {
+function Gallery({
+  rows,
+  onAdd,
+  onRemove,
+}: {
+  rows: ImageRow[];
+  onAdd: (row: ImageRow) => void;
+  onRemove: (index: number) => void;
+}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
 
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-
     setUploading(true);
     try {
       const urls = await uploadClinicImages(files);
-      urls.forEach((u) =>
-        onAdd({
-          url: u,
-          // можно будет редактировать title позже, сейчас просто пусто
-        }),
-      );
+      urls.forEach((u) => onAdd({ url: u, title: '' }));
     } catch (err) {
       console.error(err);
       alert('Failed to upload images');
@@ -544,7 +770,7 @@ function Gallery({ onAdd, rows }: { onAdd: (row: ImageRow) => void; rows: ImageR
       />
 
       <div className="rounded-md border p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -561,32 +787,45 @@ function Gallery({ onAdd, rows }: { onAdd: (row: ImageRow) => void; rows: ImageR
           >
             {uploading ? 'Uploading…' : '⬆ Upload Images'}
           </button>
-          <div className="text-xs text-slate-500">
+          <span className="text-xs text-slate-500">
             You can select multiple images at once.
-          </div>
+          </span>
         </div>
       </div>
 
       <EmptyOrList
-        emptyText="No images added yet. Upload images using the button above."
+        emptyText="No images added yet. Upload some images."
         rows={rows}
-        render={(r) => (
-          <div className="flex items-center gap-3 rounded border px-3 py-2 text-sm">
-            <div className="h-16 w-16 overflow-hidden rounded bg-slate-100">
-              <img
-                src={r.url}
-                alt={r.title || 'Clinic photo'}
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="truncate text-xs text-slate-500">{r.url}</div>
-              {r.title && (
-                <div className="text-xs text-slate-600 mt-0.5 truncate">
-                  {r.title}
+        render={(r, i) => (
+          <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Превью */}
+              <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded bg-slate-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={r.url}
+                  alt={r.title || 'Clinic image'}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-xs text-slate-600">
+                  {r.url}
                 </div>
-              )}
+                {r.title && (
+                  <div className="truncate text-[11px] text-slate-400">
+                    {r.title}
+                  </div>
+                )}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              className="text-xs text-rose-600 hover:text-rose-700"
+            >
+              Remove
+            </button>
           </div>
         )}
       />
@@ -632,12 +871,21 @@ function Location({
   );
 }
 
-function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: DoctorRow[] }) {
+function Doctors({
+  rows,
+  onAdd,
+  onRemove,
+}: {
+  rows: DoctorRow[];
+  onAdd: (row: DoctorRow) => void;
+  onRemove: (index: number) => void;
+}) {
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [spec, setSpec] = useState('');
   const [photo, setPhoto] = useState('');
   const [bio, setBio] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -663,6 +911,7 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
         title="Doctors & Specialists"
         desc="Add information about doctors and specialists working at the clinic."
       />
+
       <div className="rounded-md border p-4 space-y-3">
         <Row>
           <Field label="Doctor Name*">
@@ -680,6 +929,7 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
             />
           </Field>
         </Row>
+
         <Row>
           <Field label="Specialty">
             <Input
@@ -688,19 +938,16 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
               placeholder="e.g., Dentistry"
             />
           </Field>
-
           <Field label="Photo">
-            {photo && (
-              <div className="mb-2 h-16 w-16 overflow-hidden rounded bg-slate-100">
-                <img
-                  src={photo}
-                  alt={name || 'Doctor photo'}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            )}
-
-            <div className="flex gap-2">
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-md border bg-white px-3 py-2 text-sm"
+                disabled={uploading}
+              >
+                {uploading ? 'Uploading…' : '⬆ Upload Photo'}
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -708,17 +955,20 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
                 onChange={handlePhotoUpload}
                 className="hidden"
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-md border bg-white px-3 py-1 text-xs"
-                disabled={uploading}
-              >
-                {uploading ? 'Uploading…' : '⬆ Upload Photo'}
-              </button>
+              {photo && (
+                <div className="h-12 w-12 overflow-hidden rounded bg-slate-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo}
+                    alt={name || 'Doctor photo'}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
             </div>
           </Field>
         </Row>
+
         <Field label="Biography/Description">
           <Textarea
             value={bio}
@@ -726,6 +976,7 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
             placeholder="Brief biography and qualifications"
           />
         </Field>
+
         <button
           type="button"
           onClick={() => {
@@ -746,10 +997,21 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
       <EmptyOrList
         emptyText="No doctors added yet. Add doctors using the form above."
         rows={rows}
-        render={(r) => (
-          <div className="rounded border px-3 py-2 text-sm">
-            {r.name}
-            {r.title ? ` — ${r.title}` : ''}
+        render={(r, i) => (
+          <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+            <div>
+              <div className="font-medium">{r.name}</div>
+              <div className="text-xs text-slate-500">
+                {[r.title, r.spec].filter(Boolean).join(' • ')}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              className="text-xs text-rose-600 hover:text-rose-700"
+            >
+              Remove
+            </button>
           </div>
         )}
       />
@@ -761,8 +1023,11 @@ function Additional({
   clinic,
   setClinic,
   onAddHour,
+  onRemoveHour,
   onAddPayment,
+  onRemovePayment,
   onAddAcc,
+  onRemoveAcc,
   hours,
   payments,
   accs,
@@ -770,8 +1035,11 @@ function Additional({
   clinic: ClinicState;
   setClinic: React.Dispatch<React.SetStateAction<ClinicState>>;
   onAddHour: (r: HourRow) => void;
+  onRemoveHour: (index: number) => void;
   onAddPayment: (r: { pay: string }) => void;
+  onRemovePayment: (index: number) => void;
   onAddAcc: (r: AccRow) => void;
+  onRemoveAcc: (index: number) => void;
   hours: HourRow[];
   payments: string[];
   accs: AccRow[];
@@ -806,7 +1074,7 @@ function Additional({
 
   const updateAmenities = (
     field: keyof ClinicState['amenities'],
-    updater: (prev: string[]) => string[],
+    updater: (prev: AmenityItem[]) => AmenityItem[],
   ) => {
     setClinic((c) => ({
       ...c,
@@ -852,12 +1120,22 @@ function Additional({
             + Add Hours
           </button>
         </div>
+        {/* Operating hours list */}
         <EmptyOrList
           emptyText="No operating hours added yet."
           rows={hours}
-          render={(r) => (
-            <div className="rounded border px-3 py-2 text-sm">
-              {r.day} — {r.time || '—'}
+          render={(r, i) => (
+            <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+              <div>
+                {r.day} — {r.time || '—'}
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemoveHour(i)}
+                className="text-xs text-rose-600 hover:text-rose-700"
+              >
+                Remove
+              </button>
             </div>
           )}
         />
@@ -867,47 +1145,37 @@ function Additional({
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">Additional Services (Amenities)</h3>
         <div className="grid gap-4 md:grid-cols-2">
-          <TagInput
+          <AmenityGroup
             label="Premises"
-            values={amenities.premises}
-            onAdd={(v) => updateAmenities('premises', (prev) => [...prev, v])}
-            onRemove={(i) =>
-              updateAmenities('premises', (prev) => prev.filter((_, idx) => idx !== i))
-            }
+            items={amenities.premises}
             placeholder="e.g., Operating theatre, Recovery room"
+            onChange={(next) =>
+              updateAmenities('premises', () => next)
+            }
           />
-          <TagInput
+          <AmenityGroup
             label="Clinic services"
-            values={amenities.clinic_services}
-            onAdd={(v) => updateAmenities('clinic_services', (prev) => [...prev, v])}
-            onRemove={(i) =>
-              updateAmenities('clinic_services', (prev) =>
-                prev.filter((_, idx) => idx !== i),
-              )
-            }
+            items={amenities.clinic_services}
             placeholder="e.g., Online consultation"
+            onChange={(next) =>
+              updateAmenities('clinic_services', () => next)
+            }
           />
-          <TagInput
+          <AmenityGroup
             label="Travel services"
-            values={amenities.travel_services}
-            onAdd={(v) => updateAmenities('travel_services', (prev) => [...prev, v])}
-            onRemove={(i) =>
-              updateAmenities('travel_services', (prev) =>
-                prev.filter((_, idx) => idx !== i),
-              )
-            }
+            items={amenities.travel_services}
             placeholder="e.g., Airport pickup, Hotel booking"
-          />
-          <TagInput
-            label="Languages spoken"
-            values={amenities.languages_spoken}
-            onAdd={(v) => updateAmenities('languages_spoken', (prev) => [...prev, v])}
-            onRemove={(i) =>
-              updateAmenities('languages_spoken', (prev) =>
-                prev.filter((_, idx) => idx !== i),
-              )
+            onChange={(next) =>
+              updateAmenities('travel_services', () => next)
             }
+          />
+          <AmenityGroup
+            label="Languages spoken"
+            items={amenities.languages_spoken}
             placeholder="English, Turkish, Russian…"
+            onChange={(next) =>
+              updateAmenities('languages_spoken', () => next)
+            }
           />
         </div>
       </div>
@@ -935,11 +1203,21 @@ function Additional({
             + Add Payment Method
           </button>
         </div>
+        {/* Payment methods list */}
         <EmptyOrList
           emptyText="No payment methods added yet."
           rows={payments}
-          render={(r) => (
-            <div className="rounded border px-3 py-2 text-sm">{r}</div>
+          render={(r, i) => (
+            <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+              <div>{r}</div>
+              <button
+                type="button"
+                onClick={() => onRemovePayment(i)}
+                className="text-xs text-rose-600 hover:text-rose-700"
+              >
+                Remove
+              </button>
+            </div>
           )}
         />
       </div>
@@ -1015,11 +1293,21 @@ function Additional({
           </button>
         </div>
 
+        {/* Accreditations list */}
         <EmptyOrList
           emptyText="No accreditations added yet."
           rows={accs}
-          render={(r) => (
-            <div className="rounded border px-3 py-2 text-sm">{r.name}</div>
+          render={(r, i) => (
+            <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+              <div className="font-medium">{r.name}</div>
+              <button
+                type="button"
+                onClick={() => onRemoveAcc(i)}
+                className="text-xs text-rose-600 hover:text-rose-700"
+              >
+                Remove
+              </button>
+            </div>
           )}
         />
       </div>

@@ -16,6 +16,76 @@ type Props = { clinic: Clinic };
 
 type ReviewRow = { id: string; review: string | null; rating_overall: number | null; created_at: string | null };
 
+type AmenityItem = { label: string; icon?: string | null };
+
+function normalizeAmenityArray(raw: any): AmenityItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') return { label: item, icon: 'check' };
+      if (!item) return null;
+      const label = String(item.label ?? '').trim();
+      if (!label) return null;
+      const icon = item.icon ? String(item.icon) : 'check';
+      return { label, icon };
+    })
+    .filter(Boolean) as AmenityItem[];
+}
+
+const iconMap: Record<string, JSX.Element> = {
+  check: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      ✓
+    </span>
+  ),
+  bed: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      B
+    </span>
+  ),
+  tooth: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      T
+    </span>
+  ),
+  airplane: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      ✈
+    </span>
+  ),
+  car: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      🚗
+    </span>
+  ),
+  hotel: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      H
+    </span>
+  ),
+  language: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      🌐
+    </span>
+  ),
+  globe: (
+    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
+      G
+    </span>
+  ),
+};
+
+function AmenityPill({ item }: { item: AmenityItem }) {
+  const Icon =
+    iconMap[item.icon || 'check'] ?? iconMap['check'];
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
+      {Icon}
+      <span>{item.label}</span>
+    </div>
+  );
+}
+
 // --- helpers ---
 function buildMapEmbedFromAny(input?: string | null, fallbackAddress?: string | null) {
   const raw = (input ?? '').trim();
@@ -152,10 +222,13 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
   // Additional services
   const services = (clinic as any).additionalServices ?? (clinic as any).servicesExtra ?? {};
-  const premises: string[] = services.premises ?? [];
-  const clinicServices: string[] = services.clinic_services ?? [];
-  const travelServices: string[] = services.travel_services ?? [];
-  const languagesSpoken: string[] = services.languages_spoken ?? [];
+
+  const amenities = (clinic as any).amenities || {};
+
+const premises = normalizeAmenityArray(amenities.premises);
+const clinicServices = normalizeAmenityArray(amenities.clinic_services);
+const travelServices = normalizeAmenityArray(amenities.travel_services);
+const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
 
   // Accreditations
   const accs = useMemo(() => {
@@ -458,18 +531,51 @@ export default function ClinicDetailPage({ clinic }: Props) {
           )}
 
           {/* Additional Services */}
-          {(premises.length || clinicServices.length || travelServices.length || languagesSpoken.length) ? (
-            <section className="space-y-6 pt-10">
-              <h2 className="text-2xl font-semibold">Additional Services</h2>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                {premises.length > 0 && <CardList title="Premises" items={premises} />}
-                {clinicServices.length > 0 && <CardList title="Clinic services" items={clinicServices} />}
-                {travelServices.length > 0 && <CardList title="Travel services" items={travelServices} />}
-                {languagesSpoken.length > 0 && <CardList title="Languages spoken" items={languagesSpoken} />}
-              </div>
-            </section>
-          ) : null}
+          <section>
+            <h2 className="text-xl font-semibold mb-4">Additional Services</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              {premises.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold">Premises</h3>
+                  <div className="space-y-2">
+                    {premises.map((a, i) => (
+                      <AmenityPill key={i} item={a} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {premises.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold">Clinic Services</h3>
+                  <div className="space-y-2">
+                    {clinicServices.map((a, i) => (
+                      <AmenityPill key={i} item={a} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {premises.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold">Travel Services</h3>
+                  <div className="space-y-2">
+                    {travelServices.map((a, i) => (
+                      <AmenityPill key={i} item={a} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {premises.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold">Languages Spoken</h3>
+                  <div className="space-y-2">
+                    {languagesSpoken.map((a, i) => (
+                      <AmenityPill key={i} item={a} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Accreditations */}
           {hasAccreditations && (
