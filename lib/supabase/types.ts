@@ -274,13 +274,6 @@ export type Database = {
             foreignKeyName: "clinic_accreditations_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -336,13 +329,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_amenities_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -467,13 +453,6 @@ export type Database = {
             foreignKeyName: "clinic_categories_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_categories_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -550,13 +529,6 @@ export type Database = {
             foreignKeyName: "clinic_hours_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_hours_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -612,13 +584,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_hours_raw_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -689,13 +654,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_images_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -781,13 +739,6 @@ export type Database = {
             foreignKeyName: "clinic_inquiries_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -847,13 +798,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_languages_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -934,13 +878,6 @@ export type Database = {
             foreignKeyName: "clinic_members_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_members_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -993,13 +930,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_premises_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -1098,13 +1028,6 @@ export type Database = {
             foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: true
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: true
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1175,13 +1098,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_reports_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -1273,13 +1189,6 @@ export type Database = {
             foreignKeyName: "booking_requests_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "booking_requests_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1365,13 +1274,6 @@ export type Database = {
             foreignKeyName: "clinic_services_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_services_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1443,13 +1345,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_sources_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -1535,13 +1430,6 @@ export type Database = {
             foreignKeyName: "clinic_staff_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_staff_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1606,13 +1494,6 @@ export type Database = {
             foreignKeyName: "clinic_translations_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_translations_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1665,13 +1546,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_travel_services_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -1909,13 +1783,6 @@ export type Database = {
             foreignKeyName: "doctors_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "doctors_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -1980,13 +1847,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "invoices_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -2117,13 +1977,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "patients_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -2266,13 +2119,6 @@ export type Database = {
             foreignKeyName: "reports_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "reports_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -2374,13 +2220,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "reviews_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -2524,13 +2363,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "transactions_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -2700,7 +2532,50 @@ export type Database = {
           name: string | null
           slug: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "clinic_profile_drafts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mv_admin_reviews: {
         Row: {
@@ -2781,13 +2656,6 @@ export type Database = {
             foreignKeyName: "booking_requests_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "booking_requests_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -2847,13 +2715,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "booking_requests_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -2925,13 +2786,6 @@ export type Database = {
             foreignKeyName: "clinic_inquiries_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_inquiries_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -2977,13 +2831,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "reports_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -3042,13 +2889,6 @@ export type Database = {
             foreignKeyName: "reviews_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "reviews_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -3095,13 +2935,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_accreditations_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -3165,13 +2998,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "clinic_services_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -3261,13 +3087,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "booking_requests_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {
@@ -3386,13 +3205,6 @@ export type Database = {
             foreignKeyName: "reports_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "reports_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -3466,13 +3278,6 @@ export type Database = {
             foreignKeyName: "reviews_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "reviews_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
             referencedRelation: "mv_catalog_clinics"
             referencedColumns: ["id"]
           },
@@ -3537,13 +3342,6 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "moderation_queue"
-            referencedColumns: ["clinic_id"]
-          },
-          {
-            foreignKeyName: "transactions_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "moderation_queue_v2"
             referencedColumns: ["clinic_id"]
           },
           {

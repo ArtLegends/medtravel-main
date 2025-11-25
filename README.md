@@ -1325,3 +1325,549 @@ Middleware ограничивает доступ по префиксу и рол
 Если хочешь, дальше можем:
 
 дописать /auth/callback под эту схему (создание профиля + обновление app_metadata.roles);
+
+
+
+---------------------------------------------------------------------
+
+1. Технический стек проекта
+
+Фронтенд / SPA:
+
+Next.js 15 (App Router) — рендер и публичного сайта, и личных кабинетов (admin / customer).
+
+TypeScript, строгая типизация, server components + server actions.
+
+React 18 (client components для динамики, фильтров, real-time).
+
+Tailwind / utility-классы для верстки, локальные кастомные классы.
+
+Компонентные обёртки: TableShell, тулбары, клиентские компоненты для списков (BookingsClient, ReportsClient и т.д.).
+
+Бэкенд / сторедж:
+
+Supabase (Postgres) — основная БД + Auth + RLS.
+
+Используем два клиента:
+
+supabaseServer (service-role или серверный клиент) — в server components / server actions.
+
+useSupabase (supabaseProvider) — клиентский SDK для real-time подписок и динамической загрузки.
+
+Прочее:
+
+Supabase Auth (роль admin, владельцы клиник).
+
+RLS-политики на большинстве таблиц (ограничение по clinic_id и/или пользователю).
+
+Build / deploy — через Vercel (production проект medtravel-main).
+
+2. Концепция и суть проекта
+
+Проект — это агрегатор медицинского туризма MedTravel с тремя основными слоями:
+
+Публичный каталог:
+
+Маркетинговый сайт (лендинг) + SEO-ориентированный каталог клиник и услуг.
+
+Страницы клиник, описания, услуги, цены, фото, языки, удобства и т.д.
+
+Формы для заявок/booking’ов:
+
+обычные пациентские заявки (booking/clinic inquiry),
+
+заявки с конкретной услуги на странице клиники.
+
+Панель клиники (Customer Panel):
+
+Доступ для клиник (владельцев) к своим данным и лидам.
+
+Разделы:
+
+Bookings — запросы на запись из публичного сайта.
+
+Patients — список пациентов / контактов.
+
+Reviews — отзывы о клинике.
+
+Reports — пользовательские жалобы/репорты на клинику.
+
+Clinic Profile — данные профиля клиники.
+
+Transactions — (заготовка под биллинг / расчёты).
+
+Основная идея: клиника работает со всеми входящими лидами и обратной связью в одном месте (меняет статусы, помечает обработанные, удаляет мусор).
+
+Админ-панель MedTravel:
+
+Доступ только для внутренней команды (роль admin).
+
+Управление всем массивом данных:
+
+Clinic Requests — заявки из клиник/со страниц клиник.
+
+New Clinic Requests — заявки на подключение новых клиник (отдельный раздел).
+
+All Clinics / Add New Clinic — управление клиниками и их статусами.
+
+Contacts, Reviews, Reports, Clinic Inquiries, Moderation — глобальный контроль контента, жалоб, отзывов.
+
+Цель: дать админам полный контроль над лидами и качеством данных/контента.
+
+Бизнес-логика:
+Пациенты → через сайт → заявки / бронирования / отзывы / репорты → попадают в таблицы Supabase, откуда:
+
+Клиники видят только свои данные в Customer Panel (через RLS на clinic_id).
+
+Админы MedTravel видят и управляют всем массивом через Admin Panel (обычно через сервисный серверный клиент без RLS-ограничений).
+
+3. Что уже реализовано
+3.1. Публичный сайт (каталог)
+
+(Точный список страниц у нас сейчас не на руках, но по проекту реализовано/заложено:)
+
+Лендинг MedTravel с описанием сервиса.
+
+Категории / услуги (services, categories).
+
+Страницы клиник с:
+
+описанием,
+
+списком услуг (привязка через clinic_services),
+
+ценами/валютой,
+
+контактной информацией.
+
+Формы отправки:
+
+Clinic Request / Booking (имя, телефон, метод связи, выбранная услуга и т.д.).
+
+Форма для отправки отзывов.
+
+Форма для репортов (жалоба на клинику / проблему).
+
+Все формы сохраняются в соответствующие таблицы Supabase, триггеря появление данных в панелях.
+
+3.2. Customer Panel (панель клиники)
+
+Путь: app/(customer)/customer/*
+
+Общее:
+
+Используется getCurrentClinicId() — утилита, которая по пользователю/куку вытаскивает clinic_id.
+
+Строгая проверка: если клиника ещё не связана с аккаунтом — показываем сообщение об ошибке.
+
+Данные берутся из вьюх вида v_customer_*, которые уже готовы под UI.
+
+3.2.1. Bookings
+
+Путь: /customer/bookings
+
+Источник: v_customer_bookings (view поверх таблиц bookings, clinics, services и др. — точно не расписывали, но смысл такой).
+
+Функционал:
+
+Фильтры:
+
+диапазон дат (From / To),
+
+поиск по имени/телефону,
+
+статус (All Statuses, New, In progress, Done, Rejected и т.д.),
+
+услуги, методы связи.
+
+Пагинация с лимитом на страницу, «Prev/Next».
+
+Изменение статуса booking’а через server action (форма в строке):
+
+select + кнопка Save.
+
+Удаление заявок:
+
+кнопка Delete в строке (server action),
+
+Delete All с подтверждением и фильтрами (в админке; в customer — аккуратнее).
+
+Экспорт CSV (кнопка Export CSV — реализовано/заложено в UI).
+
+3.2.2. Reviews (отзывы)
+
+Путь: /customer/reviews
+
+Источник: view v_customer_reviews.
+
+Таблица reviews содержит отзывы, привязанные к клинике.
+
+Реализовано:
+
+Фильтры:
+
+статус (new, published, rejected),
+
+Start Date / End Date.
+
+Без кнопки Apply — фильтр работает через searchParams, при изменении формы сразу перерендер с нужными query.
+
+Кнопка Reset Filters — сбрасывает searchParams (ссылка на /customer/reviews).
+
+Таблица:
+
+колонки: Date, Reviewer, Rating, Comment, Status, Actions.
+
+Изменение статуса отзыва:
+
+select new/published/rejected + Save (server action updateReviewStatusAction).
+
+Удаление отзыва: Delete (server action deleteReviewAction).
+
+Delete All сверху:
+
+отдельный клиентский компонент DeleteAllReviewsButton с подтверждением.
+
+Пагинация:
+
+лимит 10 отзывов на страницу (PAGE_SIZE = 10),
+
+серверная пагинация через range(from, to) в запросе к v_customer_reviews,
+
+контролы Previous / Next и текст Showing X–Y of Z.
+
+UI/разметка и стилистика полностью приведены к стилю раздела Bookings: одинаковый вид фильтров, заголовков, таблиц и пагинации.
+
+3.2.3. Reports (репорты/жалобы)
+
+Путь: /customer/reports
+
+Источник: view v_customer_reports, базовая таблица reports.
+
+Есть серверные actions:
+
+updateReportStatusAction(id, status: "New" | "Processed" | "Rejected")
+
+deleteReportAction(id)
+
+deleteAllReportsAction() (используется в админской/клиентской логике).
+
+Реализовано:
+
+Вариант 1 (старый, чисто server component) — был первоначально.
+
+Вариант 2 (текущий) — клиентский ReportsClient с realtime:
+
+Используем useSupabase() и клиентский SDK Supabase.
+
+Логика:
+
+При монтировании:
+
+supabase.auth.getUser() → находим пользователя,
+
+по owner_id в таблице clinics вытаскиваем clinic_id,
+
+подтягиваем репорты из v_customer_reports по clinic_id, сортировка по дате.
+
+Real-time подписка:
+
+подписка на postgres_changes по таблице reports с фильтром по clinic_id,
+
+при любых INSERT/UPDATE/DELETE — тихий рефреш списка (без спиннера).
+
+Фильтры:
+
+статус (All Statuses / New / Processed / Rejected),
+
+Start Date / End Date (YYYY-MM-DD),
+
+Reset Filters — сбрасывает локальный state.
+
+Всё работает динамически, без server actions, часть фильтрации на фронте.
+
+Пагинация:
+
+лимит 10 репортов на страницу (PAGE_SIZE = 10),
+
+считаем total, totalPages, currentPage,
+
+выводим Page X of Y + кнопки Previous / Next.
+
+Таблица:
+
+колонки: Date, Reporter, Contact, Relationship, Details, Status, Actions.
+
+Изменение статуса:
+
+select + кнопка Save (client → server action updateReportStatusAction).
+
+Удаление репорта:
+
+кнопка Delete с window.confirm,
+
+вызывает deleteReportAction, затем локально удаляет строку.
+
+Кнопка Delete All:
+
+только наверху (нижнюю убрали),
+
+обязательное подтверждение через window.confirm,
+
+вызывает server action deleteAllReportsAction, затем чистит state.
+
+UI/верстка и поведение повторяют Bookings: одинаковые отступы, заголовки, таблица и блок пагинации.
+
+3.2.4. Другие разделы в Customer Panel
+
+Patients — список пациентов (таблица в Supabase есть, UI либо реализован частично, либо заглушка; в любом случае — доступен в боковом меню).
+
+Clinic Profile — редактирование профиля клиники (описание, адрес, часы работы и т.д.; данные хранятся в clinics, clinic_profile_drafts, clinic_images, clinic_hours, clinic_languages, clinic_amenities и т.п.).
+
+Transactions — раздел под финансовые операции (пока по функционалу или заглушка, или минимальная реализация).
+
+Back to Home — возврат на основную страницу кабинета/дешборда.
+
+3.3. Admin Panel
+
+Путь: app/(admin)/admin/*
+
+Общее:
+
+Доступ под админским пользователем (admin@medtravel.com/роль admin в Supabase).
+
+Используем supabaseServer (серверный клиент, как правило, с возможностью видеть все строки).
+
+Всё также построено на App Router, layout’ах и TableShell-подобных компонентах.
+
+3.3.1. Clinic Requests
+
+Путь: /admin/clinic-requests
+
+Самый важный раздел, который мы недавно допиливали.
+
+Таблица: clinic_requests:
+
+id (uuid),
+
+user_id (uuid),
+
+clinic_id (uuid),
+
+service_id (int, ссылается на services.id),
+
+doctor_id (uuid),
+
+name, phone, contact_method, origin, status, created_at.
+
+View мы не используем, работаем напрямую по таблице с join’ом.
+
+Фронт:
+
+Файл страницы: app/(admin)/admin/clinic-requests/page.tsx.
+
+Таблица/клиент: components/admin/clinic-requests/ClinicRequestsTable.tsx.
+
+Тулбар фильтров: ClinicRequestsToolbar (фильтр по датам + Apply / Clear filters).
+
+Server actions: actions.ts:
+
+updateClinicRequestStatusAction(id, status)
+
+deleteClinicRequestAction(id)
+
+deleteAllClinicRequestsAction({ start?, end? }).
+
+Что реализовано:
+
+Фильтр по датам (Start / End):
+
+в page.tsx конвертим в ISO:
+
+start → T00:00:00Z,
+
+end → T23:59:59.999Z,
+
+gte / lte по created_at.
+
+Пагинация:
+
+PAGE_SIZE = 15,
+
+range(from, to) + count: 'exact',
+
+вывод Total: X • Page P / N + Prev/Next + числа страниц.
+
+Join с clinics:
+
+в select:
+
+clinics:clinics!inner(id,name)
+
+
+в таблице показываем Clinic = r.clinics?.name.
+
+Главное изменение — отображение названия услуги вместо service_id:
+
+Раньше в колонке Service выводился чисто service_id.
+
+Сейчас:
+
+На сервере собираем уникальные service_id по текущей странице.
+
+Делаем второй запрос в таблицу services:
+
+const { data: servicesData } = await supabaseServer
+  .from('services' as any)
+  .select('id,name')
+  .in('id', serviceIds)
+
+
+Делаем map serviceId → serviceName.
+
+Обогащаем строки rowsWithNames полем service:
+
+service: { id: sid, name: map.get(sid) ?? null }
+
+
+В ClinicRequestsTable используем:
+
+<td className="p-3">
+  {r.service?.name ?? r.service_id ?? '—'}
+</td>
+
+
+Управление статусом:
+
+select со списком статусов (New, In review, Contacted, Scheduled, Done, Rejected) + onChange вызывает onChangeStatus → серверный экшен → update в clinic_requests.status.
+
+Удаление:
+
+Кнопка Delete в строке → onDelete (server action).
+
+Кнопка Delete all сверху → вызывает deleteAllClinicRequestsAction с текущими датами (при необходимости).
+
+3.3.2. Остальные разделы админки
+
+Судя по структуре проекта и скринам, в админке есть:
+
+Bookings — глобальный список бронирований.
+
+New Clinic Requests — заявки от клиник, которые хотят подключиться.
+
+All Clinics / Add New Clinic — управление данными клиник, создание новых.
+
+Contacts — заявки/контакты из форм.
+
+Reviews — все отзывы по всем клиникам.
+
+Reports — все репорты по клиникам.
+
+Clinic Inquiries — вопросы клиникам/админам.
+
+Moderation — модерация контента.
+
+Структура обычно та же:
+
+дата-фильтры,
+
+таблица,
+
+управление статусом/удаление,
+
+пагинация.
+
+Мы детально работали в этом чате именно с Clinic Requests, остальные — либо уже были реализованы, либо требуют доработки в следующих шагах.
+
+4. Supabase: таблицы, вьюхи, RLS, функции (краткая карта)
+4.1. Основные таблицы, которые точно участвуют
+
+clinics — клиники (основные данные).
+
+clinic_requests — заявки из форм (admin/Clinic Requests).
+
+bookings — пациентские бронирования.
+
+reviews — отзывы.
+
+reports — жалобы/репорты.
+
+clinic_services — связка clinic_id ↔ service_id + цена и валюта.
+
+services — словарь услуг (id, name, slug, description).
+
+clinic_images, clinic_hours, clinic_languages, clinic_amenities и т.п. — атрибуты клиник.
+
+patients — пациенты/контакты.
+
+clinic_inquiries — вопросы/обращения в клинику.
+
+blog_* (blog_posts, blog_categories, blog_post_tags, blog_tags) — блоговая часть (для контент-маркетинга, не основной фокус пока).
+
+4.2. Вьюхи (views)
+
+Используем вьюхи вида:
+
+v_customer_bookings
+
+v_customer_reviews
+
+v_customer_reports
+
+Есть и другие v_* и mv_* (materialized views) для аналитики (mv_daily_bookings, mv_daily_reports, и т.п.) — их мы не трогали, но они служат для агрегаций.
+
+Цель вьюх v_customer_*:
+
+Упростить выборку в кабинетах:
+
+сразу join’ы с clinics, services, clinic_services, иногда patients.
+
+даём фронту уже готовую «плоскую» структуру с полями, нужными для UI.
+
+На базовые таблицы висят строгие RLS, а access к вьюхам можно настраивать чуть мягче (или тоже через RLS по clinic_id).
+
+4.3. RLS-политики
+
+В общих чертах (детальный SQL не воспроизводим, но логика такая):
+
+На таблицы, связанные с клиниками (bookings, reviews, reports, clinic_requests, clinic_services, и т.д.), навешаны RLS-политики:
+
+для ролей клиник: clinic_id строки должен совпадать с clinic_id, привязанным к пользователю.
+
+для админа / service key: разрешён полный доступ (обычно через сервисный ключ на сервере без RLS или с отдельной политикой).
+
+На блог/публичные таблицы (services, categories, контент лендинга) могут быть более мягкие политики либо вообще Unrestricted (чтение всем).
+
+5. Структура проекта (в общих чертах)
+
+Главные директории:
+
+app/(public)/... — публичный сайт / лендинг / каталог.
+
+app/(customer)/customer/...
+
+layout.tsx, page.tsx дашборда.
+
+bookings/page.tsx (+ возможный BookingsClient).
+
+reviews/page.tsx + DeleteAllReviewsButton.tsx.
+
+reports/page.tsx + ReportsClient.tsx.
+
+patients, clinic-profile, transactions и т.п.
+
+_utils/getCurrentClinicId.ts — утилита для привязки аккаунта к клинике.
+
+app/(admin)/admin/...
+
+clinic-requests/page.tsx, actions.ts.
+
+bookings, new-clinic-requests, all-clinics, contacts, reviews, reports, clinic-inquiries, moderation и т.д.
+
+components/admin/..., components/customer/...
+
+ClinicRequestsTable.tsx, ClinicRequestsToolbar.tsx, TableShell и прочие таблицы/обёртки.
+
+lib/supabase/server.ts — создание supabaseServer.
+
+lib/supabase/supabase-provider.tsx — провайдер клиента для useSupabase.

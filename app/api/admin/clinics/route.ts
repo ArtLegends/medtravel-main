@@ -379,6 +379,14 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, id: clinicId }, { status: 201 });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Invalid payload' }, { status: 400 });
+    if (e?.code === '23505' && String(e?.constraint).includes('accts_slug_uq')) {
+      return NextResponse.json(
+        { error: 'Slug already exists. Please choose another one.' },
+        { status: 400 },
+      )
+    }
+
+    console.error(e)
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

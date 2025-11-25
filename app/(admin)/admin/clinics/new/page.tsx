@@ -485,9 +485,11 @@ function Services({ onAdd, rows }: { onAdd: (row: ServiceRow) => void; rows: Ser
           <Field label="Description"><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Brief description of the service" /></Field>
           <Field label="Price"><Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g., 100" /></Field>
           <Field label="Currency">
-            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full rounded border border-slate-300 px-3 py-2 text-sm">
-              <option>USD</option><option>EUR</option><option>GBP</option><option>TRY</option>
-            </select>
+            <Input
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              placeholder="USD"
+            />
           </Field>
         </div>
         <button
@@ -509,18 +511,22 @@ function Services({ onAdd, rows }: { onAdd: (row: ServiceRow) => void; rows: Ser
 }
 
 function Gallery({ onAdd, rows }: { onAdd: (row: ImageRow) => void; rows: ImageRow[] }) {
-  const [url, setUrl] = useState('');
-  const [title, setTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
 
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+
     setUploading(true);
     try {
       const urls = await uploadClinicImages(files);
-      urls.forEach((u) => onAdd({ url: u, title: '' }));
+      urls.forEach((u) =>
+        onAdd({
+          url: u,
+          // можно будет редактировать title позже, сейчас просто пусто
+        }),
+      );
     } catch (err) {
       console.error(err);
       alert('Failed to upload images');
@@ -538,38 +544,7 @@ function Gallery({ onAdd, rows }: { onAdd: (row: ImageRow) => void; rows: ImageR
       />
 
       <div className="rounded-md border p-4 space-y-3">
-        <Row>
-          <Field label="Image URL*">
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-            />
-          </Field>
-          <Field label="Image Title/Caption">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Reception area"
-            />
-          </Field>
-        </Row>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (!url.trim()) return;
-              onAdd({ url, title });
-              setUrl('');
-              setTitle('');
-            }}
-            className="rounded-md border bg-sky-50 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100"
-          >
-            + Add Image URL
-          </button>
-
-          {/* upload from device */}
+        <div className="flex flex-wrap items-center gap-3">
           <input
             ref={fileInputRef}
             type="file"
@@ -584,18 +559,34 @@ function Gallery({ onAdd, rows }: { onAdd: (row: ImageRow) => void; rows: ImageR
             className="rounded-md border bg-white px-3 py-2 text-sm"
             disabled={uploading}
           >
-            {uploading ? 'Uploading…' : '⬆ Upload Image'}
+            {uploading ? 'Uploading…' : '⬆ Upload Images'}
           </button>
+          <div className="text-xs text-slate-500">
+            You can select multiple images at once.
+          </div>
         </div>
       </div>
 
       <EmptyOrList
-        emptyText="No images added yet. Add via URL or upload."
+        emptyText="No images added yet. Upload images using the button above."
         rows={rows}
         render={(r) => (
-          <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-            <div className="truncate">{r.url}</div>
-            {r.title && <div className="ml-2 text-xs text-slate-500 truncate">{r.title}</div>}
+          <div className="flex items-center gap-3 rounded border px-3 py-2 text-sm">
+            <div className="h-16 w-16 overflow-hidden rounded bg-slate-100">
+              <img
+                src={r.url}
+                alt={r.title || 'Clinic photo'}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="truncate text-xs text-slate-500">{r.url}</div>
+              {r.title && (
+                <div className="text-xs text-slate-600 mt-0.5 truncate">
+                  {r.title}
+                </div>
+              )}
+            </div>
           </div>
         )}
       />
@@ -697,13 +688,19 @@ function Doctors({ onAdd, rows }: { onAdd: (row: DoctorRow) => void; rows: Docto
               placeholder="e.g., Dentistry"
             />
           </Field>
-          <Field label="Photo URL">
-            <Input
-              value={photo}
-              onChange={(e) => setPhoto(e.target.value)}
-              placeholder="https://example.com/doctor.jpg"
-            />
-            <div className="mt-2 flex gap-2">
+
+          <Field label="Photo">
+            {photo && (
+              <div className="mb-2 h-16 w-16 overflow-hidden rounded bg-slate-100">
+                <img
+                  src={photo}
+                  alt={name || 'Doctor photo'}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -785,6 +782,25 @@ function Additional({
   const [accName, setAccName] = useState('');
   const [accLogo, setAccLogo] = useState('');
   const [accDesc, setAccDesc] = useState('');
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files[0]) return;
+
+    setLogoUploading(true);
+    try {
+      const [url] = await uploadClinicImages([files[0]]);
+      if (url) setAccLogo(url);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload logo');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
+    }
+  }
 
   const { amenities } = clinic;
 
@@ -940,14 +956,38 @@ function Additional({
                 placeholder="e.g., JCI Accredited"
               />
             </Field>
-            <Field label="Logo URL">
-              <Input
-                value={accLogo}
-                onChange={(e) => setAccLogo(e.target.value)}
-                placeholder="https://example.com/logo.png"
-              />
+
+            <Field label="Logo">
+              {accLogo && (
+                <div className="mb-2 h-10 w-10 overflow-hidden rounded bg-slate-100">
+                  <img
+                    src={accLogo}
+                    alt={accName || 'Accreditation logo'}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="rounded-md border bg-white px-3 py-1 text-xs"
+                  disabled={logoUploading}
+                >
+                  {logoUploading ? 'Uploading…' : '⬆ Upload Logo'}
+                </button>
+              </div>
             </Field>
           </Row>
+
           <Field label="Description">
             <Textarea
               value={accDesc}
@@ -955,6 +995,7 @@ function Additional({
               placeholder="Brief description of the accreditation"
             />
           </Field>
+
           <button
             type="button"
             onClick={() => {
@@ -973,6 +1014,7 @@ function Additional({
             + Add Accreditation
           </button>
         </div>
+
         <EmptyOrList
           emptyText="No accreditations added yet."
           rows={accs}
