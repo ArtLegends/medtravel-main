@@ -14,11 +14,19 @@ function slugify(s: string) {
     .replace(/(^-|-$)+/g, '');
 }
 
+const AmenityItem = z.union([
+  z.string(),
+  z.object({
+    label: z.string().min(1),
+    icon: z.string().nullable().optional(),
+  }),
+]);
+
 const Amenities = z.object({
-  premises: z.array(z.string()).default([]),
-  clinic_services: z.array(z.string()).default([]),
-  travel_services: z.array(z.string()).default([]),
-  languages_spoken: z.array(z.string()).default([]),
+  premises: z.array(AmenityItem).default([]),
+  clinic_services: z.array(AmenityItem).default([]),
+  travel_services: z.array(AmenityItem).default([]),
+  languages_spoken: z.array(AmenityItem).default([]),
 });
 
 const Body = z.object({

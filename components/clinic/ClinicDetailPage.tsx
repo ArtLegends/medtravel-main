@@ -228,19 +228,44 @@ export default function ClinicDetailPage({ clinic }: Props) {
     }));
   }, [clinic]);
 
-  // Additional services
-  const services = (clinic as any).additionalServices ?? (clinic as any).servicesExtra ?? {};
+  // --- Additional services / amenities ---
 
-  // amenities могут быть либо в clinics.amenities (JSONB), либо в старых полях
+  // старый формат (как был раньше на клиниках)
+  const rawAdditional =
+    (clinic as any).additionalServices ??
+    (clinic as any).servicesExtra ??
+    {};
+
+  // новый формат – clinics.amenities (jsonb)
   const rawAmenities = (clinic as any).amenities || {};
+
   const amenities = {
-    premises: rawAmenities.premises ?? (clinic as any).premises ?? [],
+    premises:
+      rawAmenities.premises ??
+      rawAdditional.premises ??
+      (clinic as any).premises ??
+      [],
     clinic_services:
-      rawAmenities.clinic_services ?? (clinic as any).clinic_services ?? [],
+      rawAmenities.clinic_services ??
+      rawAmenities.clinicServices ??
+      rawAdditional.clinic_services ??
+      rawAdditional.clinicServices ??
+      (clinic as any).clinic_services ??
+      [],
     travel_services:
-      rawAmenities.travel_services ?? (clinic as any).travel_services ?? [],
+      rawAmenities.travel_services ??
+      rawAmenities.travelServices ??
+      rawAdditional.travel_services ??
+      rawAdditional.travelServices ??
+      (clinic as any).travel_services ??
+      [],
     languages_spoken:
-      rawAmenities.languages_spoken ?? (clinic as any).languages_spoken ?? [],
+      rawAmenities.languages_spoken ??
+      rawAmenities.languagesSpoken ??
+      rawAdditional.languages_spoken ??
+      rawAdditional.languagesSpoken ??
+      (clinic as any).languages_spoken ??
+      [],
   };
 
   const premises = normalizeAmenityArray(amenities.premises);
