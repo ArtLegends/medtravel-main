@@ -22,18 +22,19 @@ function normalizeAmenityArray(raw: any): AmenityItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((item) => {
-      // старый формат: просто строки
-      if (typeof item === 'string') return { label: item, icon: undefined };
-
+      // старый формат: просто массив строк
+      if (typeof item === 'string') {
+        return { label: item, icon: 'check' };
+      }
       if (!item) return null;
+
       const label = String(item.label ?? '').trim();
       if (!label) return null;
 
-      const rawIcon = item.icon;
-      const icon =
-        typeof rawIcon === 'string' && rawIcon.trim().length > 0
-          ? rawIcon.trim()
-          : undefined; // пустое = "нет иконки"
+      // если иконка не указана или пустая — используем зелёную галочку
+      const icon = item.icon && String(item.icon).trim()
+        ? String(item.icon).trim()
+        : 'check';
 
       return { label, icon };
     })
@@ -84,9 +85,7 @@ const iconMap: Record<string, JSX.Element> = {
 };
 
 function AmenityPill({ item }: { item: AmenityItem }) {
-  const key = item.icon && iconMap[item.icon] ? item.icon : 'check';
-  const Icon = iconMap[key];
-
+  const Icon = iconMap[item.icon || 'check'] ?? iconMap['check'];
   return (
     <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
       {Icon}
@@ -232,12 +231,28 @@ export default function ClinicDetailPage({ clinic }: Props) {
   // Additional services
   const services = (clinic as any).additionalServices ?? (clinic as any).servicesExtra ?? {};
 
-  const amenities = (clinic as any).amenities || {};
+  // amenities могут быть либо в clinics.amenities (JSONB), либо в старых полях
+  const rawAmenities = (clinic as any).amenities || {};
+  const amenities = {
+    premises: rawAmenities.premises ?? (clinic as any).premises ?? [],
+    clinic_services:
+      rawAmenities.clinic_services ?? (clinic as any).clinic_services ?? [],
+    travel_services:
+      rawAmenities.travel_services ?? (clinic as any).travel_services ?? [],
+    languages_spoken:
+      rawAmenities.languages_spoken ?? (clinic as any).languages_spoken ?? [],
+  };
 
-const premises = normalizeAmenityArray(amenities.premises);
-const clinicServices = normalizeAmenityArray(amenities.clinic_services);
-const travelServices = normalizeAmenityArray(amenities.travel_services);
-const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
+  const premises = normalizeAmenityArray(amenities.premises);
+  const clinicServices = normalizeAmenityArray(amenities.clinic_services);
+  const travelServices = normalizeAmenityArray(amenities.travel_services);
+  const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
+
+  const hasAmenities =
+    premises.length ||
+    clinicServices.length ||
+    travelServices.length ||
+    languagesSpoken.length;
 
   // Accreditations
   const accs = useMemo(() => {
@@ -279,11 +294,12 @@ const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
     if (hasTreatments) s.push({ id: 'treatments', label: 'Treatments & Prices' });
     if (hasDoctors) s.push({ id: 'staff', label: 'Staff' });
     if (hasPhotos) s.push({ id: 'photos', label: 'Transformation photos' });
+    if (hasAmenities) s.push({ id: 'amenities', label: 'Additional Services' });
     if (hasAccreditations) s.push({ id: 'accreditations', label: 'Accreditations' });
     if (hasHours) s.push({ id: 'hours', label: 'Operation Hours' });
     if (hasLocation) s.push({ id: 'location', label: 'Location' });
     return s;
-  }, [hasAbout, hasTreatments, hasDoctors, hasPhotos, hasAccreditations, hasHours, hasLocation]);
+  }, [hasAbout, hasTreatments, hasDoctors, hasPhotos, hasAmenities, hasAccreditations, hasHours, hasLocation]);
 
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -540,54 +556,53 @@ const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
           )}
 
           {/* Additional Services */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">Additional Services</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {premises.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Premises</h3>
-                  <div className="space-y-2">
-                    {premises.map((a, i) => (
-                      <AmenityPill key={i} item={a} />
-                    ))}
+          {hasAmenities && (
+            <section id="amenities" className="space-y-4 pt-10">
+              <h2 className="text-2xl font-semibold mb-2">Additional Services</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                {premises.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Premises</h3>
+                    <div className="space-y-2">
+                      {premises.map((a, i) => (
+                        <AmenityPill key={i} item={a} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {clinicServices.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Clinic Services</h3>
-                  <div className="space-y-2">
-                    {clinicServices.map((a, i) => (
-                      <AmenityPill key={i} item={a} />
-                    ))}
+                )}
+                {clinicServices.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Clinic services</h3>
+                    <div className="space-y-2">
+                      {clinicServices.map((a, i) => (
+                        <AmenityPill key={i} item={a} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {travelServices.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Travel Services</h3>
-                  <div className="space-y-2">
-                    {travelServices.map((a, i) => (
-                      <AmenityPill key={i} item={a} />
-                    ))}
+                )}
+                {travelServices.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Travel services</h3>
+                    <div className="space-y-2">
+                      {travelServices.map((a, i) => (
+                        <AmenityPill key={i} item={a} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {languagesSpoken.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Languages Spoken</h3>
-                  <div className="space-y-2">
-                    {languagesSpoken.map((a, i) => (
-                      <AmenityPill key={i} item={a} />
-                    ))}
+                )}
+                {languagesSpoken.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Languages spoken</h3>
+                    <div className="space-y-2">
+                      {languagesSpoken.map((a, i) => (
+                        <AmenityPill key={i} item={a} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </section>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Accreditations */}
           {hasAccreditations && (

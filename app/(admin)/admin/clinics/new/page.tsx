@@ -469,8 +469,8 @@ function AmenityGroup({
               className="flex items-center justify-between rounded-full bg-slate-100 px-3 py-1 text-xs"
             >
               <div className="flex items-center gap-2">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-600">
-                  {(it.icon || '').slice(0, 2).toUpperCase()}
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-600">
+                  {it.icon ? it.icon.slice(0, 2).toUpperCase() : '✓'}
                 </span>
                 <span>{it.label}</span>
               </div>
