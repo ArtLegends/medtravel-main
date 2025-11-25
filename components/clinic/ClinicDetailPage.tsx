@@ -22,11 +22,19 @@ function normalizeAmenityArray(raw: any): AmenityItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((item) => {
-      if (typeof item === 'string') return { label: item, icon: 'check' };
+      // старый формат: просто строки
+      if (typeof item === 'string') return { label: item, icon: undefined };
+
       if (!item) return null;
       const label = String(item.label ?? '').trim();
       if (!label) return null;
-      const icon = item.icon ? String(item.icon) : 'check';
+
+      const rawIcon = item.icon;
+      const icon =
+        typeof rawIcon === 'string' && rawIcon.trim().length > 0
+          ? rawIcon.trim()
+          : undefined; // пустое = "нет иконки"
+
       return { label, icon };
     })
     .filter(Boolean) as AmenityItem[];
@@ -76,8 +84,9 @@ const iconMap: Record<string, JSX.Element> = {
 };
 
 function AmenityPill({ item }: { item: AmenityItem }) {
-  const Icon =
-    iconMap[item.icon || 'check'] ?? iconMap['check'];
+  const key = item.icon && iconMap[item.icon] ? item.icon : 'check';
+  const Icon = iconMap[key];
+
   return (
     <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
       {Icon}
@@ -532,7 +541,7 @@ const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
 
           {/* Additional Services */}
           <section>
-            <h2 className="text-xl font-semibold mb-4">Additional Services</h2>
+            <h2 className="mb-4 text-xl font-semibold">Additional Services</h2>
             <div className="grid gap-4 md:grid-cols-2">
               {premises.length > 0 && (
                 <div>
@@ -544,7 +553,8 @@ const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
                   </div>
                 </div>
               )}
-              {premises.length > 0 && (
+
+              {clinicServices.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-sm font-semibold">Clinic Services</h3>
                   <div className="space-y-2">
@@ -554,7 +564,8 @@ const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
                   </div>
                 </div>
               )}
-              {premises.length > 0 && (
+
+              {travelServices.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-sm font-semibold">Travel Services</h3>
                   <div className="space-y-2">
@@ -564,7 +575,8 @@ const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
                   </div>
                 </div>
               )}
-              {premises.length > 0 && (
+
+              {languagesSpoken.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-sm font-semibold">Languages Spoken</h3>
                   <div className="space-y-2">

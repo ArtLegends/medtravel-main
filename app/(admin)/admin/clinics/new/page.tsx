@@ -33,7 +33,7 @@ type ClinicState = {
   };
 };
 
-type AmenityItem = { label: string; icon: string };
+type AmenityItem = { label: string; icon?: string };
 type ServiceRow = { name: string; desc?: string; price?: string; currency: string };
 type ImageRow   = { url: string; title?: string };
 type DoctorRow  = { name: string; title?: string; spec?: string; photo?: string; bio?: string };
@@ -383,6 +383,7 @@ function EmptyOrList<T>({
 }
 
 const AMENITY_ICON_OPTIONS = [
+  { value: '',        label: 'No icon' },
   { value: 'check', label: 'Check' },
   { value: 'bed', label: 'Bed / room' },
   { value: 'tooth', label: 'Tooth / dental' },
@@ -405,13 +406,15 @@ function AmenityGroup({
   onChange: (next: AmenityItem[]) => void;
 }) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('check');
+  const [icon, setIcon] = useState(''); // '' = No icon по умолчанию
 
   const add = () => {
     const v = name.trim();
     if (!v) return;
-    onChange([...items, { label: v, icon }]);
+    const normalizedIcon = icon || undefined; // в БД храним undefined/пусто
+    onChange([...items, { label: v, icon: normalizedIcon }]);
     setName('');
+    setIcon(''); // снова No icon
   };
 
   const remove = (index: number) => {
@@ -419,8 +422,11 @@ function AmenityGroup({
   };
 
   const changeIcon = (index: number, value: string) => {
+    const normalizedIcon = value || undefined;
     onChange(
-      items.map((it, i) => (i === index ? { ...it, icon: value } : it)),
+      items.map((it, i) =>
+        i === index ? { ...it, icon: normalizedIcon } : it,
+      ),
     );
   };
 
@@ -454,7 +460,7 @@ function AmenityGroup({
       </div>
 
       {!items.length ? (
-        <div className="text-xs text-slate-400 mt-1">No items yet.</div>
+        <div className="mt-1 text-xs text-slate-400">No items yet.</div>
       ) : (
         <div className="mt-2 space-y-1">
           {items.map((it, i) => (
@@ -464,13 +470,13 @@ function AmenityGroup({
             >
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-600">
-                  {it.icon.slice(0, 2).toUpperCase()}
+                  {(it.icon || '').slice(0, 2).toUpperCase()}
                 </span>
                 <span>{it.label}</span>
               </div>
               <div className="flex items-center gap-2">
                 <select
-                  value={it.icon}
+                  value={it.icon || ''} // '' → “No icon”
                   onChange={(e) => changeIcon(i, e.target.value)}
                   className="rounded border border-slate-300 px-2 py-1 text-[11px]"
                 >
