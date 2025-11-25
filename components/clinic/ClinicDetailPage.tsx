@@ -334,6 +334,18 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllDoctors, setShowAllDoctors] = useState(false);
 
+  // offset для карусели фоток
+  const [photoOffset, setPhotoOffset] = useState(0);
+
+  const visiblePhotos = useMemo(() => {
+    if (imgs.length <= 3) return imgs;
+    const res: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      res.push(imgs[(photoOffset + i) % imgs.length]);
+    }
+    return res;
+  }, [imgs, photoOffset]);
+
   const visibleServices = showAllServices ? allServices : allServices.slice(0, 5);
   const hasPrice = allServices.some(s => String(s?.price ?? '').trim() !== '');
   const hasDesc = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
@@ -564,18 +576,49 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {hasPhotos && (
             <section id="photos" className="space-y-4 pt-10">
               <h2 className="text-2xl font-semibold">Transformation photos</h2>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                {imgs.map(src => (
-                  <div key={src} className="relative aspect-[4/3] overflow-hidden rounded-lg">
-                    <Image
-                      src={src}
-                      alt="Clinic photo"
-                      fill
-                      sizes="(min-width:1024px) 33vw, 50vw"
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
+
+              <div className="relative">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  {visiblePhotos.map((src) => (
+                    <div
+                      key={src}
+                      className="relative aspect-[4/3] overflow-hidden rounded-lg"
+                    >
+                      <Image
+                        src={src}
+                        alt="Clinic photo"
+                        fill
+                        sizes="(min-width:1024px) 33vw, 50vw"
+                        className="object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {imgs.length > 3 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPhotoOffset((prev) =>
+                          (prev - 1 + imgs.length) % imgs.length
+                        )
+                      }
+                      className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full bg-white/80 px-2 py-1 text-xl leading-none shadow hover:bg-white"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPhotoOffset((prev) => (prev + 1) % imgs.length)
+                      }
+                      className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full bg-white/80 px-2 py-1 text-xl leading-none shadow hover:bg-white"
+                    >
+                      ›
+                    </button>
+                  </>
+                )}
               </div>
             </section>
           )}
@@ -779,7 +822,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
 /* ---------- HERO GALLERY ---------- */
 function HeroGallery({ images, name }: { images: string[]; name: string }) {
-  const list = images.filter(Boolean).slice(0, 5);
+  const list = images.filter(Boolean).slice(0, 3);
   if (list.length === 0) return null;
 
   return (
@@ -800,7 +843,7 @@ function HeroGallery({ images, name }: { images: string[]; name: string }) {
 
       {/* right column - up to 2 thumbs */}
       <div className="col-span-12 grid gap-3 md:col-span-4">
-        {list.slice(1, 3).map((src) => (
+        {list.slice(1).map((src) => (
           <div key={src} className="relative overflow-hidden rounded-2xl">
             <Image
               src={src}
@@ -812,21 +855,6 @@ function HeroGallery({ images, name }: { images: string[]; name: string }) {
           </div>
         ))}
       </div>
-
-      {/* bottom thumbnails (up to 2 more) */}
-      {list.slice(3).map((src) => (
-        <div key={src} className="col-span-6 md:col-span-3">
-          <div className="relative overflow-hidden rounded-2xl">
-            <Image
-              src={src}
-              alt={`${name} photo`}
-              width={800}
-              height={800}
-              className="block w-full h-[160px] md:h-[200px] object-cover"
-            />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
