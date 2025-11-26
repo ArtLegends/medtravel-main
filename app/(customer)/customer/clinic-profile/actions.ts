@@ -226,15 +226,28 @@ export async function publishClinic(clinicId: string) {
   if (error) throw error;
 }
 
-export async function uploadGallery(files: File[]) {
+const MAX_IMAGE_SIZE_MB = 20;
+const MAX_IMAGE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
+/**
+ * Внутренний helper: грузим файлы в bucket `clinic-images`
+ * с префиксом (gallery/staff/accreditations) и лимитом по размеру.
+ */
+async function uploadImagesInternal(files: File[], folder: string) {
   const supa = await getSupa();
   await supa.auth.getUser();
 
   const urls: string[] = [];
 
   for (const f of files) {
+    if (f.size > MAX_IMAGE_BYTES) {
+      throw new Error(
+        `File "${f.name}" is too large. Max size is ${MAX_IMAGE_SIZE_MB} MB.`
+      );
+    }
+
     const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
-    const key = `u/${Date.now()}-${Math.random()
+    const key = `u/${folder}/${Date.now()}-${Math.random()
       .toString(36)
       .slice(2)}.${ext}`;
 
@@ -245,6 +258,7 @@ export async function uploadGallery(files: File[]) {
         upsert: false,
         contentType: f.type || "image/*",
       });
+
     if (upErr) throw upErr;
 
     const { data: pub } = supa.storage
@@ -252,12 +266,34 @@ export async function uploadGallery(files: File[]) {
       .getPublicUrl(key);
     urls.push(pub.publicUrl);
   }
+
   return urls;
 }
 
+/**
+ * Галерея клиники – можно загружать сразу несколько файлов.
+ * Лимиты по количеству обрабатываются на клиенте.
+ */
+export async function uploadGallery(files: File[]) {
+  return uploadImagesInternal(files, "gallery");
+}
+
+/** Фото доктора – одно изображение */
+export async function uploadDoctorImage(file: File) {
+  const [url] = await uploadImagesInternal([file], "staff");
+  return url;
+}
+
+/** Лого аккредитации – одно изображение */
+export async function uploadAccreditationLogo(file: File) {
+  const [url] = await uploadImagesInternal([file], "accreditations");
+  return url;
+}
+
+// copyImageFromUrl оставляем как было, но чуть подчищу:
+
 export async function copyImageFromUrl(url: string) {
   const supa = await getSupa();
-  // убеждаемся, что пользователь залогинен (RLS и т.д.)
   await supa.auth.getUser();
 
   const res = await fetch(url);

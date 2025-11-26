@@ -16,6 +16,8 @@ import {
   submitForReview,
   getCategories,
   uploadGallery,
+  uploadDoctorImage,
+  uploadAccreditationLogo,
 } from "./actions";
 
 type SectionKey =
@@ -39,14 +41,14 @@ type HourRow = {
   end?: string;
 };
 
-const DEFAULT_HOURS: HourRow[] = [
-  { day: "Monday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Tuesday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Wednesday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Thursday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Friday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Saturday", status: "Closed", start: "00:00", end: "00:00" },
-  { day: "Sunday", status: "Closed", start: "00:00", end: "00:00" },
+const DEFAULT_HOURS: Array<{ day: string; status: "Open" | "Closed"; start?: string; end?: string }> = [
+  { day: "Monday",    status: "Open",  start: "00:00", end: "00:00" },
+  { day: "Tuesday",   status: "Open",  start: "00:00", end: "00:00" },
+  { day: "Wednesday", status: "Open",  start: "00:00", end: "00:00" },
+  { day: "Thursday",  status: "Open",  start: "00:00", end: "00:00" },
+  { day: "Friday",    status: "Open",  start: "00:00", end: "00:00" },
+  { day: "Saturday",  status: "Closed" },
+  { day: "Sunday",    status: "Closed" },
 ];
 
 type ServiceRow = {
@@ -105,7 +107,7 @@ export default function ClinicProfilePage() {
     languages_spoken: [],
     accreditations: [],
   });
-  const [hours, setHours] = useState<HourRow[]>(DEFAULT_HOURS);
+  const [hours, setHours] = useState(DEFAULT_HOURS);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [location, setLocation] = useState({ mapUrl: "", directions: "" });
   const [payments, setPayments] = useState<string[]>([]);
@@ -159,7 +161,11 @@ export default function ClinicProfilePage() {
               }
             );
 
-            setHours(draft.hours ?? DEFAULT_HOURS);
+            setHours(
+              draft.hours && Array.isArray(draft.hours) && draft.hours.length
+                ? draft.hours
+                : DEFAULT_HOURS
+            );
             setGallery(draft.gallery ?? []);
             setLocation(draft.location ?? { mapUrl: "", directions: "" });
 
@@ -372,7 +378,10 @@ export default function ClinicProfilePage() {
           )}
 
           {active === "doctors" && (
-            <DoctorsSection rows={doctors} onChange={setDoctors} />
+            <DoctorsSection
+              rows={doctors}
+              onChange={setDoctors}
+            />
           )}
 
           {active === "additional" && (
@@ -380,11 +389,17 @@ export default function ClinicProfilePage() {
           )}
 
           {active === "hours" && (
-            <HoursSection rows={hours} onChange={setHours} />
+            <HoursSection
+              rows={hours}
+              onChange={setHours}
+            />
           )}
 
           {active === "gallery" && (
-            <GallerySection rows={gallery} onChange={setGallery} />
+            <GallerySection
+              rows={gallery}
+              onChange={setGallery}
+            />
           )}
 
           {active === "location" && (
@@ -881,66 +896,102 @@ function DoctorsSection({
   rows,
   onChange,
 }: {
-  rows: DoctorRow[];
-  onChange: (rows: DoctorRow[]) => void;
+  rows: Array<{ fullName: string; title?: string; specialty?: string; description?: string; photo?: string }>;
+  onChange: (rows: Array<{ fullName: string; title?: string; specialty?: string; description?: string; photo?: string }>) => void;
 }) {
-  const [draft, setDraft] = useState<DoctorRow>({
+  const [draft, setDraft] = useState<{
+    fullName: string;
+    title?: string;
+    specialty?: string;
+    description?: string;
+    photo?: string;
+  }>({
     fullName: "",
     title: "",
     specialty: "",
     description: "",
     photo: "",
   });
+
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  function resetDraft() {
-    setDraft({
-      fullName: "",
-      title: "",
-      specialty: "",
-      description: "",
-      photo: "",
-    });
+  const fileInputId = "doctorPhotoUpload";
+  const MAX_MB = 20;
+  const MAX_BYTES = MAX_MB * 1024 * 1024;
+
+  const startNew = () => {
+    setDraft({ fullName: "", title: "", specialty: "", description: "", photo: "" });
     setEditingIndex(null);
     setError(null);
-  }
+  };
 
-  async function handleUploadFromDevice(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files[0]) return;
     const file = files[0];
-    if (!file) return;
+
+    if (file.size > MAX_BYTES) {
+      setError(`Image is too large. Max size is ${MAX_MB} MB.`);
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const [url] = await uploadGallery([file]); // 1 изображение на доктора
-      if (url) {
-        setDraft((prev) => ({ ...prev, photo: url }));
-      }
-    } catch (err) {
-      console.error(err);
+      const url = await uploadDoctorImage(file);
+      setDraft((d) => ({ ...d, photo: url }));
+    } catch (e: any) {
+      console.error(e);
       setError("Failed to upload image. Please try again.");
     } finally {
       setBusy(false);
-      e.target.value = "";
     }
-  }
+  };
 
-  function handleSaveDoctor() {
+  const handleSave = () => {
     if (!draft.fullName.trim()) return;
-    const next = { ...draft };
+
+    const normalized = {
+      fullName: draft.fullName.trim(),
+      title: draft.title?.trim() || "",
+      specialty: draft.specialty?.trim() || "",
+      description: draft.description?.trim() || "",
+      photo: draft.photo?.trim() || "",
+    };
 
     if (editingIndex === null) {
-      onChange([...rows, next]);
+      onChange([...rows, normalized]);
     } else {
-      onChange(rows.map((r, i) => (i === editingIndex ? next : r)));
+      onChange(
+        rows.map((r, i) => (i === editingIndex ? normalized : r))
+      );
     }
-    resetDraft();
-  }
+
+    startNew();
+  };
+
+  const handleEdit = (index: number) => {
+    const d = rows[index];
+    setDraft({
+      fullName: d.fullName,
+      title: d.title || "",
+      specialty: d.specialty || "",
+      description: d.description || "",
+      photo: d.photo || "",
+    });
+    setEditingIndex(index);
+    setError(null);
+  };
+
+  const handleDelete = (index: number) => {
+    onChange(rows.filter((_, i) => i !== index));
+    if (editingIndex === index) {
+      startNew();
+    }
+  };
 
   return (
     <>
@@ -966,27 +1017,31 @@ function DoctorsSection({
           placeholder="Orthopedics, etc."
         />
 
-        <div className="md:col-span-1 space-y-2">
+        <div className="md:col-span-1">
           <label className="text-[13px] text-gray-600">Photo</label>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
-              disabled={busy}
-            >
-              {busy ? "Uploading…" : "⬆ Upload photo from device"}
-            </button>
+          <div className="mt-1 flex items-center gap-3">
             <input
-              ref={fileInputRef}
+              id={fileInputId}
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={handleUploadFromDevice}
+              onChange={handleUpload}
             />
+            <label
+              htmlFor={fileInputId}
+              className={clsx(
+                "rounded-md border bg-white px-3 py-2 text-sm cursor-pointer hover:bg-gray-50",
+                busy && "opacity-60 cursor-default"
+              )}
+            >
+              {busy ? "Uploading…" : "⬆ Upload photo from device"}
+            </label>
+            <span className="text-xs text-gray-500">
+              One image per doctor. You can change it while editing.
+            </span>
           </div>
           {draft.photo && (
-            <div className="mt-2 h-16 w-16 overflow-hidden rounded-full bg-gray-100">
+            <div className="mt-2 h-10 w-10 rounded-full overflow-hidden bg-gray-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={draft.photo}
@@ -995,9 +1050,6 @@ function DoctorsSection({
               />
             </div>
           )}
-          <p className="text-[11px] text-gray-500">
-            One image per doctor. You can change it while editing.
-          </p>
         </div>
 
         <Textarea
@@ -1009,31 +1061,34 @@ function DoctorsSection({
         />
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-3 flex gap-2">
         <button
-          onClick={handleSaveDoctor}
+          type="button"
+          onClick={handleSave}
+          disabled={!draft.fullName.trim() || busy}
           className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
-          disabled={busy || !draft.fullName.trim()}
         >
           {editingIndex === null ? "+ Add Doctor" : "Save changes"}
         </button>
         {editingIndex !== null && (
           <button
             type="button"
-            onClick={resetDraft}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            onClick={startNew}
+            className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
           >
             Cancel
           </button>
         )}
       </div>
 
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-2 text-xs text-red-600">{error}</p>
+      )}
 
       {!rows.length ? (
-        <p className="mt-2 text-sm text-gray-400">No doctors added yet.</p>
+        <p className="mt-3 text-sm text-gray-400">No doctors added yet.</p>
       ) : (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 space-y-2">
           {rows.map((d, i) => (
             <div
               key={i}
@@ -1059,19 +1114,16 @@ function DoctorsSection({
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    setDraft(d);
-                    setEditingIndex(i);
-                  }}
-                  className="text-gray-500 hover:text-blue-600 text-sm"
+                  type="button"
+                  onClick={() => handleEdit(i)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
                 >
                   Edit
                 </button>
                 <button
-                  onClick={() =>
-                    onChange(rows.filter((_, idx) => idx !== i))
-                  }
-                  className="text-gray-500 hover:text-rose-600 text-sm"
+                  type="button"
+                  onClick={() => handleDelete(i)}
+                  className="text-sm text-gray-500 hover:text-rose-600"
                 >
                   Delete
                 </button>
@@ -1260,245 +1312,304 @@ function AdditionalSection({
   value,
   onChange,
 }: {
-  value: FacilitiesState;
-  onChange: (v: FacilitiesState) => void;
+  value: {
+    premises: string[];
+    clinic_services: string[];
+    travel_services: string[];
+    languages_spoken: string[];
+    accreditations: Array<{ name: string; logo_url?: string; description?: string }>;
+  };
+  onChange: (v: any) => void;
 }) {
-  const premises = normalizeAmenityList(value.premises);
-  const clinicServices = normalizeAmenityList(value.clinic_services);
-  const travelServices = normalizeAmenityList(value.travel_services);
-  const languagesSpoken = normalizeAmenityList(value.languages_spoken);
-
-  const [accDraft, setAccDraft] = useState<Accreditation>({
+  const [accDraft, setAccDraft] = useState<{ name: string; logo_url?: string; description?: string }>({
     name: "",
     logo_url: "",
     description: "",
   });
-  const [accEditingIndex, setAccEditingIndex] = useState<number | null>(null);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [accBusy, setAccBusy] = useState(false);
+  const [accError, setAccError] = useState<string | null>(null);
 
-  function updateField(
-    field: keyof FacilitiesState,
-    items: any
-  ) {
-    onChange({
-      ...value,
-      [field]: items,
-    });
-  }
+  const logoInputId = "accreditationLogoUpload";
+  const MAX_MB = 20;
+  const MAX_BYTES = MAX_MB * 1024 * 1024;
 
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files[0]) return;
     const file = files[0];
-    if (!file) return;
-    setLogoUploading(true);
+
+    if (file.size > MAX_BYTES) {
+      setAccError(`Image is too large. Max size is ${MAX_MB} MB.`);
+      return;
+    }
+
+    setAccBusy(true);
+    setAccError(null);
+
     try {
-      const [url] = await uploadGallery([file]);
-      if (url) {
-        setAccDraft((prev) => ({ ...prev, logo_url: url }));
-      }
+      const url = await uploadAccreditationLogo(file);
+      setAccDraft((d) => ({ ...d, logo_url: url }));
     } catch (err) {
       console.error(err);
+      setAccError("Failed to upload image. Please try again.");
     } finally {
-      setLogoUploading(false);
-      e.target.value = "";
+      setAccBusy(false);
     }
-  }
+  };
 
-  function resetAccDraft() {
+  const resetAcc = () => {
     setAccDraft({ name: "", logo_url: "", description: "" });
-    setAccEditingIndex(null);
-  }
+    setEditingIndex(null);
+    setAccError(null);
+  };
 
-  function handleSaveAccreditation() {
+  const saveAccreditation = () => {
     if (!accDraft.name.trim()) return;
-    const list = value.accreditations ?? [];
-    const nextAcc = {
+
+    const normalized = {
       name: accDraft.name.trim(),
-      logo_url: accDraft.logo_url || undefined,
-      description: accDraft.description || undefined,
+      logo_url: accDraft.logo_url?.trim() || undefined,
+      description: accDraft.description?.trim() || undefined,
     };
-    let next: Accreditation[];
-    if (accEditingIndex === null) {
-      next = [...list, nextAcc];
+
+    if (editingIndex === null) {
+      onChange({
+        ...value,
+        accreditations: [...(value.accreditations || []), normalized],
+      });
     } else {
-      next = list.map((a, i) => (i === accEditingIndex ? nextAcc : a));
+      onChange({
+        ...value,
+        accreditations: value.accreditations.map((a, i) =>
+          i === editingIndex ? normalized : a
+        ),
+      });
     }
+
+    resetAcc();
+  };
+
+  const editAccreditation = (index: number) => {
+    const a = value.accreditations[index];
+    setAccDraft({
+      name: a.name,
+      logo_url: a.logo_url || "",
+      description: a.description || "",
+    });
+    setEditingIndex(index);
+    setAccError(null);
+  };
+
+  const deleteAccreditation = (index: number) => {
     onChange({
       ...value,
-      accreditations: next,
+      accreditations: value.accreditations.filter((_, i) => i !== index),
     });
-    resetAccDraft();
-  }
+    if (editingIndex === index) {
+      resetAcc();
+    }
+  };
 
   return (
     <>
-      <div className="text-lg font-semibold">
-        Additional Services &amp; Facilities
-      </div>
+      <div className="text-lg font-semibold">Additional Services & Facilities</div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <AmenityGroupField
-          label="Premises"
-          placeholder="Operating rooms, recovery rooms, etc."
-          items={premises}
-          onChange={(items) => updateField("premises", items)}
-        />
-        <AmenityGroupField
-          label="Clinic Services"
-          placeholder="Consultation, diagnosis, treatment, etc."
-          items={clinicServices}
-          onChange={(items) => updateField("clinic_services", items)}
-        />
-        <AmenityGroupField
-          label="Travel Services"
-          placeholder="Airport pickup, accommodation, etc."
-          items={travelServices}
-          onChange={(items) => updateField("travel_services", items)}
-        />
-        <AmenityGroupField
-          label="Languages Spoken"
-          placeholder="English, Spanish, French, etc."
-          items={languagesSpoken}
-          onChange={(items) => updateField("languages_spoken", items)}
-        />
-      </div>
+      <TagInput
+        label="Premises"
+        values={value.premises}
+        onAdd={(v) => onChange({ ...value, premises: [...value.premises, v] })}
+        onRemove={(i) =>
+          onChange({
+            ...value,
+            premises: value.premises.filter((_, idx) => idx !== i),
+          })
+        }
+        placeholder="Operating rooms, recovery rooms, etc."
+      />
+      <div className="h-2" />
+
+      <TagInput
+        label="Clinic Services"
+        values={value.clinic_services}
+        onAdd={(v) =>
+          onChange({
+            ...value,
+            clinic_services: [...value.clinic_services, v],
+          })
+        }
+        onRemove={(i) =>
+          onChange({
+            ...value,
+            clinic_services: value.clinic_services.filter((_, idx) => idx !== i),
+          })
+        }
+        placeholder="Consultation, diagnosis, treatment, etc."
+      />
+      <div className="h-2" />
+
+      <TagInput
+        label="Travel Services"
+        values={value.travel_services}
+        onAdd={(v) =>
+          onChange({
+            ...value,
+            travel_services: [...value.travel_services, v],
+          })
+        }
+        onRemove={(i) =>
+          onChange({
+            ...value,
+            travel_services: value.travel_services.filter((_, idx) => idx !== i),
+          })
+        }
+        placeholder="Airport pickup, accommodation, etc."
+      />
+      <div className="h-2" />
+
+      <TagInput
+        label="Languages Spoken"
+        values={value.languages_spoken}
+        onAdd={(v) =>
+          onChange({
+            ...value,
+            languages_spoken: [...value.languages_spoken, v],
+          })
+        }
+        onRemove={(i) =>
+          onChange({
+            ...value,
+            languages_spoken: value.languages_spoken.filter(
+              (_, idx) => idx !== i
+            ),
+          })
+        }
+        placeholder="English, Spanish, French, etc."
+      />
 
       {/* Accreditations */}
-      <div className="mt-4 space-y-2">
-        <div className="text-base font-medium">Accreditations</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field
-            label="Name *"
-            value={accDraft.name}
-            onChange={(v) =>
-              setAccDraft((a) => ({ ...a, name: v }))
-            }
-            placeholder="JCI, ISO..."
-          />
-          <div>
-            <label className="text-[13px] text-gray-600">Logo</label>
-            <div className="mt-1 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
-                disabled={logoUploading}
-              >
-                {logoUploading ? "Uploading…" : "⬆ Upload logo"}
-              </button>
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleLogoUpload}
-              />
-              {accDraft.logo_url && (
-                <div className="h-8 w-8 overflow-hidden rounded bg-gray-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={accDraft.logo_url}
-                    alt={accDraft.name || "Logo"}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
+      <div className="h-4" />
+      <div className="text-base font-medium">Accreditations</div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field
+          label="Name *"
+          value={accDraft.name}
+          onChange={(v) => setAccDraft((a) => ({ ...a, name: v }))}
+          placeholder="JCI, ISO..."
+        />
+
+        <div>
+          <label className="text-[13px] text-gray-600">Logo</label>
+          <div className="mt-1 flex items-center gap-3">
+            <input
+              id={logoInputId}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
+            <label
+              htmlFor={logoInputId}
+              className={clsx(
+                "rounded-md border bg-white px-3 py-2 text-sm cursor-pointer hover:bg-gray-50",
+                accBusy && "opacity-60 cursor-default"
               )}
-            </div>
-            <p className="mt-1 text-[11px] text-gray-500">
-              One image per accreditation.
-            </p>
-          </div>
-          <Textarea
-            className="md:col-span-2"
-            label="Description"
-            value={accDraft.description || ""}
-            onChange={(v) =>
-              setAccDraft((a) => ({ ...a, description: v }))
-            }
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSaveAccreditation}
-            className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
-            disabled={!accDraft.name.trim()}
-          >
-            {accEditingIndex === null
-              ? "+ Add Accreditation"
-              : "Save changes"}
-          </button>
-          {accEditingIndex !== null && (
-            <button
-              type="button"
-              onClick={resetAccDraft}
-              className="text-sm text-gray-500 hover:text-gray-700"
             >
-              Cancel
-            </button>
+              {accBusy ? "Uploading…" : "⬆ Upload logo"}
+            </label>
+            <span className="text-xs text-gray-500">
+              One image per accreditation.
+            </span>
+          </div>
+          {accDraft.logo_url && (
+            <div className="mt-2 h-10 w-10 overflow-hidden rounded bg-gray-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={accDraft.logo_url}
+                alt={accDraft.name || "Accreditation logo"}
+                className="h-full w-full object-cover"
+              />
+            </div>
           )}
         </div>
 
-        {!value.accreditations?.length ? (
-          <p className="mt-2 text-sm text-gray-400">
-            No accreditations yet.
-          </p>
-        ) : (
-          <div className="mt-2 space-y-2">
-            {value.accreditations.map((a, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  {a.logo_url && (
-                    <div className="h-7 w-7 overflow-hidden rounded-full bg-gray-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={a.logo_url}
-                        alt={a.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <span className="font-medium">{a.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAccDraft({
-                        name: a.name,
-                        logo_url: a.logo_url,
-                        description: a.description,
-                      });
-                      setAccEditingIndex(i);
-                    }}
-                    className="text-gray-500 hover:text-blue-600 text-sm"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange({
-                        ...value,
-                        accreditations: value.accreditations.filter(
-                          (_, idx) => idx !== i
-                        ),
-                      })
-                    }
-                    className="text-gray-500 hover:text-rose-600 text-sm"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+        <Textarea
+          className="md:col-span-2"
+          label="Description"
+          value={accDraft.description || ""}
+          onChange={(v) => setAccDraft((a) => ({ ...a, description: v }))}
+          placeholder="Brief description of the accreditation"
+        />
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={saveAccreditation}
+          className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
+          disabled={!accDraft.name.trim() || accBusy}
+        >
+          {editingIndex === null ? "+ Add Accreditation" : "Save changes"}
+        </button>
+        {editingIndex !== null && (
+          <button
+            type="button"
+            onClick={resetAcc}
+            className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Cancel
+          </button>
         )}
       </div>
+
+      {accError && (
+        <p className="mt-2 text-xs text-red-600">{accError}</p>
+      )}
+
+      {!value.accreditations?.length ? (
+        <p className="mt-3 text-sm text-gray-400">No accreditations yet.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {value.accreditations.map((a, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                {a.logo_url && (
+                  <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={a.logo_url}
+                      alt={a.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="truncate font-medium">{a.name}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => editAccreditation(i)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteAccreditation(i)}
+                  className="text-sm text-gray-500 hover:text-rose-600"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -1509,86 +1620,112 @@ function HoursSection({
   rows,
   onChange,
 }: {
-  rows: HourRow[];
-  onChange: (rows: HourRow[]) => void;
+  rows: Array<{ day: string; status: "Open" | "Closed"; start?: string; end?: string }>;
+  onChange: (rows: Array<{ day: string; status: "Open" | "Closed"; start?: string; end?: string }>) => void;
 }) {
-  function updateRow(
-    index: number,
-    patch: Partial<HourRow>
-  ) {
-    onChange(
-      rows.map((r, i) => (i === index ? { ...r, ...patch } : r))
-    );
-  }
+  const applyToAll = (index: number) => {
+    const src = rows[index];
+    const isClosed = src.status === "Closed";
 
-  function applyToAll(index: number) {
-    const base = rows[index];
-    onChange(
-      rows.map((r) => ({
-        ...r,
-        status: base.status,
-        start: base.start,
-        end: base.end,
-      }))
-    );
-  }
+    const next = rows.map((r) => ({
+      ...r,
+      status: src.status,
+      start: isClosed ? undefined : src.start || "00:00",
+      end: isClosed ? undefined : src.end || "00:00",
+    }));
+
+    onChange(next);
+  };
 
   return (
     <>
       <div className="text-lg font-semibold">Operating Hours</div>
+      <p className="mt-1 text-sm text-gray-500">
+        Set opening hours for each day. Use “Apply to all days” to quickly copy status and time.
+      </p>
+
       <div className="mt-3 space-y-3">
-        {rows.map((r, i) => (
-          <div
-            key={i}
-            className="rounded border p-3"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {/* Day – disabled input */}
-              <div>
-                <label className="text-[13px] text-gray-600">Day</label>
-                <input
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
-                  value={r.day}
-                  disabled
+        {rows.map((r, i) => {
+          const isClosed = r.status === "Closed";
+
+          return (
+            <div key={r.day} className="rounded border p-3">
+              <div className="grid grid-cols-1 md:grid-cols-[1.1fr,1.1fr,1fr,1fr] gap-3 items-end">
+                {/* Day (fixed, disabled) */}
+                <div>
+                  <label className="text-[13px] text-gray-600">Day</label>
+                  <input
+                    className="mt-1 w-full rounded-md border bg-gray-50 px-3 py-2 text-sm text-gray-500"
+                    value={r.day}
+                    disabled
+                  />
+                </div>
+
+                {/* Status */}
+                <Select
+                  label="Status"
+                  value={r.status}
+                  onChange={(v) => {
+                    const status = v as "Open" | "Closed";
+                    const next = rows.map((x, idx) =>
+                      idx === i
+                        ? {
+                            ...x,
+                            status,
+                            start: status === "Closed" ? undefined : x.start || "00:00",
+                            end: status === "Closed" ? undefined : x.end || "00:00",
+                          }
+                        : x
+                    );
+                    onChange(next);
+                  }}
+                  options={[
+                    { value: "Open", label: "Open" },
+                    { value: "Closed", label: "Closed" },
+                  ]}
+                />
+
+                {/* Start time */}
+                <Field
+                  label="Start Time"
+                  type="time"
+                  value={isClosed ? "" : (r.start || "")}
+                  onChange={(v) => {
+                    const next = rows.map((x, idx) =>
+                      idx === i ? { ...x, start: v } : x
+                    );
+                    onChange(next);
+                  }}
+                  className={isClosed ? "opacity-60" : ""}
+                />
+
+                {/* End time */}
+                <Field
+                  label="End Time"
+                  type="time"
+                  value={isClosed ? "" : (r.end || "")}
+                  onChange={(v) => {
+                    const next = rows.map((x, idx) =>
+                      idx === i ? { ...x, end: v } : x
+                    );
+                    onChange(next);
+                  }}
+                  className={isClosed ? "opacity-60" : ""}
                 />
               </div>
-              <Select
-                label="Status"
-                value={r.status}
-                onChange={(v) =>
-                  updateRow(i, {
-                    status: v as "Open" | "Closed",
-                  })
-                }
-                options={[
-                  { value: "Open", label: "Open" },
-                  { value: "Closed", label: "Closed" },
-                ]}
-              />
-              <Field
-                label="Start Time"
-                type="time"
-                value={r.start || ""}
-                onChange={(v) => updateRow(i, { start: v })}
-              />
-              <Field
-                label="End Time"
-                type="time"
-                value={r.end || ""}
-                onChange={(v) => updateRow(i, { end: v })}
-              />
+
+              <div className="mt-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => applyToAll(i)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Apply to all days
+                </button>
+              </div>
             </div>
-            <div className="mt-2 text-right">
-              <button
-                type="button"
-                onClick={() => applyToAll(i)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Apply to all days
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -1600,94 +1737,117 @@ function GallerySection({
   rows,
   onChange,
 }: {
-  rows: GalleryItem[];
-  onChange: (rows: GalleryItem[]) => void;
+  rows: Array<{ url: string; title?: string }>;
+  onChange: (rows: Array<{ url: string; title?: string }>) => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  const MAX_IMAGES = 10;
+  const MAX_MB = 20;
+  const MAX_BYTES = MAX_MB * 1024 * 1024;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
+
     if (!files.length) return;
+
+    const remaining = MAX_IMAGES - rows.length;
+    if (remaining <= 0) {
+      setError(`You can upload up to ${MAX_IMAGES} images.`);
+      return;
+    }
+
+    const allowed = files.slice(0, remaining);
+    const tooBig = allowed.filter((f) => f.size > MAX_BYTES);
+
+    if (tooBig.length) {
+      setError(`Some files are too large. Max size is ${MAX_MB} MB per image.`);
+      return;
+    }
+
+    setError(null);
     setUploading(true);
+
     try {
-      const urls = await uploadGallery(files);
-      const toAdd = urls.map((u) => ({ url: u, title: "" }));
-      onChange([...rows, ...toAdd]);
-    } catch (err) {
-      console.error(err);
+      const urls = await uploadGallery(allowed);
+      const next = [
+        ...rows,
+        ...urls.map((url, idx) => ({
+          url,
+          title: `Image ${rows.length + idx + 1}`,
+        })),
+      ];
+      onChange(next);
+    } catch (e: any) {
+      console.error(e);
+      setError("Failed to upload images. Please try again.");
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
-  }
+  };
 
-  function updateTitle(index: number, title: string) {
-    onChange(
-      rows.map((r, i) => (i === index ? { ...r, title } : r))
-    );
-  }
+  const handleDelete = (index: number) => {
+    onChange(rows.filter((_, i) => i !== index));
+  };
 
   return (
     <>
       <div className="text-lg font-semibold">Gallery</div>
+      <p className="mt-1 text-sm text-gray-500">
+        Upload up to {MAX_IMAGES} images. Max size {MAX_MB} MB per image.
+      </p>
 
-      <div className="rounded-md border p-4 space-y-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
-            disabled={uploading}
-          >
-            {uploading ? "Uploading…" : "⬆ Upload Images"}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleUpload}
-          />
-          <span className="text-xs text-gray-500">
-            You can upload multiple images at once. One slot per image.
-          </span>
-        </div>
+      <div className="mt-3">
+        <input
+          id="galleryUpload"
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleUpload}
+        />
+        <label
+          htmlFor="galleryUpload"
+          className={clsx(
+            "inline-flex items-center rounded-md border px-3 py-2 text-sm cursor-pointer",
+            "bg-white hover:bg-gray-50",
+            uploading && "opacity-60 cursor-default"
+          )}
+        >
+          {uploading ? "Uploading…" : "⬆ Upload images"}
+        </label>
       </div>
+
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
 
       {!rows.length ? (
         <p className="mt-3 text-sm text-gray-400">No images yet.</p>
       ) : (
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((g, i) => (
-            <div
-              key={i}
-              className="rounded-lg border overflow-hidden flex flex-col"
-            >
+            <div key={i} className="rounded-lg border overflow-hidden">
               <div className="aspect-[4/3] bg-gray-100">
                 {g.url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={g.url}
                     alt={g.title || `Image ${i + 1}`}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 )}
               </div>
-              <div className="p-2 border-t flex items-center gap-2">
-                <input
-                  className="flex-1 rounded-md border px-2 py-1 text-xs outline-none focus:border-blue-500"
-                  value={g.title || ""}
-                  onChange={(e) => updateTitle(i, e.target.value)}
-                  placeholder="Image title (optional)"
-                />
+              <div className="flex items-center justify-between px-3 py-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm text-gray-700">
+                    {g.title || `Image ${i + 1}`}
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    onChange(rows.filter((_, idx) => idx !== i))
-                  }
-                  className="text-xs text-gray-500 hover:text-rose-600"
+                  onClick={() => handleDelete(i)}
+                  className="text-sm text-gray-500 hover:text-rose-600"
                 >
                   Delete
                 </button>
