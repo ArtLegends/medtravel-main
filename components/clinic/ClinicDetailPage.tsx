@@ -11,6 +11,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/browserClient';
 import { clinicPath } from '@/lib/clinic-url'
 import { clinicHref } from '@/lib/clinic-url';
+import { Icon } from '@iconify/react';
+import { AMENITY_ICON_MAP } from '@/lib/amenityIcons';
 
 type Props = { clinic: Clinic };
 
@@ -41,54 +43,17 @@ function normalizeAmenityArray(raw: any): AmenityItem[] {
     .filter(Boolean) as AmenityItem[];
 }
 
-const iconMap: Record<string, JSX.Element> = {
-  check: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      ✓
-    </span>
-  ),
-  bed: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      B
-    </span>
-  ),
-  tooth: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      T
-    </span>
-  ),
-  airplane: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      ✈
-    </span>
-  ),
-  car: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      🚗
-    </span>
-  ),
-  hotel: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      H
-    </span>
-  ),
-  language: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      🌐
-    </span>
-  ),
-  globe: (
-    <span className="inline-block h-5 w-5 rounded-full bg-emerald-100 text-emerald-600 text-[11px] leading-5 text-center">
-      G
-    </span>
-  ),
-};
-
 function AmenityPill({ item }: { item: AmenityItem }) {
-  const Icon = iconMap[item.icon || 'check'] ?? iconMap['check'];
+  const key = (item.icon || 'check') as keyof typeof AMENITY_ICON_MAP;
+  const def = AMENITY_ICON_MAP[key] ?? AMENITY_ICON_MAP.check;
+
   return (
     <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-      {Icon}
+      <Icon
+        icon={def.icon}
+        className="h-5 w-5 md:h-6 md:w-6 text-sky-600 flex-shrink-0"
+        aria-hidden="true"
+      />
       <span>{item.label}</span>
     </div>
   );

@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState, useRef } from 'react';
 import { uploadClinicImages } from './actions';
+import { Icon } from '@iconify/react';
+import { AMENITY_ICON_DEFS, AMENITY_ICON_MAP } from '@/lib/amenityIcons';
 
 type TabKey = 'basic' | 'services' | 'gallery' | 'location' | 'doctors' | 'additional';
 
@@ -382,18 +384,6 @@ function EmptyOrList<T>({
   );
 }
 
-const AMENITY_ICON_OPTIONS = [
-  { value: '',        label: 'No icon' },
-  { value: 'check', label: 'Check' },
-  { value: 'bed', label: 'Bed / room' },
-  { value: 'tooth', label: 'Tooth / dental' },
-  { value: 'airplane', label: 'Airplane / travel' },
-  { value: 'car', label: 'Car / transfer' },
-  { value: 'hotel', label: 'Hotel / stay' },
-  { value: 'language', label: 'Languages' },
-  { value: 'globe', label: 'Global / international' },
-];
-
 function AmenityGroup({
   label,
   items,
@@ -444,9 +434,9 @@ function AmenityGroup({
           onChange={(e) => setIcon(e.target.value)}
           className="rounded border border-slate-300 px-2 py-2 text-xs"
         >
-          {AMENITY_ICON_OPTIONS.map((opt) => (
+          {AMENITY_ICON_DEFS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.label}
+              {opt.value ? opt.label : 'No icon'}
             </option>
           ))}
         </select>
@@ -469,20 +459,28 @@ function AmenityGroup({
               className="flex items-center justify-between rounded-full bg-slate-100 px-3 py-1 text-xs"
             >
               <div className="flex items-center gap-2">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-600">
-                  {it.icon ? it.icon.slice(0, 2).toUpperCase() : '✓'}
-                </span>
+                {(() => {
+                  const key = (it.icon || 'check') as keyof typeof AMENITY_ICON_MAP;
+                  const def = AMENITY_ICON_MAP[key] ?? AMENITY_ICON_MAP.check;
+                  return (
+                    <Icon
+                      icon={def.icon}
+                      className="h-4 w-4 text-sky-600 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                  );
+                })()}
                 <span>{it.label}</span>
               </div>
               <div className="flex items-center gap-2">
                 <select
-                  value={it.icon || ''} // '' → “No icon”
+                  value={it.icon || ''}
                   onChange={(e) => changeIcon(i, e.target.value)}
                   className="rounded border border-slate-300 px-2 py-1 text-[11px]"
                 >
-                  {AMENITY_ICON_OPTIONS.map((opt) => (
+                  {AMENITY_ICON_DEFS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                      {opt.value ? opt.label : 'No icon'}
                     </option>
                   ))}
                 </select>
