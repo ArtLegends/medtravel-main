@@ -1207,8 +1207,14 @@ function IconPicker({
         <Icon icon={active.icon} className="h-4 w-4 text-sky-600" />
         <span className="text-[11px] text-gray-600">Icon</span>
       </button>
+
       {open && (
-        <div className="absolute z-20 mt-1 w-56 rounded-md border bg-white shadow-lg p-2 grid grid-cols-3 gap-1">
+        <div
+          className={clsx(
+            "absolute z-20 mt-1 w-56 max-w-[80vw] rounded-md border bg-white shadow-lg",
+            "right-0 p-2 grid grid-cols-3 gap-1"
+          )}
+        >
           <button
             type="button"
             onClick={() => {
@@ -1219,6 +1225,7 @@ function IconPicker({
           >
             <span>No icon</span>
           </button>
+
           {AMENITY_ICON_OPTIONS.map((opt) => (
             <button
               key={opt.value}

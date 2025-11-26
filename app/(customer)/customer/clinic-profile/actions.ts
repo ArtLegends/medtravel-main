@@ -253,17 +253,20 @@ async function uploadImagesInternal(files: File[], folder: string) {
       .toString(36)
       .slice(2)}.${ext}`;
 
+    // ВАЖНО: конвертим File -> ArrayBuffer, чтобы upload не падал на сервере
+    const buffer = await f.arrayBuffer();
+
     const { error: upErr } = await supa.storage
       .from("clinic-images")
-      .upload(key, f, {
+      .upload(key, buffer, {
         cacheControl: "31536000",
         upsert: false,
-        contentType: f.type || "image/*",
+        contentType: f.type || "application/octet-stream",
       });
 
     if (upErr) {
       console.error("Supabase upload error:", upErr);
-      throw upErr;
+      throw new Error(upErr.message || "Supabase upload error");
     }
 
     const { data: pub } = supa.storage.from("clinic-images").getPublicUrl(key);
