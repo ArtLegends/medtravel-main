@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useState,
   useTransition,
-  useRef,
 } from "react";
 import clsx from "clsx";
 import { Icon } from "@iconify/react";
@@ -41,14 +40,14 @@ type HourRow = {
   end?: string;
 };
 
-const DEFAULT_HOURS: Array<{ day: string; status: "Open" | "Closed"; start?: string; end?: string }> = [
-  { day: "Monday",    status: "Open",  start: "00:00", end: "00:00" },
-  { day: "Tuesday",   status: "Open",  start: "00:00", end: "00:00" },
-  { day: "Wednesday", status: "Open",  start: "00:00", end: "00:00" },
-  { day: "Thursday",  status: "Open",  start: "00:00", end: "00:00" },
-  { day: "Friday",    status: "Open",  start: "00:00", end: "00:00" },
-  { day: "Saturday",  status: "Closed" },
-  { day: "Sunday",    status: "Closed" },
+const DEFAULT_HOURS: HourRow[] = [
+  { day: "Monday", status: "Open", start: "00:00", end: "00:00" },
+  { day: "Tuesday", status: "Open", start: "00:00", end: "00:00" },
+  { day: "Wednesday", status: "Open", start: "00:00", end: "00:00" },
+  { day: "Thursday", status: "Open", start: "00:00", end: "00:00" },
+  { day: "Friday", status: "Open", start: "00:00", end: "00:00" },
+  { day: "Saturday", status: "Closed" },
+  { day: "Sunday", status: "Closed" },
 ];
 
 type ServiceRow = {
@@ -71,10 +70,10 @@ type AmenityItem = { label: string; icon?: string | null };
 type Accreditation = { name: string; logo_url?: string; description?: string };
 
 type FacilitiesState = {
-  premises: any[]; // strings или AmenityItem[]
-  clinic_services: any[];
-  travel_services: any[];
-  languages_spoken: any[];
+  premises: AmenityItem[];
+  clinic_services: AmenityItem[];
+  travel_services: AmenityItem[];
+  languages_spoken: AmenityItem[];
   accreditations: Accreditation[];
 };
 
@@ -107,7 +106,7 @@ export default function ClinicProfilePage() {
     languages_spoken: [],
     accreditations: [],
   });
-  const [hours, setHours] = useState(DEFAULT_HOURS);
+  const [hours, setHours] = useState<HourRow[]>(DEFAULT_HOURS);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [location, setLocation] = useState({ mapUrl: "", directions: "" });
   const [payments, setPayments] = useState<string[]>([]);
@@ -151,15 +150,26 @@ export default function ClinicProfilePage() {
               : [];
             setDoctors(docs);
 
-            setAdditional(
-              draft.facilities ?? {
-                premises: [],
-                clinic_services: [],
-                travel_services: [],
-                languages_spoken: [],
-                accreditations: [],
-              }
-            );
+            const fac = draft.facilities ?? {};
+            setAdditional({
+              premises: normalizeAmenityList(fac.premises),
+              clinic_services: normalizeAmenityList(fac.clinic_services),
+              travel_services: normalizeAmenityList(fac.travel_services),
+              languages_spoken: normalizeAmenityList(fac.languages_spoken),
+              accreditations: Array.isArray(fac.accreditations)
+                ? fac.accreditations
+                    .map((a: any): Accreditation | null => {
+                      const name = (a?.name ?? "").trim();
+                      if (!name) return null;
+                      return {
+                        name,
+                        logo_url: a?.logo_url ?? a?.logo ?? undefined,
+                        description: a?.description ?? "",
+                      };
+                    })
+                    .filter(Boolean) as Accreditation[]
+                : [],
+            });
 
             setHours(
               draft.hours && Array.isArray(draft.hours) && draft.hours.length
@@ -781,7 +791,10 @@ function ServicesSection({
 
   function handleSave() {
     if (!draft.name.trim()) return;
-    const next = { ...draft, currency: (draft.currency || "USD").toUpperCase() };
+    const next = {
+      ...draft,
+      currency: (draft.currency || "USD").toUpperCase(),
+    };
 
     if (editingIndex === null) {
       onChange([...rows, next]);
@@ -896,16 +909,10 @@ function DoctorsSection({
   rows,
   onChange,
 }: {
-  rows: Array<{ fullName: string; title?: string; specialty?: string; description?: string; photo?: string }>;
-  onChange: (rows: Array<{ fullName: string; title?: string; specialty?: string; description?: string; photo?: string }>) => void;
+  rows: DoctorRow[];
+  onChange: (rows: DoctorRow[]) => void;
 }) {
-  const [draft, setDraft] = useState<{
-    fullName: string;
-    title?: string;
-    specialty?: string;
-    description?: string;
-    photo?: string;
-  }>({
+  const [draft, setDraft] = useState<DoctorRow>({
     fullName: "",
     title: "",
     specialty: "",
@@ -922,7 +929,13 @@ function DoctorsSection({
   const MAX_BYTES = MAX_MB * 1024 * 1024;
 
   const startNew = () => {
-    setDraft({ fullName: "", title: "", specialty: "", description: "", photo: "" });
+    setDraft({
+      fullName: "",
+      title: "",
+      specialty: "",
+      description: "",
+      photo: "",
+    });
     setEditingIndex(null);
     setError(null);
   };
@@ -941,7 +954,9 @@ function DoctorsSection({
     setBusy(true);
     setError(null);
     try {
-      const url = await uploadDoctorImage(file);
+      const fd = new FormData();
+      fd.append("file", file);
+      const url = await uploadDoctorImage(fd);
       setDraft((d) => ({ ...d, photo: url }));
     } catch (e: any) {
       console.error(e);
@@ -954,7 +969,7 @@ function DoctorsSection({
   const handleSave = () => {
     if (!draft.fullName.trim()) return;
 
-    const normalized = {
+    const normalized: DoctorRow = {
       fullName: draft.fullName.trim(),
       title: draft.title?.trim() || "",
       specialty: draft.specialty?.trim() || "",
@@ -1189,10 +1204,7 @@ function IconPicker({
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-xs hover:bg-gray-50"
       >
-        <Icon
-          icon={active.icon}
-          className="h-4 w-4 text-sky-600"
-        />
+        <Icon icon={active.icon} className="h-4 w-4 text-sky-600" />
         <span className="text-[11px] text-gray-600">Icon</span>
       </button>
       {open && (
@@ -1220,10 +1232,7 @@ function IconPicker({
                 value === opt.value && "ring-2 ring-sky-500"
               )}
             >
-              <Icon
-                icon={opt.icon}
-                className="mb-1 h-5 w-5 text-sky-600"
-              />
+              <Icon icon={opt.icon} className="mb-1 h-5 w-5 text-sky-600" />
               <span className="text-center leading-tight">{opt.label}</span>
             </button>
           ))}
@@ -1279,29 +1288,31 @@ function AmenityGroupField({
         <p className="mt-1 text-xs text-gray-400">No items yet.</p>
       ) : (
         <div className="mt-2 flex flex-wrap gap-2">
-            {items.map((it, i) => {
-              const cfg = AMENITY_ICON_OPTIONS.find((o) => o.value === it.icon);
-              const iconName = cfg?.icon ?? AMENITY_ICON_OPTIONS[0].icon;
+          {items.map((it, i) => {
+            const cfg = AMENITY_ICON_OPTIONS.find(
+              (o) => o.value === it.icon
+            );
+            const iconName = cfg?.icon ?? AMENITY_ICON_OPTIONS[0].icon;
 
-              return (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-2 rounded-full bg-gray-50 border px-2 py-1 text-xs"
+            return (
+              <span
+                key={i}
+                className="inline-flex items-center gap-2 rounded-full bg-gray-50 border px-2 py-1 text-xs"
+              >
+                <Icon icon={iconName} className="h-4 w-4 text-sky-600" />
+                <span>{it.label}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange(items.filter((_, idx) => idx !== i))
+                  }
+                  className="text-gray-400 hover:text-rose-600"
                 >
-                  <Icon icon={iconName} className="h-4 w-4 text-sky-600" />
-                  <span>{it.label}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange(items.filter((_, idx) => idx !== i))
-                    }
-                    className="text-gray-400 hover:text-rose-600"
-                  >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
+                  ×
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1312,16 +1323,10 @@ function AdditionalSection({
   value,
   onChange,
 }: {
-  value: {
-    premises: string[];
-    clinic_services: string[];
-    travel_services: string[];
-    languages_spoken: string[];
-    accreditations: Array<{ name: string; logo_url?: string; description?: string }>;
-  };
-  onChange: (v: any) => void;
+  value: FacilitiesState;
+  onChange: (v: FacilitiesState) => void;
 }) {
-  const [accDraft, setAccDraft] = useState<{ name: string; logo_url?: string; description?: string }>({
+  const [accDraft, setAccDraft] = useState<Accreditation>({
     name: "",
     logo_url: "",
     description: "",
@@ -1349,7 +1354,9 @@ function AdditionalSection({
     setAccError(null);
 
     try {
-      const url = await uploadAccreditationLogo(file);
+      const fd = new FormData();
+      fd.append("file", file);
+      const url = await uploadAccreditationLogo(fd);
       setAccDraft((d) => ({ ...d, logo_url: url }));
     } catch (err) {
       console.error(err);
@@ -1368,7 +1375,7 @@ function AdditionalSection({
   const saveAccreditation = () => {
     if (!accDraft.name.trim()) return;
 
-    const normalized = {
+    const normalized: Accreditation = {
       name: accDraft.name.trim(),
       logo_url: accDraft.logo_url?.trim() || undefined,
       description: accDraft.description?.trim() || undefined,
@@ -1416,76 +1423,41 @@ function AdditionalSection({
     <>
       <div className="text-lg font-semibold">Additional Services & Facilities</div>
 
-      <TagInput
+      <AmenityGroupField
         label="Premises"
-        values={value.premises}
-        onAdd={(v) => onChange({ ...value, premises: [...value.premises, v] })}
-        onRemove={(i) =>
-          onChange({
-            ...value,
-            premises: value.premises.filter((_, idx) => idx !== i),
-          })
-        }
         placeholder="Operating rooms, recovery rooms, etc."
+        items={value.premises}
+        onChange={(items) => onChange({ ...value, premises: items })}
       />
       <div className="h-2" />
 
-      <TagInput
+      <AmenityGroupField
         label="Clinic Services"
-        values={value.clinic_services}
-        onAdd={(v) =>
-          onChange({
-            ...value,
-            clinic_services: [...value.clinic_services, v],
-          })
-        }
-        onRemove={(i) =>
-          onChange({
-            ...value,
-            clinic_services: value.clinic_services.filter((_, idx) => idx !== i),
-          })
-        }
         placeholder="Consultation, diagnosis, treatment, etc."
+        items={value.clinic_services}
+        onChange={(items) =>
+          onChange({ ...value, clinic_services: items })
+        }
       />
       <div className="h-2" />
 
-      <TagInput
+      <AmenityGroupField
         label="Travel Services"
-        values={value.travel_services}
-        onAdd={(v) =>
-          onChange({
-            ...value,
-            travel_services: [...value.travel_services, v],
-          })
-        }
-        onRemove={(i) =>
-          onChange({
-            ...value,
-            travel_services: value.travel_services.filter((_, idx) => idx !== i),
-          })
-        }
         placeholder="Airport pickup, accommodation, etc."
+        items={value.travel_services}
+        onChange={(items) =>
+          onChange({ ...value, travel_services: items })
+        }
       />
       <div className="h-2" />
 
-      <TagInput
+      <AmenityGroupField
         label="Languages Spoken"
-        values={value.languages_spoken}
-        onAdd={(v) =>
-          onChange({
-            ...value,
-            languages_spoken: [...value.languages_spoken, v],
-          })
-        }
-        onRemove={(i) =>
-          onChange({
-            ...value,
-            languages_spoken: value.languages_spoken.filter(
-              (_, idx) => idx !== i
-            ),
-          })
-        }
         placeholder="English, Spanish, French, etc."
+        items={value.languages_spoken}
+        onChange={(items) =>
+          onChange({ ...value, languages_spoken: items })
+        }
       />
 
       {/* Accreditations */}
@@ -1620,8 +1592,8 @@ function HoursSection({
   rows,
   onChange,
 }: {
-  rows: Array<{ day: string; status: "Open" | "Closed"; start?: string; end?: string }>;
-  onChange: (rows: Array<{ day: string; status: "Open" | "Closed"; start?: string; end?: string }>) => void;
+  rows: HourRow[];
+  onChange: (rows: HourRow[]) => void;
 }) {
   const applyToAll = (index: number) => {
     const src = rows[index];
@@ -1672,8 +1644,14 @@ function HoursSection({
                         ? {
                             ...x,
                             status,
-                            start: status === "Closed" ? undefined : x.start || "00:00",
-                            end: status === "Closed" ? undefined : x.end || "00:00",
+                            start:
+                              status === "Closed"
+                                ? undefined
+                                : x.start || "00:00",
+                            end:
+                              status === "Closed"
+                                ? undefined
+                                : x.end || "00:00",
                           }
                         : x
                     );
@@ -1689,7 +1667,7 @@ function HoursSection({
                 <Field
                   label="Start Time"
                   type="time"
-                  value={isClosed ? "" : (r.start || "")}
+                  value={isClosed ? "" : r.start || ""}
                   onChange={(v) => {
                     const next = rows.map((x, idx) =>
                       idx === i ? { ...x, start: v } : x
@@ -1703,7 +1681,7 @@ function HoursSection({
                 <Field
                   label="End Time"
                   type="time"
-                  value={isClosed ? "" : (r.end || "")}
+                  value={isClosed ? "" : r.end || ""}
                   onChange={(v) => {
                     const next = rows.map((x, idx) =>
                       idx === i ? { ...x, end: v } : x
@@ -1737,8 +1715,8 @@ function GallerySection({
   rows,
   onChange,
 }: {
-  rows: Array<{ url: string; title?: string }>;
-  onChange: (rows: Array<{ url: string; title?: string }>) => void;
+  rows: GalleryItem[];
+  onChange: (rows: GalleryItem[]) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1771,7 +1749,9 @@ function GallerySection({
     setUploading(true);
 
     try {
-      const urls = await uploadGallery(allowed);
+      const fd = new FormData();
+      allowed.forEach((f) => fd.append("files", f));
+      const urls = await uploadGallery(fd);
       const next = [
         ...rows,
         ...urls.map((url, idx) => ({

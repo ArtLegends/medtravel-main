@@ -226,6 +226,8 @@ export async function publishClinic(clinicId: string) {
   if (error) throw error;
 }
 
+/* -------------------- Upload helpers -------------------- */
+
 const MAX_IMAGE_SIZE_MB = 20;
 const MAX_IMAGE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 
@@ -259,11 +261,12 @@ async function uploadImagesInternal(files: File[], folder: string) {
         contentType: f.type || "image/*",
       });
 
-    if (upErr) throw upErr;
+    if (upErr) {
+      console.error("Supabase upload error:", upErr);
+      throw upErr;
+    }
 
-    const { data: pub } = supa.storage
-      .from("clinic-images")
-      .getPublicUrl(key);
+    const { data: pub } = supa.storage.from("clinic-images").getPublicUrl(key);
     urls.push(pub.publicUrl);
   }
 
@@ -271,27 +274,37 @@ async function uploadImagesInternal(files: File[], folder: string) {
 }
 
 /**
- * Галерея клиники – можно загружать сразу несколько файлов.
- * Лимиты по количеству обрабатываются на клиенте.
+ * Галерея клиники – вызывается с FormData, в котором несколько файлов под ключом "files".
  */
-export async function uploadGallery(files: File[]) {
+export async function uploadGallery(formData: FormData) {
+  const files = formData.getAll("files") as File[];
+  if (!files.length) {
+    throw new Error("No files provided");
+  }
   return uploadImagesInternal(files, "gallery");
 }
 
-/** Фото доктора – одно изображение */
-export async function uploadDoctorImage(file: File) {
+/** Фото доктора – одно изображение (FormData, ключ "file") */
+export async function uploadDoctorImage(formData: FormData) {
+  const file = formData.get("file") as File | null;
+  if (!file) {
+    throw new Error("No file provided");
+  }
   const [url] = await uploadImagesInternal([file], "staff");
   return url;
 }
 
-/** Лого аккредитации – одно изображение */
-export async function uploadAccreditationLogo(file: File) {
+/** Лого аккредитации – одно изображение (FormData, ключ "file") */
+export async function uploadAccreditationLogo(formData: FormData) {
+  const file = formData.get("file") as File | null;
+  if (!file) {
+    throw new Error("No file provided");
+  }
   const [url] = await uploadImagesInternal([file], "accreditations");
   return url;
 }
 
-// copyImageFromUrl оставляем как было, но чуть подчищу:
-
+// copyImageFromUrl оставляем почти как было
 export async function copyImageFromUrl(url: string) {
   const supa = await getSupa();
   await supa.auth.getUser();
@@ -304,10 +317,13 @@ export async function copyImageFromUrl(url: string) {
   const contentType = res.headers.get("content-type") || "image/jpeg";
 
   const ext =
-    contentType.includes("png") ? "png" :
-    contentType.includes("webp") ? "webp" :
-    contentType.includes("gif") ? "gif" :
-    "jpg";
+    contentType.includes("png")
+      ? "png"
+      : contentType.includes("webp")
+      ? "webp"
+      : contentType.includes("gif")
+      ? "gif"
+      : "jpg";
 
   const key = `u/staff/${Date.now()}-${Math.random()
     .toString(36)
@@ -323,11 +339,12 @@ export async function copyImageFromUrl(url: string) {
       contentType,
     });
 
-  if (upErr) throw upErr;
+  if (upErr) {
+    console.error("Supabase upload from URL error:", upErr);
+    throw upErr;
+  }
 
-  const { data: pub } = supa.storage
-    .from("clinic-images")
-    .getPublicUrl(key);
+  const { data: pub } = supa.storage.from("clinic-images").getPublicUrl(key);
 
   return pub.publicUrl;
 }
