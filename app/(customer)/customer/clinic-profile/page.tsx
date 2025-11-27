@@ -23,15 +23,23 @@ type SectionKey =
   | "basic"
   | "services"
   | "doctors"
+  | "accreditations"
   | "additional"
   | "hours"
   | "gallery"
   | "location"
   | "payments";
 
-type SectionStatus = "Required" | "Complete" | "Empty";
+  type SectionStatus = "Required" | "Optional" | "Complete";
 
-const REQUIRED: SectionKey[] = ["basic", "services", "doctors", "location"];
+  const REQUIRED: SectionKey[] = [
+    "basic",
+    "services",
+    "doctors",
+    "accreditations",
+    "hours",
+    "location",
+  ];
 
 type HourRow = {
   day: string;
@@ -41,11 +49,11 @@ type HourRow = {
 };
 
 const DEFAULT_HOURS: HourRow[] = [
-  { day: "Monday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Tuesday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Wednesday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Thursday", status: "Open", start: "00:00", end: "00:00" },
-  { day: "Friday", status: "Open", start: "00:00", end: "00:00" },
+  { day: "Monday", status: "Open" },
+  { day: "Tuesday", status: "Open" },
+  { day: "Wednesday", status: "Open" },
+  { day: "Thursday", status: "Open" },
+  { day: "Friday", status: "Open" },
   { day: "Saturday", status: "Closed" },
   { day: "Sunday", status: "Closed" },
 ];
@@ -113,6 +121,12 @@ export default function ClinicProfilePage() {
 
   const [cats, setCats] = useState<Array<{ id: number; name: string; slug: string }>>([]);
 
+  const [clinicMeta, setClinicMeta] = useState<{
+    is_published: boolean;
+    moderation_status: string | null;
+    status: string | null;
+  } | null>(null);
+
   // загрузка драфта
   useEffect(() => {
     startTransition(async () => {
@@ -123,7 +137,18 @@ export default function ClinicProfilePage() {
         ]);
 
         if (draftRes.status === "fulfilled") {
-          const draft = draftRes.value?.draft;
+          const res = draftRes.value;
+          const draft = res?.draft;
+          const clinic = res?.clinic;
+        
+          if (clinic) {
+            setClinicMeta({
+              is_published: !!clinic.is_published,
+              moderation_status: clinic.moderation_status ?? null,
+              status: clinic.status ?? null,
+            });
+          }
+        
           if (draft) {
             setBasic((p) =>
               draft.basic_info ? { ...p, ...draft.basic_info } : p
@@ -210,40 +235,45 @@ export default function ClinicProfilePage() {
       basic.country.trim() &&
       basic.city.trim() &&
       basic.address.trim();
-
+  
     const servicesOk =
       services.length > 0 && services.every((s) => s.name.trim());
+  
     const doctorsOk =
       doctors.length > 0 && doctors.every((d) => d.fullName.trim());
-    const locationOk = Boolean(
-      location.mapUrl.trim() ||
-        (basic.country && basic.city && basic.address)
+  
+    // Location: оба поля обязательны
+    const locationOk =
+      location.mapUrl.trim().length > 0 &&
+      location.directions.trim().length > 0;
+  
+    const accreditationsOk =
+      (additional.accreditations?.length ?? 0) > 0;
+  
+    const additionalFilled =
+      (additional.premises?.length ?? 0) ||
+      (additional.clinic_services?.length ?? 0) ||
+      (additional.travel_services?.length ?? 0) ||
+      (additional.languages_spoken?.length ?? 0);
+  
+    // Hours: для всех дней, где статус Open, должны быть start и end
+    const hoursOk = hours.every((h) =>
+      h.status === "Closed" ? true : Boolean(h.start && h.end)
     );
-
+  
+    const galleryOk = gallery.length > 0;
+    const paymentsOk = payments.length > 0;
+  
     return {
       basic: basicOk ? "Complete" : "Required",
-      services: servicesOk
-        ? "Complete"
-        : services.length
-        ? "Empty"
-        : "Required",
-      doctors: doctorsOk
-        ? "Complete"
-        : doctors.length
-        ? "Empty"
-        : "Required",
+      services: servicesOk ? "Complete" : "Required",
+      doctors: doctorsOk ? "Complete" : "Required",
+      accreditations: accreditationsOk ? "Complete" : "Required",
       location: locationOk ? "Complete" : "Required",
-      additional:
-        (additional.premises?.length ?? 0) ||
-        (additional.clinic_services?.length ?? 0) ||
-        (additional.travel_services?.length ?? 0) ||
-        (additional.languages_spoken?.length ?? 0) ||
-        (additional.accreditations?.length ?? 0)
-          ? "Complete"
-          : "Empty",
-      hours: hours.some((h) => h.status === "Open") ? "Complete" : "Empty",
-      gallery: gallery.length ? "Complete" : "Empty",
-      payments: payments.length ? "Complete" : "Empty",
+      hours: hoursOk ? "Complete" : "Required",
+      additional: additionalFilled ? "Complete" : "Optional",
+      gallery: galleryOk ? "Complete" : "Optional",
+      payments: paymentsOk ? "Complete" : "Optional",
     };
   }, [basic, services, doctors, location, additional, hours, gallery, payments]);
 
@@ -252,13 +282,35 @@ export default function ClinicProfilePage() {
       .length;
     return Math.round((done / REQUIRED.length) * 100);
   }, [sectionStatuses]);
+  
+  const publishDisabled = REQUIRED.some(
+    (key) => sectionStatuses[key] !== "Complete"
+  );
 
-  const publishDisabled = completion < 100;
+  const statusLabel = useMemo(() => {
+    if (!clinicMeta) return "Draft";
+    if (clinicMeta.is_published) return "Published";
+    if (clinicMeta.moderation_status === "pending") return "Pending review";
+    return "Draft";
+  }, [clinicMeta]);
+  
+  const statusClass =
+    statusLabel === "Published"
+      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+      : statusLabel === "Pending review"
+      ? "bg-amber-50 text-amber-800 border border-amber-100"
+      : "bg-gray-100 text-gray-700 border border-gray-200";
+  
+  const isPublished = !!clinicMeta?.is_published;
+  
+  const sidebarPrimaryLabel = isPublished ? "Update Clinic" : "Publish Clinic";
+  const submitButtonLabel = isPublished ? "Update Clinic" : "Submit for Review";
 
   const sections: { key: SectionKey; label: string }[] = [
     { key: "basic", label: "Basic Information" },
     { key: "services", label: "Services" },
     { key: "doctors", label: "Doctors" },
+    { key: "accreditations", label: "Accreditations" },
     { key: "additional", label: "Additional Services" },
     { key: "hours", label: "Operating Hours" },
     { key: "gallery", label: "Gallery" },
@@ -275,8 +327,13 @@ export default function ClinicProfilePage() {
         <div className="space-y-4">
           <Card className="p-4">
             <div className="text-sm text-gray-500 mb-2">Status</div>
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-              Draft
+            <span
+              className={clsx(
+                "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium",
+                statusClass
+              )}
+            >
+              {statusLabel}
             </span>
           </Card>
 
@@ -317,8 +374,15 @@ export default function ClinicProfilePage() {
                   : "bg-blue-600 hover:bg-blue-700"
               )}
             >
-              {isPending ? "Publishing..." : "Publish Clinic"}
+              {isPending
+                ? isPublished
+                  ? "Updating..."
+                  : "Publishing..."
+                : sidebarPrimaryLabel}
             </button>
+            <p className="text-xs text-gray-500">
+              Complete all required sections to enable publishing or updating
+            </p>
             <p className="text-xs text-gray-500">
               Complete all sections to enable publishing
             </p>
@@ -347,21 +411,13 @@ export default function ClinicProfilePage() {
                     >
                       {s.label}
                     </span>
-                    {REQUIRED.includes(s.key) && (
-                      <span className="text-[11px] text-rose-600/80">
-                        • required
-                      </span>
-                    )}
                   </div>
                   <span
                     className={clsx(
                       "text-xs px-2 py-1 rounded-full",
-                      state === "Required" &&
-                        "bg-rose-50 text-rose-600",
-                      state === "Complete" &&
-                        "bg-emerald-50 text-emerald-600",
-                      state === "Empty" &&
-                        "bg-gray-100 text-gray-700"
+                      state === "Required" && "bg-rose-50 text-rose-600",
+                      state === "Complete" && "bg-emerald-50 text-emerald-600",
+                      state === "Optional" && "bg-gray-100 text-gray-700"
                     )}
                   >
                     {state}
@@ -388,9 +444,15 @@ export default function ClinicProfilePage() {
           )}
 
           {active === "doctors" && (
-            <DoctorsSection
-              rows={doctors}
-              onChange={setDoctors}
+            <DoctorsSection rows={doctors} onChange={setDoctors} />
+          )}
+
+          {active === "accreditations" && (
+            <AccreditationsSection
+              value={additional.accreditations}
+              onChange={(next) =>
+                setAdditional((prev) => ({ ...prev, accreditations: next }))
+              }
             />
           )}
 
@@ -469,7 +531,11 @@ export default function ClinicProfilePage() {
               className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"
               disabled={publishDisabled || isPending}
             >
-              {isPending ? "Submitting..." : "Submit for Review"}
+              {isPending
+                ? isPublished
+                  ? "Updating..."
+                  : "Submitting..."
+                : submitButtonLabel}
             </button>
           </div>
         </Card>
@@ -1326,12 +1392,12 @@ function AmenityGroupField({
   );
 }
 
-function AdditionalSection({
+function AccreditationsSection({
   value,
   onChange,
 }: {
-  value: FacilitiesState;
-  onChange: (v: FacilitiesState) => void;
+  value: Accreditation[];
+  onChange: (v: Accreditation[]) => void;
 }) {
   const [accDraft, setAccDraft] = useState<Accreditation>({
     name: "",
@@ -1389,24 +1455,18 @@ function AdditionalSection({
     };
 
     if (editingIndex === null) {
-      onChange({
-        ...value,
-        accreditations: [...(value.accreditations || []), normalized],
-      });
+      onChange([...(value || []), normalized]);
     } else {
-      onChange({
-        ...value,
-        accreditations: value.accreditations.map((a, i) =>
-          i === editingIndex ? normalized : a
-        ),
-      });
+      onChange(
+        value.map((a, i) => (i === editingIndex ? normalized : a))
+      );
     }
 
     resetAcc();
   };
 
   const editAccreditation = (index: number) => {
-    const a = value.accreditations[index];
+    const a = value[index];
     setAccDraft({
       name: a.name,
       logo_url: a.logo_url || "",
@@ -1417,10 +1477,7 @@ function AdditionalSection({
   };
 
   const deleteAccreditation = (index: number) => {
-    onChange({
-      ...value,
-      accreditations: value.accreditations.filter((_, i) => i !== index),
-    });
+    onChange(value.filter((_, i) => i !== index));
     if (editingIndex === index) {
       resetAcc();
     }
@@ -1428,48 +1485,7 @@ function AdditionalSection({
 
   return (
     <>
-      <div className="text-lg font-semibold">Additional Services & Facilities</div>
-
-      <AmenityGroupField
-        label="Premises"
-        placeholder="Operating rooms, recovery rooms, etc."
-        items={value.premises}
-        onChange={(items) => onChange({ ...value, premises: items })}
-      />
-      <div className="h-2" />
-
-      <AmenityGroupField
-        label="Clinic Services"
-        placeholder="Consultation, diagnosis, treatment, etc."
-        items={value.clinic_services}
-        onChange={(items) =>
-          onChange({ ...value, clinic_services: items })
-        }
-      />
-      <div className="h-2" />
-
-      <AmenityGroupField
-        label="Travel Services"
-        placeholder="Airport pickup, accommodation, etc."
-        items={value.travel_services}
-        onChange={(items) =>
-          onChange({ ...value, travel_services: items })
-        }
-      />
-      <div className="h-2" />
-
-      <AmenityGroupField
-        label="Languages Spoken"
-        placeholder="English, Spanish, French, etc."
-        items={value.languages_spoken}
-        onChange={(items) =>
-          onChange({ ...value, languages_spoken: items })
-        }
-      />
-
-      {/* Accreditations */}
-      <div className="h-4" />
-      <div className="text-base font-medium">Accreditations</div>
+      <div className="text-lg font-semibold">Accreditations</div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field
@@ -1518,7 +1534,9 @@ function AdditionalSection({
           className="md:col-span-2"
           label="Description"
           value={accDraft.description || ""}
-          onChange={(v) => setAccDraft((a) => ({ ...a, description: v }))}
+          onChange={(v) =>
+            setAccDraft((a) => ({ ...a, description: v }))
+          }
           placeholder="Brief description of the accreditation"
         />
       </div>
@@ -1547,11 +1565,11 @@ function AdditionalSection({
         <p className="mt-2 text-xs text-red-600">{accError}</p>
       )}
 
-      {!value.accreditations?.length ? (
+      {!value?.length ? (
         <p className="mt-3 text-sm text-gray-400">No accreditations yet.</p>
       ) : (
         <div className="mt-3 space-y-2">
-          {value.accreditations.map((a, i) => (
+          {value.map((a, i) => (
             <div
               key={i}
               className="flex items-center justify-between rounded border px-3 py-2 text-sm"
@@ -1589,6 +1607,59 @@ function AdditionalSection({
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+function AdditionalSection({
+  value,
+  onChange,
+}: {
+  value: FacilitiesState;
+  onChange: (v: FacilitiesState) => void;
+}) {
+  return (
+    <>
+      <div className="text-lg font-semibold">
+        Additional Services & Facilities
+      </div>
+
+      <AmenityGroupField
+        label="Premises"
+        placeholder="Operating rooms, recovery rooms, etc."
+        items={value.premises}
+        onChange={(items) => onChange({ ...value, premises: items })}
+      />
+      <div className="h-2" />
+
+      <AmenityGroupField
+        label="Clinic Services"
+        placeholder="Consultation, diagnosis, treatment, etc."
+        items={value.clinic_services}
+        onChange={(items) =>
+          onChange({ ...value, clinic_services: items })
+        }
+      />
+      <div className="h-2" />
+
+      <AmenityGroupField
+        label="Travel Services"
+        placeholder="Airport pickup, accommodation, etc."
+        items={value.travel_services}
+        onChange={(items) =>
+          onChange({ ...value, travel_services: items })
+        }
+      />
+      <div className="h-2" />
+
+      <AmenityGroupField
+        label="Languages Spoken"
+        placeholder="English, Spanish, French, etc."
+        items={value.languages_spoken}
+        onChange={(items) =>
+          onChange({ ...value, languages_spoken: items })
+        }
+      />
     </>
   );
 }
@@ -1891,7 +1962,7 @@ function PaymentsSection({
       <div className="text-lg font-semibold">Payment Methods</div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field
-          label="Payment Method *"
+          label="Payment Method"
           value={draft}
           onChange={setDraft}
           placeholder="e.g., Visa, Cash, Insurance"
