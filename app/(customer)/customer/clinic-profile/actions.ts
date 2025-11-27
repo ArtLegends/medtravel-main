@@ -195,7 +195,7 @@ export async function submitForReview() {
   let slug = slugify(basic.slug || basic.name || "");
   if (!slug) slug = `clinic-${Math.random().toString(36).slice(2, 8)}`;
 
-  // 2) формируем апдейт для clinics (то, что лежит прямо в таблице clinics)
+  // 2) формируем апдейт для clinics
   const clinicUpdate: Record<string, unknown> = {
     name: safe(basic.name),
     slug,
@@ -204,13 +204,13 @@ export async function submitForReview() {
     city: safe(basic.city),
     province: safe(basic.province),
     district: safe(basic.district),
-    about, // текст
-    amenities, // jsonb
+    about,
+    amenities,
     map_embed_url,
-    payments, // jsonb [{method:"..."}] или null
+    payments,
   };
 
-  // Если клиника ЕЩЁ НЕ опубликована – это запрос на модерацию
+  // если клиника ещё НЕ опубликована – это первый сабмит на модерацию
   if (!alreadyPublished) {
     clinicUpdate.moderation_status = "pending";
     clinicUpdate.is_published = false;
@@ -223,12 +223,11 @@ export async function submitForReview() {
     .from("clinics")
     .update(clinicUpdate)
     .eq("id", clinicId);
-
   if (uErr) throw uErr;
 
   // 3) статус черновика:
   //    - до первой публикации: pending (для модератора)
-  //    - после публикации: editing, без повторной модерации
+  //    - после публикации: editing (без повторной модерации)
   const draftStatus = alreadyPublished ? "editing" : "pending";
 
   const { error: e1 } = await admin
@@ -238,17 +237,9 @@ export async function submitForReview() {
       updated_at: new Date().toISOString(),
     })
     .eq("clinic_id", clinicId);
-
   if (e1) throw e1;
 
-  // 4) если клиника уже опубликована — сразу же полностью обновляем все
-  //    связанные таблицы из драфта (услуги, доктора, часы, галерея, аккредитации и т.п.)
-  if (alreadyPublished) {
-    const { error: rpcErr } = await admin.rpc("publish_clinic_from_draft", {
-      p_clinic_id: clinicId,
-    });
-    if (rpcErr) throw rpcErr;
-  }
+  // БЕЗ rpc("publish_clinic_from_draft") — иначе 500 на повторном вызове
 
   return { ok: true, alreadyPublished };
 }
