@@ -225,6 +225,13 @@ export async function submitForReview() {
     .eq("id", clinicId);
   if (uErr) throw uErr;
 
+  // синхронизируем связанные таблицы (услуги, доктора, часы, галерея, аккредитации, категории)
+  const { error: syncErr } = await admin.rpc(
+    "sync_clinic_relations_from_draft",
+    { p_clinic_id: clinicId }
+  );
+  if (syncErr) throw syncErr;
+
   // 3) статус черновика:
   //    - до первой публикации: pending (для модератора)
   //    - после публикации: editing (без повторной модерации)
@@ -422,4 +429,12 @@ export async function saveDraftWhole(payload: {
   if (upErr) throw upErr;
 
   return { ok: true };
+}
+
+export async function syncClinicRelationsFromDraft(clinicId: string) {
+  const supabase = await createServerClient();
+  const { error } = await supabase.rpc("sync_clinic_relations_from_draft", {
+    p_clinic_id: clinicId,
+  });
+  if (error) throw error;
 }
