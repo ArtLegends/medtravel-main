@@ -110,10 +110,21 @@ export async function saveDraftSection(
   return { ok: true };
 }
 
-/** Отправить на ревью */
+/** Отправить на ревью / обновить опубликованную клинику */
 export async function submitForReview() {
   const clinicId = await ensureClinicForOwner();
   const admin = await getSupa();
+
+  // 0) тянем саму клинику, чтобы понять опубликована она или нет
+  const { data: clinic, error: cErr } = await admin
+    .from("clinics")
+    .select("id, is_published, moderation_status, status")
+    .eq("id", clinicId)
+    .maybeSingle();
+
+  if (cErr) throw cErr;
+
+  const alreadyPublished = !!clinic?.is_published;
 
   // 1) тянем черновик
   const { data: draft, error: dErr } = await admin
@@ -174,38 +185,51 @@ export async function submitForReview() {
   let slug = slugify(basic.slug || basic.name || "");
   if (!slug) slug = `clinic-${Math.random().toString(36).slice(2, 8)}`;
 
-  // 2) обновляем клинику для модерации и предпросмотра
+  // 2) формируем апдейт для clinics
+  const clinicUpdate: Record<string, unknown> = {
+    name: safe(basic.name),
+    slug,
+    address: safe(basic.address),
+    country: safe(basic.country),
+    city: safe(basic.city),
+    province: safe(basic.province),
+    district: safe(basic.district),
+    about,        // текст
+    amenities,    // jsonb
+    map_embed_url,
+    payments,     // jsonb [{method:"..."}] или null
+  };
+
+  // Если клиника ЕЩЁ НЕ опубликована – это запрос на модерацию
+  if (!alreadyPublished) {
+    clinicUpdate.moderation_status = "pending";
+    clinicUpdate.is_published = false;
+    clinicUpdate.status = "draft";
+    clinicUpdate.verified_by_medtravel = true;
+    clinicUpdate.is_official_partner = true;
+  }
+
   const { error: uErr } = await admin
     .from("clinics")
-    .update({
-      name: safe(basic.name),
-      slug,
-      address: safe(basic.address),
-      country: safe(basic.country),
-      city: safe(basic.city),
-      province: safe(basic.province),
-      district: safe(basic.district),
-      about, // текст
-      amenities, // jsonb
-      map_embed_url, // ссылка карты
-      payments, // jsonb [{method:"..."}] или null
-      moderation_status: "pending",
-      is_published: false,
-      status: "draft",
-      verified_by_medtravel: true,
-      is_official_partner: true,
-    })
+    .update(clinicUpdate)
     .eq("id", clinicId);
   if (uErr) throw uErr;
 
-  // 3) помечаем черновик как pending
+  // 3) статус черновика:
+  //    - до первой публикации: pending (для модератора)
+  //    - после публикации: просто editing, без повторной модерации
+  const draftStatus = alreadyPublished ? "editing" : "pending";
+
   const { error: e1 } = await admin
     .from("clinic_profile_drafts")
-    .update({ status: "pending", updated_at: new Date().toISOString() })
+    .update({
+      status: draftStatus,
+      updated_at: new Date().toISOString(),
+    })
     .eq("clinic_id", clinicId);
   if (e1) throw e1;
 
-  return { ok: true };
+  return { ok: true, alreadyPublished };
 }
 
 export async function getCategories() {
