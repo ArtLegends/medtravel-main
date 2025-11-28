@@ -3,6 +3,7 @@
 
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
+import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
 
 import React, { useMemo, useCallback } from "react";
 import {
@@ -96,18 +97,14 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя: клиника + партнёр */
+/** Дропдаун гостя — две опции: клиника (модалка) и партнёр (модалка) */
 function ProfileDropdownGuest({
-  onOpenAuth,
+  onOpenCustomerAuth,
+  onOpenPartnerAuth,
 }: {
-  onOpenAuth: () => void;
+  onOpenCustomerAuth: () => void;
+  onOpenPartnerAuth: () => void;
 }) {
-  const router = useRouter();
-
-  const goPartnerLogin = useCallback(() => {
-    router.push("/auth/login?as=PARTNER&next=/partner");
-  }, [router]);
-
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
@@ -120,10 +117,10 @@ function ProfileDropdownGuest({
         </Button>
       </DropdownTrigger>
       <DropdownMenu aria-label="Guest Actions" variant="flat">
-        <DropdownItem key="signin-clinic" onPress={onOpenAuth}>
+        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
           Sign in / Sign up as clinic
         </DropdownItem>
-        <DropdownItem key="signin-partner" onPress={goPartnerLogin}>
+        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
           Sign in / Sign up as partner
         </DropdownItem>
       </DropdownMenu>
@@ -151,85 +148,13 @@ function ProfileDropdownAuth({
     router.refresh();
   }, [supabase, router]);
 
+  // роль из провайдера может быть "CUSTOMER" | "PARTNER" | "ADMIN" | "SUPER_ADMIN" | ...
   const upperRole = String(role || "").toUpperCase();
-  const isAdmin = upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
+
+  // Админ одновременно считается и "клиникой", чтобы не ломать существующую логику
   const isPartner = upperRole === "PARTNER";
-  const isCustomer = upperRole === "CUSTOMER";
-
-  // Собираем элементы меню в массив без boolean / undefined
-  const items: JSX.Element[] = [];
-
-  items.push(
-    <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
-      <p className="font-semibold text-small">
-        {tSafe(t, "navbar.signedInAs", "Signed in as")}
-      </p>
-      <p className="font-medium text-tiny text-default-500">
-        {session?.user?.email ?? ""}
-      </p>
-    </DropdownItem>,
-  );
-
-  if (isCustomer) {
-    items.push(
-      <DropdownItem
-        key="settings-customer"
-        onPress={() => router.push("/settings")}
-        startContent={<Icon icon="solar:settings-linear" width={16} />}
-      >
-        {tSafe(t, "navbar.mySettings", "My settings")}
-      </DropdownItem>,
-      <DropdownItem
-        key="my-clinic"
-        onPress={() => router.push("/customer")}
-        startContent={<Icon icon="solar:hospital-linear" width={16} />}
-      >
-        My clinic
-      </DropdownItem>,
-    );
-  }
-
-  if (isPartner) {
-    items.push(
-      <DropdownItem
-        key="partner-dashboard"
-        onPress={() => router.push("/partner")}
-        startContent={<Icon icon="solar:chart-square-linear" width={16} />}
-      >
-        My dashboard
-      </DropdownItem>,
-      <DropdownItem
-        key="partner-settings"
-        onPress={() => router.push("/partner/settings")}
-        startContent={<Icon icon="solar:settings-linear" width={16} />}
-      >
-        My settings
-      </DropdownItem>,
-    );
-  }
-
-  if (isAdmin) {
-    items.push(
-      <DropdownItem
-        key="admin"
-        onPress={() => router.push("/admin")}
-        startContent={<Icon icon="solar:shield-user-bold" width={16} />}
-      >
-        {tSafe(t, "navbar.adminPanel", "Admin panel")}
-      </DropdownItem>,
-    );
-  }
-
-  items.push(
-    <DropdownItem
-      key="logout"
-      color="danger"
-      startContent={<Icon icon="solar:logout-linear" width={16} />}
-      onPress={handleLogout}
-    >
-      {tSafe(t, "navbar.logOut", "Log out")}
-    </DropdownItem>,
-  );
+  const isAdmin = upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
+  const isCustomer = upperRole === "CUSTOMER" || isAdmin;
 
   return (
     <Dropdown placement="bottom-end">
@@ -252,7 +177,88 @@ function ProfileDropdownAuth({
       </DropdownTrigger>
 
       <DropdownMenu aria-label="Profile Actions" variant="flat">
-        {items}
+        {/* header */}
+        <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
+          <p className="font-semibold text-small">
+            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+          </p>
+          <p className="font-medium text-tiny text-default-500">
+            {session?.user?.email ?? ""}
+          </p>
+        </DropdownItem>
+
+        {/* CUSTOMER: My settings + My clinic (как было раньше, + для admin тоже) */}
+        {isCustomer ? (
+          <>
+            <DropdownItem
+              key="settings-customer"
+              onPress={() => router.push("/settings")}
+              startContent={
+                <Icon icon="solar:settings-linear" width={16} />
+              }
+            >
+              {tSafe(t, "navbar.mySettings", "My settings")}
+            </DropdownItem>
+
+            <DropdownItem
+              key="my-clinic"
+              onPress={() => router.push("/customer")}
+              startContent={
+                <Icon icon="solar:hospital-linear" width={16} />
+              }
+            >
+              My clinic
+            </DropdownItem>
+          </>
+        ) : null}
+
+        {/* PARTNER: My dashboard + Partner settings */}
+        {isPartner ? (
+          <>
+            <DropdownItem
+              key="partner-dashboard"
+              onPress={() => router.push("/partner")}
+              startContent={
+                <Icon icon="solar:chart-2-linear" width={16} />
+              }
+            >
+              My dashboard
+            </DropdownItem>
+
+            <DropdownItem
+              key="partner-settings"
+              onPress={() => router.push("/partner/settings")}
+              startContent={
+                <Icon icon="solar:settings-linear" width={16} />
+              }
+            >
+              Partner settings
+            </DropdownItem>
+          </>
+        ) : null}
+
+        {/* ADMIN: Admin panel (дополнительно к My clinic/My settings) */}
+        {isAdmin ? (
+          <DropdownItem
+            key="admin"
+            onPress={() => router.push("/admin")}
+            startContent={
+              <Icon icon="solar:shield-user-bold" width={16} />
+            }
+          >
+            {tSafe(t, "navbar.adminPanel", "Admin panel")}
+          </DropdownItem>
+        ) : null}
+
+        {/* Logout */}
+        <DropdownItem
+          key="logout"
+          color="danger"
+          startContent={<Icon icon="solar:logout-linear" width={16} />}
+          onPress={handleLogout}
+        >
+          {tSafe(t, "navbar.logOut", "Log out")}
+        </DropdownItem>
       </DropdownMenu>
     </Dropdown>
   );
@@ -264,20 +270,20 @@ export const Navbar = React.memo(() => {
     useSupabase() as SupabaseContextType;
   const pathname = usePathname() ?? "";
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [authOpen, setAuthOpen] = React.useState(false);
+
+  // две независимые модалки: для клиник и для партнёров
+  const [customerAuthOpen, setCustomerAuthOpen] =
+    React.useState(false);
+  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
 
   const navItems = useMemo(
     () => getAccessibleNavItems(role),
     [role],
   );
-  useMemo(
-    () => getAccessibleProfileMenuItems(role),
-    [role],
-  );
+  useMemo(() => getAccessibleProfileMenuItems(role), [role]);
 
   const isAuth = useMemo(
-    () =>
-      pathname.startsWith("/login") || pathname.startsWith("/auth"),
+    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
     [pathname],
   );
 
@@ -328,8 +334,7 @@ export const Navbar = React.memo(() => {
           {navItems.map((item) => {
             const active =
               pathname === item.href ||
-              (item.href !== "/" &&
-                pathname.startsWith(item.href));
+              (item.href !== "/" && pathname.startsWith(item.href));
             return (
               <NavItemLink
                 key={item.key}
@@ -361,7 +366,8 @@ export const Navbar = React.memo(() => {
               />
             ) : (
               <ProfileDropdownGuest
-                onOpenAuth={() => setAuthOpen(true)}
+                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
+                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
               />
             )}
           </NavbarItem>
@@ -374,8 +380,7 @@ export const Navbar = React.memo(() => {
                 key={item.key}
                 active={
                   pathname === item.href ||
-                  (item.href !== "/" &&
-                    pathname.startsWith(item.href))
+                  (item.href !== "/" && pathname.startsWith(item.href))
                 }
                 item={item}
                 t={t}
@@ -386,10 +391,16 @@ export const Navbar = React.memo(() => {
         </NavbarMenu>
       </HeroUINavbar>
 
-      {/* Модалка авторизации КЛИНИКИ (CUSTOMER) */}
+      {/* Модалка авторизации кастомера (клиника / customer panel) */}
       <CustomerAuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
+        open={customerAuthOpen}
+        onClose={() => setCustomerAuthOpen(false)}
+      />
+
+      {/* Модалка авторизации партнёра (partner panel) */}
+      <PartnerAuthModal
+        open={partnerAuthOpen}
+        onClose={() => setPartnerAuthOpen(false)}
       />
     </>
   );

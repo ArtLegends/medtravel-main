@@ -11,7 +11,7 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
   const { supabase } = useSupabase();
   const sp = useSearchParams();
 
-  // по умолчанию ведём в партнёрскую панель
+  // по умолчанию ведём в /partner
   const next = sp?.get("next") || "/partner";
 
   const [email, setEmail] = useState("");
@@ -19,10 +19,11 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
   const [info, setInfo] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Закрытие по ESC
+  // закрытие по ESC
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) =>
+      e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -34,7 +35,6 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
       ? window.location.origin
       : (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
 
-  // важный момент: as=PARTNER + next=/partner
   const callback = `${origin}/auth/callback?as=PARTNER&next=${encodeURIComponent(
     next,
   )}`;
@@ -51,7 +51,7 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
         },
       });
       if (error) setErrorMsg(error.message);
-      // дальше управление уйдет в Google → /auth/callback
+      // дальше управление уйдёт в Google → /auth/callback
     } finally {
       setBusy(false);
     }
@@ -62,22 +62,21 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
     setErrorMsg(null);
     setInfo(null);
     setBusy(true);
-
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: true,
           emailRedirectTo: callback,
-          // сюда попадёт в user_metadata.requested_role
           data: { requested_role: "PARTNER" },
         },
       });
-
       if (error) {
         setErrorMsg(error.message);
       } else {
-        setInfo("We’ve sent you a secure login link. Check your inbox.");
+        setInfo(
+          "We’ve sent you a secure login link. Check your inbox.",
+        );
       }
     } finally {
       setBusy(false);
@@ -105,7 +104,7 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
           Sign in / Sign up as partner
         </div>
         <p className="mb-4 text-sm text-gray-500">
-          Use your business email to access the MedTravel partner panel. We’ll
+          Use your email to access the MedTravel partner panel. We’ll
           email you a secure magic link.
         </p>
 
@@ -116,7 +115,7 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
             <input
               type="email"
               required
-              placeholder="you@affiliate.com"
+              placeholder="you@site.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -132,8 +131,13 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
           </button>
         </form>
 
-        {info && <p className="mt-2 text-sm text-gray-600">{info}</p>}
-        {errorMsg && <p className="mt-2 text-sm text-red-600">{errorMsg}</p>}
+        {/* info / error */}
+        {info && (
+          <p className="mt-2 text-sm text-gray-600">{info}</p>
+        )}
+        {errorMsg && (
+          <p className="mt-2 text-sm text-red-600">{errorMsg}</p>
+        )}
 
         <div className="my-4 flex items-center gap-3 text-xs text-gray-400">
           <div className="h-px flex-1 bg-gray-200" />
