@@ -3,6 +3,7 @@
 
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
+import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
 
 import React, { useMemo, useCallback } from "react";
 import {
@@ -35,6 +36,11 @@ import {
   getAccessibleNavItems,
   getAccessibleProfileMenuItems,
 } from "@/config/nav";
+
+type GuestDropdownProps = {
+  onOpenCustomerAuth: () => void;
+  onOpenPartnerAuth: () => void;
+};
 
 // безопасный текст без жёсткой завязки на i18n
 const tSafe = (t: any, key: string, fallback: string) => {
@@ -97,9 +103,10 @@ const MobileNavItem = React.memo(
 MobileNavItem.displayName = "MobileNavItem";
 
 /** Дропдаун гостя — клиника (модалка) + партнёр (страница логина) */
-function ProfileDropdownGuest({ onOpenAuth }: { onOpenAuth: () => void }) {
-  const router = useRouter();
-
+function ProfileDropdownGuest({
+  onOpenCustomerAuth,
+  onOpenPartnerAuth,
+}: GuestDropdownProps) {
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
@@ -112,15 +119,10 @@ function ProfileDropdownGuest({ onOpenAuth }: { onOpenAuth: () => void }) {
         </Button>
       </DropdownTrigger>
       <DropdownMenu aria-label="Guest Actions" variant="flat">
-        <DropdownItem key="signin-clinic" onPress={onOpenAuth}>
+        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
           Sign in / Sign up as clinic
         </DropdownItem>
-        <DropdownItem
-          key="signin-partner"
-          onPress={() =>
-            router.push("/auth/login?as=PARTNER&next=/partner")
-          }
-        >
+        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
           Sign in / Sign up as partner
         </DropdownItem>
       </DropdownMenu>
@@ -273,8 +275,13 @@ export const Navbar = React.memo(() => {
   const { supabase, session, role } =
     useSupabase() as SupabaseContextType;
   const pathname = usePathname() ?? "";
+
+  // --- стейты модалок ---
+  const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
+  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
+
+  // --- стейт мобильного меню (ЕГО НЕ ХВАТАЛО) ---
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [authOpen, setAuthOpen] = React.useState(false);
 
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
   useMemo(() => getAccessibleProfileMenuItems(role), [role]);
@@ -359,7 +366,8 @@ export const Navbar = React.memo(() => {
               />
             ) : (
               <ProfileDropdownGuest
-                onOpenAuth={() => setAuthOpen(true)}
+                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
+                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
               />
             )}
           </NavbarItem>
@@ -372,8 +380,7 @@ export const Navbar = React.memo(() => {
                 key={item.key}
                 active={
                   pathname === item.href ||
-                  (item.href !== "/" &&
-                    pathname.startsWith(item.href))
+                  (item.href !== "/" && pathname.startsWith(item.href))
                 }
                 item={item}
                 t={t}
@@ -386,8 +393,14 @@ export const Navbar = React.memo(() => {
 
       {/* Модалка авторизации кастомера (клиника) */}
       <CustomerAuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
+        open={customerAuthOpen}
+        onClose={() => setCustomerAuthOpen(false)}
+      />
+
+      {/* Модалка авторизации партнёра */}
+      <PartnerAuthModal
+        open={partnerAuthOpen}
+        onClose={() => setPartnerAuthOpen(false)}
       />
     </>
   );
