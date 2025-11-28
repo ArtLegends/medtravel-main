@@ -18,11 +18,7 @@ export async function middleware(req: NextRequest) {
           })),
         setAll: (all) =>
           all.forEach((cookie) =>
-            res.cookies.set(
-              cookie.name,
-              cookie.value,
-              cookie.options,
-            ),
+            res.cookies.set(cookie.name, cookie.value, cookie.options),
           ),
       },
     },
@@ -39,35 +35,31 @@ export async function middleware(req: NextRequest) {
   const isCustomerRoute = pathname.startsWith("/customer");
   const isPartnerRoute = pathname.startsWith("/partner");
 
-  // ---- собираем роли пользователя ----
-  let roles: string[] = [];
+  // --- определяем isAdmin ---
+  let isAdmin = false;
 
   if (user) {
-    // 1) из app_metadata.roles
     const metaRoles =
-      ((user.app_metadata?.roles as string[] | undefined) ??
-        []).map((r) => String(r).toUpperCase());
-    roles.push(...metaRoles);
-
-    // 2) из public.user_roles
-    const { data: rows, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    if (!error && rows) {
-      for (const r of rows) {
-        if (r.role) roles.push(String(r.role).toUpperCase());
-      }
+      ((user.app_metadata?.roles as string[] | undefined) ?? []).map(
+        (r) => String(r).toUpperCase(),
+      );
+    if (metaRoles.includes("ADMIN")) {
+      isAdmin = true;
     }
 
-    roles = Array.from(new Set(roles));
-  }
+    if (!isAdmin) {
+      const { data: rows, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
 
-  const isAdmin =
-    roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
-  const isCustomer = roles.includes("CUSTOMER");
-  const isPartner = roles.includes("PARTNER");
+      if (!error && rows?.length) {
+        if (rows.some((r) => r.role?.toUpperCase() === "ADMIN")) {
+          isAdmin = true;
+        }
+      }
+    }
+  }
 
   // Уже залогинен и идёт на /auth/... → отправляем на next или дефолт
   if (isAuthRoute && user) {
@@ -75,19 +67,14 @@ export async function middleware(req: NextRequest) {
       searchParams.get("next") ||
       (isAdmin
         ? "/admin"
-        : isPartner
-        ? "/partner"
-        : isCustomer
+        : isCustomerRoute
         ? "/customer"
         : "/");
     return NextResponse.redirect(new URL(next, req.url));
   }
 
-  const needsAuth =
-    isAdminRoute || isCustomerRoute || isPartnerRoute;
-
-  // Гость пытается в /admin /customer /partner → на логин с нужной ролью
-  if (!user && needsAuth) {
+  // Гость пытается в /admin, /customer или /partner → на логин
+  if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute)) {
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set(
       "next",
@@ -95,11 +82,7 @@ export async function middleware(req: NextRequest) {
     );
     loginUrl.searchParams.set(
       "as",
-      isAdminRoute
-        ? "ADMIN"
-        : isPartnerRoute
-        ? "PARTNER"
-        : "CUSTOMER",
+      isAdminRoute ? "ADMIN" : isPartnerRoute ? "PARTNER" : "CUSTOMER",
     );
     return NextResponse.redirect(loginUrl);
   }
@@ -109,12 +92,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Юзер есть, но не партнёр → не пускаем на /partner
-  if (isPartnerRoute && !isPartner) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  // /customer пока оставляем как есть (любая авторизованная роль может зайти).
   return res;
 }
 

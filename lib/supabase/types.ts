@@ -3582,6 +3582,10 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       slugify: { Args: { txt: string }; Returns: string }
+      sync_clinic_relations_from_draft: {
+        Args: { p_clinic_id: string }
+        Returns: undefined
+      }
       try_parse_lat_lng: {
         Args: { src: string }
         Returns: {
