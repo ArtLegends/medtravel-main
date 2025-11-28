@@ -1,11 +1,12 @@
 // components/layout/Navbar.tsx
 "use client";
 
-import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
-import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
-import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
-
 import React, { useMemo, useCallback } from "react";
+import NextLink from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
+
 import {
   Navbar as HeroUINavbar,
   NavbarBrand,
@@ -22,25 +23,16 @@ import {
   Badge,
   Button,
 } from "@heroui/react";
-import NextLink from "next/link";
-import { useTranslation } from "react-i18next";
-import { Icon } from "@iconify/react";
-import { usePathname, useRouter } from "next/navigation";
 
+import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
-import {
-  LanguageSwitcher,
-} from "@/components/shared/LanguageSwitcher";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
 import {
   getAccessibleNavItems,
   getAccessibleProfileMenuItems,
 } from "@/config/nav";
-
-type GuestDropdownProps = {
-  onOpenCustomerAuth: () => void;
-  onOpenPartnerAuth: () => void;
-};
+import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
 
 // безопасный текст без жёсткой завязки на i18n
 const tSafe = (t: any, key: string, fallback: string) => {
@@ -60,9 +52,7 @@ const NavItemLink = React.memo(
       <NextLink
         prefetch
         className={`font-medium transition-colors ${
-          active
-            ? "text-primary"
-            : "text-foreground hover:text-primary"
+          active ? "text-primary" : "text-foreground hover:text-primary"
         }`}
         href={item.href}
       >
@@ -102,11 +92,8 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя — клиника (модалка) + партнёр (страница логина) */
-function ProfileDropdownGuest({
-  onOpenCustomerAuth,
-  onOpenPartnerAuth,
-}: GuestDropdownProps) {
+/** Дропдаун гостя — только кнопка открытия модалки (клиника) */
+function ProfileDropdownGuest({ onOpenAuth }: { onOpenAuth: () => void }) {
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
@@ -119,18 +106,15 @@ function ProfileDropdownGuest({
         </Button>
       </DropdownTrigger>
       <DropdownMenu aria-label="Guest Actions" variant="flat">
-        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
+        <DropdownItem key="signin" onPress={onOpenAuth}>
           Sign in / Sign up as clinic
-        </DropdownItem>
-        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
-          Sign in / Sign up as partner
         </DropdownItem>
       </DropdownMenu>
     </Dropdown>
   );
 }
 
-/** Дропдаун авторизованного */
+/** Дропдаун авторизованного (клиника + опционально админ) */
 function ProfileDropdownAuth({
   session,
   role,
@@ -150,11 +134,7 @@ function ProfileDropdownAuth({
     router.refresh();
   }, [supabase, router]);
 
-  const normalizedRole = String(role ?? "").toUpperCase();
-  const isCustomer = normalizedRole === "CUSTOMER";
-  const isPartner = normalizedRole === "PARTNER";
-  const isAdmin =
-    normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
+  const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
 
   return (
     <Dropdown placement="bottom-end">
@@ -186,70 +166,30 @@ function ProfileDropdownAuth({
           </p>
         </DropdownItem>
 
-        {/* CUSTOMER: My settings + My clinic */}
-        {isCustomer ? (
-          <>
-            <DropdownItem
-              key="settings-customer"
-              onPress={() => router.push("/settings")}
-              startContent={
-                <Icon
-                  icon="solar:settings-linear"
-                  width={16}
-                />
-              }
-            >
-              {tSafe(t, "navbar.mySettings", "My settings")}
-            </DropdownItem>
+        {/* My settings */}
+        <DropdownItem
+          key="settings"
+          onPress={() => router.push("/settings")}
+          startContent={<Icon icon="solar:settings-linear" width={16} />}
+        >
+          {tSafe(t, "navbar.mySettings", "My settings")}
+        </DropdownItem>
 
-            <DropdownItem
-              key="my-clinic"
-              onPress={() => router.push("/customer")}
-              startContent={
-                <Icon
-                  icon="solar:hospital-linear"
-                  width={16}
-                />
-              }
-            >
-              My clinic
-            </DropdownItem>
-          </>
-        ) : null}
+        {/* My clinic (Customer panel) */}
+        <DropdownItem
+          key="my-clinic"
+          onPress={() => router.push("/customer")}
+          startContent={<Icon icon="solar:hospital-linear" width={16} />}
+        >
+          My clinic
+        </DropdownItem>
 
-        {/* PARTNER: My dashboard + Partner settings */}
-        {isPartner ? (
-          <>
-            <DropdownItem
-              key="partner-dashboard"
-              onPress={() => router.push("/partner")}
-              startContent={
-                <Icon icon="solar:chart-2-linear" width={16} />
-              }
-            >
-              My dashboard
-            </DropdownItem>
-
-            <DropdownItem
-              key="partner-settings"
-              onPress={() => router.push("/partner/settings")}
-              startContent={
-                <Icon icon="solar:settings-linear" width={16} />
-              }
-            >
-              Partner settings
-            </DropdownItem>
-          </>
-        ) : null}
-
-        {/* ADMIN: Admin panel (может быть вместе с customer / partner) */}
+        {/* Admin panel */}
         {isAdmin ? (
           <DropdownItem
             key="admin"
             onPress={() => router.push("/admin")}
-            startContent={
-              <Icon icon="solar:shield-user-bold" width={16} />
-            }
+            startContent={<Icon icon="solar:shield-user-bold" width={16} />}
           >
             {tSafe(t, "navbar.adminPanel", "Admin panel")}
           </DropdownItem>
@@ -258,9 +198,7 @@ function ProfileDropdownAuth({
         <DropdownItem
           key="logout"
           color="danger"
-          startContent={
-            <Icon icon="solar:logout-linear" width={16} />
-          }
+          startContent={<Icon icon="solar:logout-linear" width={16} />}
           onPress={handleLogout}
         >
           {tSafe(t, "navbar.logOut", "Log out")}
@@ -274,14 +212,10 @@ export const Navbar = React.memo(() => {
   const { t } = useTranslation();
   const { supabase, session, role } =
     useSupabase() as SupabaseContextType;
+
   const pathname = usePathname() ?? "";
-
-  // --- стейты модалок ---
-  const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
-  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
-
-  // --- стейт мобильного меню (ЕГО НЕ ХВАТАЛО) ---
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [authOpen, setAuthOpen] = React.useState(false);
 
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
   useMemo(() => getAccessibleProfileMenuItems(role), [role]);
@@ -291,9 +225,14 @@ export const Navbar = React.memo(() => {
     [pathname],
   );
 
+  // На /auth/* показываем урезанный navbar
   if (isAuth) {
     return (
-      <HeroUINavbar className="border-b border-divider" height="64px" maxWidth="xl">
+      <HeroUINavbar
+        className="border-b border-divider"
+        height="64px"
+        maxWidth="xl"
+      >
         <NavbarContent justify="end">
           <NavbarItem>
             <LanguageSwitcher />
@@ -366,8 +305,7 @@ export const Navbar = React.memo(() => {
               />
             ) : (
               <ProfileDropdownGuest
-                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
-                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
+                onOpenAuth={() => setAuthOpen(true)}
               />
             )}
           </NavbarItem>
@@ -393,14 +331,8 @@ export const Navbar = React.memo(() => {
 
       {/* Модалка авторизации кастомера (клиника) */}
       <CustomerAuthModal
-        open={customerAuthOpen}
-        onClose={() => setCustomerAuthOpen(false)}
-      />
-
-      {/* Модалка авторизации партнёра */}
-      <PartnerAuthModal
-        open={partnerAuthOpen}
-        onClose={() => setPartnerAuthOpen(false)}
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
       />
     </>
   );
