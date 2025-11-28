@@ -26,7 +26,7 @@ function LoginSkeleton() {
   );
 }
 
-// ВАЖНО: searchParams теперь Promise
+// searchParams теперь Promise
 type Props = {
   searchParams: Promise<{ as?: string; next?: string }>;
 };
@@ -36,12 +36,25 @@ export default async function LoginPage({ searchParams }: Props) {
 
   const as = (params.as || "CUSTOMER").toUpperCase();
   const isAdmin = as === "ADMIN";
+  const isPartner = as === "PARTNER";
 
-  const portalLabel = isAdmin ? "Admin portal" : "Clinic portal";
-  const title = isAdmin ? "Sign in to admin panel" : "Sign in";
+  const portalLabel = isAdmin
+    ? "Admin portal"
+    : isPartner
+      ? "Partner portal"
+      : "Clinic portal";
+
+  const title = isAdmin
+    ? "Sign in to admin panel"
+    : isPartner
+      ? "Sign in as partner"
+      : "Sign in";
+
   const description = isAdmin
     ? "Access the MedTravel admin dashboard."
-    : "Access your MedTravel clinic dashboard using Google or email.";
+    : isPartner
+      ? "Access your MedTravel partner dashboard using Google or email."
+      : "Access your MedTravel clinic dashboard using Google or email.";
 
   return (
     <main className="min-h-screen w-full bg-gradient-to-b flex items-center justify-center px-4">

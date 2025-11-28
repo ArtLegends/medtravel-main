@@ -33,12 +33,12 @@ export async function middleware(req: NextRequest) {
   const isAuthRoute = pathname.startsWith("/auth");
   const isAdminRoute = pathname.startsWith("/admin");
   const isCustomerRoute = pathname.startsWith("/customer");
+  const isPartnerRoute = pathname.startsWith("/partner");
 
   // --- определяем isAdmin ---
   let isAdmin = false;
 
   if (user) {
-    // 1) из app_metadata.roles (если мы туда пишем)
     const metaRoles =
       ((user.app_metadata?.roles as string[] | undefined) ?? []).map((r) =>
         String(r).toUpperCase(),
@@ -47,7 +47,6 @@ export async function middleware(req: NextRequest) {
       isAdmin = true;
     }
 
-    // 2) при необходимости — дёргаем public.user_roles
     if (!isAdmin) {
       const { data: rows, error } = await supabase
         .from("user_roles")
@@ -62,26 +61,43 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Уже залогинен и идёт на /auth/... → отправляем на next или дефолт
+  // Если уже залогинен и идёт на /auth/... → отправляем на нужный портал
   if (isAuthRoute && user) {
-    const next = searchParams.get("next") || (isAdmin ? "/admin" : "/customer");
+    const asParam = searchParams.get("as")?.toUpperCase() || null;
+
+    let defaultNext = "/";
+    if (asParam === "ADMIN") defaultNext = "/admin";
+    else if (asParam === "PARTNER") defaultNext = "/partner";
+    else if (asParam === "CUSTOMER") defaultNext = "/customer";
+    else if (isAdmin) defaultNext = "/admin";
+    else defaultNext = "/";
+
+    const next = searchParams.get("next") || defaultNext;
+
     return NextResponse.redirect(new URL(next, req.url));
   }
 
-  // Гость пытается в /admin или /customer → на логин
-  if (!user && (isAdminRoute || isCustomerRoute)) {
+  // Гость пытается в /admin /customer /partner → на логин
+  if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute)) {
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set(
       "next",
       req.nextUrl.pathname + req.nextUrl.search,
     );
-    loginUrl.searchParams.set(isAdminRoute ? "as" : "as", isAdminRoute ? "ADMIN" : "CUSTOMER");
+
+    const asParam = isAdminRoute
+      ? "ADMIN"
+      : isPartnerRoute
+        ? "PARTNER"
+        : "CUSTOMER";
+
+    loginUrl.searchParams.set("as", asParam);
+
     return NextResponse.redirect(loginUrl);
   }
 
   // Юзер есть, но не админ → не пускаем на /admin
   if (isAdminRoute && !isAdmin) {
-    // можешь поменять на /customer или /403
     return NextResponse.redirect(new URL("/", req.url));
   }
 
@@ -89,5 +105,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/auth/:path*", "/admin/:path*", "/customer/:path*"],
+  matcher: ["/auth/:path*", "/admin/:path*", "/customer/:path*", "/partner/:path*"],
 };

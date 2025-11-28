@@ -3,6 +3,7 @@
 
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
+import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
 
 import React, { useMemo, useCallback } from "react";
 import {
@@ -29,7 +30,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
-import { getAccessibleNavItems, getAccessibleProfileMenuItems } from "@/config/nav";
+import {
+  getAccessibleNavItems,
+  getAccessibleProfileMenuItems,
+} from "@/config/nav";
 
 // безопасный текст без жёсткой завязки на i18n
 const tSafe = (t: any, key: string, fallback: string) => {
@@ -48,7 +52,11 @@ const NavItemLink = React.memo(
     <NavbarItem isActive={active}>
       <NextLink
         prefetch
-        className={`font-medium transition-colors ${active ? "text-primary" : "text-foreground hover:text-primary"}`}
+        className={`font-medium transition-colors ${
+          active
+            ? "text-primary"
+            : "text-foreground hover:text-primary"
+        }`}
         href={item.href}
       >
         {tSafe(t, item.label, String(item.key ?? item.label))}
@@ -60,7 +68,17 @@ NavItemLink.displayName = "NavItemLink";
 
 /** Mobile item */
 const MobileNavItem = React.memo(
-  ({ item, active, t, onClose }: { item: any; active: boolean; t: any; onClose: () => void }) => (
+  ({
+    item,
+    active,
+    t,
+    onClose,
+  }: {
+    item: any;
+    active: boolean;
+    t: any;
+    onClose: () => void;
+  }) => (
     <NavbarMenuItem isActive={active}>
       <Link
         prefetch
@@ -77,18 +95,31 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя — только кнопка открытия модалки */
-function ProfileDropdownGuest({ onOpenAuth }: { onOpenAuth: () => void }) {
+/** Дропдаун гостя — две опции: клиника и партнёр */
+function ProfileDropdownGuest({
+  onOpenCustomerAuth,
+  onOpenPartnerAuth,
+}: {
+  onOpenCustomerAuth: () => void;
+  onOpenPartnerAuth: () => void;
+}) {
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
         <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
-          <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+          <Icon
+            className="text-default-500"
+            icon="solar:user-linear"
+            width={24}
+          />
         </Button>
       </DropdownTrigger>
       <DropdownMenu aria-label="Guest Actions" variant="flat">
-        <DropdownItem key="signin" onPress={onOpenAuth}>
+        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
           Sign in / Sign up as clinic
+        </DropdownItem>
+        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
+          Sign in / Sign up as partner
         </DropdownItem>
       </DropdownMenu>
     </Dropdown>
@@ -119,16 +150,30 @@ function ProfileDropdownAuth({
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
         <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
-          <Badge color="success" content="" placement="bottom-right" shape="circle" size="sm">
-            <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+          <Badge
+            color="success"
+            content=""
+            placement="bottom-right"
+            shape="circle"
+            size="sm"
+          >
+            <Icon
+              className="text-default-500"
+              icon="solar:user-linear"
+              width={24}
+            />
           </Badge>
         </Button>
       </DropdownTrigger>
 
       <DropdownMenu aria-label="Profile Actions" variant="flat">
         <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
-          <p className="font-semibold text-small">{tSafe(t, "navbar.signedInAs", "Signed in as")}</p>
-          <p className="font-medium text-tiny text-default-500">{session?.user?.email ?? ""}</p>
+          <p className="font-semibold text-small">
+            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+          </p>
+          <p className="font-medium text-tiny text-default-500">
+            {session?.user?.email ?? ""}
+          </p>
         </DropdownItem>
 
         <DropdownItem
@@ -147,7 +192,10 @@ function ProfileDropdownAuth({
           My clinic
         </DropdownItem>
 
-        {(role === "ADMIN" || role === "SUPER_ADMIN") ? (
+        {/* Позже сюда можно добавить отдельный пункт Partner panel,
+            когда будет готова проверка роли PARTNER в провайдере */}
+
+        {role === "ADMIN" || role === "SUPER_ADMIN" ? (
           <DropdownItem
             key="admin"
             onPress={() => router.push("/admin")}
@@ -175,19 +223,29 @@ export const Navbar = React.memo(() => {
   const { supabase, session, role } = useSupabase() as SupabaseContextType;
   const pathname = usePathname() ?? "";
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [authOpen, setAuthOpen] = React.useState(false);
+
+  // модалки
+  const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
+  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
 
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
   useMemo(() => getAccessibleProfileMenuItems(role), [role]);
 
-  const isAuth = useMemo(() => pathname.startsWith("/login") || pathname.startsWith("/auth"), [pathname]);
+  const isAuth = useMemo(
+    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
+    [pathname],
+  );
 
   if (isAuth) {
     return (
       <HeroUINavbar className="border-b border-divider" height="64px" maxWidth="xl">
         <NavbarContent justify="end">
-          <NavbarItem><LanguageSwitcher /></NavbarItem>
-          <NavbarItem><ThemeSwitch /></NavbarItem>
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
         </NavbarContent>
       </HeroUINavbar>
     );
@@ -205,26 +263,52 @@ export const Navbar = React.memo(() => {
       >
         <NavbarBrand className="gap-2">
           <NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
-          <NextLink prefetch className="font-bold text-xl text-inherit hover:text-primary transition-colors" href="/">
+          <NextLink
+            prefetch
+            className="font-bold text-xl text-inherit hover:text-primary transition-colors"
+            href="/"
+          >
             MedTravel
           </NextLink>
         </NavbarBrand>
 
-        <NavbarContent className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6" justify="center">
+        <NavbarContent
+          className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6"
+          justify="center"
+        >
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-            return <NavItemLink key={item.key} active={active} item={item} t={t} />;
+            const active =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
+            return (
+              <NavItemLink key={item.key} active={active} item={item} t={t} />
+            );
           })}
         </NavbarContent>
 
-        <NavbarContent className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0" justify="end">
-          <NavbarItem><LanguageSwitcher /></NavbarItem>
-          <NavbarItem><ThemeSwitch /></NavbarItem>
+        <NavbarContent
+          className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0"
+          justify="end"
+        >
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
           <NavbarItem className="px-2">
             {session ? (
-              <ProfileDropdownAuth session={session} role={role} supabase={supabase} t={t} />
+              <ProfileDropdownAuth
+                session={session}
+                role={role}
+                supabase={supabase}
+                t={t}
+              />
             ) : (
-              <ProfileDropdownGuest onOpenAuth={() => setAuthOpen(true)} />
+              <ProfileDropdownGuest
+                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
+                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
+              />
             )}
           </NavbarItem>
         </NavbarContent>
@@ -234,7 +318,10 @@ export const Navbar = React.memo(() => {
             {navItems.map((item) => (
               <MobileNavItem
                 key={item.key}
-                active={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
+                active={
+                  pathname === item.href ||
+                  (item.href !== "/" && pathname.startsWith(item.href))
+                }
                 item={item}
                 t={t}
                 onClose={() => setIsMenuOpen(false)}
@@ -245,7 +332,16 @@ export const Navbar = React.memo(() => {
       </HeroUINavbar>
 
       {/* Модалка авторизации кастомера */}
-      <CustomerAuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <CustomerAuthModal
+        open={customerAuthOpen}
+        onClose={() => setCustomerAuthOpen(false)}
+      />
+
+      {/* Модалка авторизации партнёра */}
+      <PartnerAuthModal
+        open={partnerAuthOpen}
+        onClose={() => setPartnerAuthOpen(false)}
+      />
     </>
   );
 });
