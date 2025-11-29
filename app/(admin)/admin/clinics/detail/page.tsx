@@ -1,6 +1,7 @@
 // app/(admin)/admin/clinics/detail/page.tsx
 
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,8 @@ type ClinicRow = {
   slug: string | null;
   country: string | null;
   city: string | null;
+  province: string | null;
+  district: string | null;
   address: string | null;
   status: string | null;
   moderation_status: string | null;
@@ -38,9 +41,99 @@ type SearchParams = {
   id?: string;
 };
 
-export default async function ClinicEditorPage(
-  { searchParams }: { searchParams: Promise<SearchParams> }
-) {
+/* ---------- server action: сохранить клинику + драфт ---------- */
+
+async function saveClinic(formData: FormData) {
+  "use server";
+
+  const id = String(formData.get("clinic_id") || "");
+  if (!id) return;
+
+  const sb = createServiceClient();
+
+  const str = (name: string) =>
+    String(formData.get(name) ?? "").trim();
+
+  // --- обновляем основную запись clinics ---
+  const clinicUpdate: any = {
+    name: str("clinic_name") || null,
+    slug: str("clinic_slug") || null,
+    country: str("clinic_country") || null,
+    city: str("clinic_city") || null,
+    province: str("clinic_province") || null,
+    district: str("clinic_district") || null,
+    address: str("clinic_address") || null,
+    status: str("clinic_status") || null,
+    moderation_status: str("clinic_moderation_status") || null,
+    is_published: formData.get("clinic_is_published") === "on",
+  };
+
+  await sb.from("clinics").update(clinicUpdate).eq("id", id);
+
+  // --- собираем basic_info / location для драфта ---
+  const basic_info = {
+    name: str("clinic_name") || null,
+    slug: str("clinic_slug") || null,
+    specialty: str("clinic_specialty") || null,
+    country: str("clinic_country") || null,
+    city: str("clinic_city") || null,
+    province: str("clinic_province") || null,
+    district: str("clinic_district") || null,
+    description: str("clinic_description") || null,
+  };
+
+  const location = {
+    mapUrl: str("clinic_mapUrl") || null,
+    directions: str("clinic_directions") || null,
+  };
+
+  const parseJson = (field: string) => {
+    const raw = formData.get(field);
+    if (!raw) return null;
+    try {
+      return JSON.parse(String(raw));
+    } catch {
+      return null;
+    }
+  };
+
+  const services = parseJson("draft_services");
+  const doctors = parseJson("draft_doctors");
+  const hours = parseJson("draft_hours");
+  const gallery = parseJson("draft_gallery");
+  const facilities = parseJson("draft_facilities");
+  const pricing = parseJson("draft_pricing");
+  const draftStatus = str("draft_status") || null;
+
+  await sb
+    .from("clinic_profile_drafts")
+    .upsert(
+      {
+        clinic_id: id,
+        basic_info,
+        location,
+        services: Array.isArray(services) ? services : services ?? [],
+        doctors: Array.isArray(doctors) ? doctors : doctors ?? [],
+        hours: Array.isArray(hours) ? hours : hours ?? [],
+        gallery: Array.isArray(gallery) ? gallery : gallery ?? [],
+        facilities: facilities ?? null,
+        pricing: Array.isArray(pricing) ? pricing : pricing ?? [],
+        status: draftStatus,
+        updated_at: new Date().toISOString(),
+      } as any,
+      { onConflict: "clinic_id" } as any,
+    );
+
+  revalidatePath(`/admin/clinics/detail?id=${id}`);
+}
+
+/* ---------- сама страница ---------- */
+
+export default async function ClinicEditorPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   const sp = await searchParams;
   const id = sp.id;
 
@@ -63,25 +156,23 @@ export default async function ClinicEditorPage(
 
   const sb = createServiceClient();
 
-  const [{ data: clinic, error: clinicError }, { data: draft, error: draftError }] =
-    await Promise.all([
-      sb
-        .from("clinics")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle<ClinicRow>(),
-      sb
-        .from("clinic_profile_drafts")
-        .select("*")
-        .eq("clinic_id", id)
-        .maybeSingle<DraftRow>(),
-    ]);
+  const [
+    { data: clinic, error: clinicError },
+    { data: draft, error: draftError },
+  ] = await Promise.all([
+    sb.from("clinics").select("*").eq("id", id).maybeSingle<ClinicRow>(),
+    sb
+      .from("clinic_profile_drafts")
+      .select("*")
+      .eq("clinic_id", id)
+      .maybeSingle<DraftRow>(),
+  ]);
 
   if (clinicError || draftError) {
     return (
       <div className="p-6 space-y-4">
         <h1 className="text-xl font-semibold">Clinic editor error</h1>
-        <pre className="rounded-lg bg-red-50 p-4 text-xs text-red-700 whitespace-pre-wrap">
+        <pre className="whitespace-pre-wrap rounded-lg bg-red-50 p-4 text-xs text-red-700">
           {clinicError && `clinics error: ${clinicError.message}\n\n`}
           {draftError && `drafts error: ${draftError.message}\n\n`}
         </pre>
@@ -114,24 +205,39 @@ export default async function ClinicEditorPage(
   }
 
   const basic = (draft?.basic_info ?? {}) as any;
-  const services = (Array.isArray(draft?.services) ? draft!.services : []) as any[];
-  const doctors  = (Array.isArray(draft?.doctors)  ? draft!.doctors  : []) as any[];
-  const hours    = (Array.isArray(draft?.hours)    ? draft!.hours    : []) as any[];
-  const gallery  = (Array.isArray(draft?.gallery)  ? draft!.gallery  : []) as any[];
+  const services = (Array.isArray(draft?.services)
+    ? draft!.services
+    : []) as any[];
+  const doctors = (Array.isArray(draft?.doctors)
+    ? draft!.doctors
+    : []) as any[];
+  const hours = (Array.isArray(draft?.hours)
+    ? draft!.hours
+    : []) as any[];
+  const gallery = (Array.isArray(draft?.gallery)
+    ? draft!.gallery
+    : []) as any[];
   const facilities = (draft?.facilities ?? {
     premises: [],
     clinic_services: [],
     travel_services: [],
     languages_spoken: [],
   }) as any;
-  const payments = (Array.isArray(draft?.pricing) ? draft!.pricing : []) as any[];
+  const payments = (Array.isArray(draft?.pricing)
+    ? draft!.pricing
+    : []) as any[];
   const location = (draft?.location ?? {}) as any;
 
   const formatDate = (v?: string | null) =>
     v ? new Date(v).toLocaleString() : "-";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
+    <form
+      className="mx-auto max-w-6xl space-y-6 p-6"
+      action={saveClinic}
+    >
+      <input type="hidden" name="clinic_id" value={clinic.id} />
+
       {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -139,7 +245,7 @@ export default async function ClinicEditorPage(
             {clinic.name || "(no name)"}
           </h1>
           <p className="text-sm text-gray-500">
-            Admin view &amp; basic edit for clinic
+            Admin view &amp; full edit for clinic
           </p>
         </div>
 
@@ -162,7 +268,7 @@ export default async function ClinicEditorPage(
         </div>
       </div>
 
-      {/* SUMMARY CARD */}
+      {/* SUMMARY CARD (read-only + admin meta) */}
       <div className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
@@ -173,7 +279,7 @@ export default async function ClinicEditorPage(
             <div className="text-xs text-gray-500">{clinic.slug}</div>
           </div>
 
-          <div className="space-y-1 text-sm">
+        <div className="space-y-1 text-sm">
             <div>
               <span className="text-xs uppercase tracking-wide text-gray-500">
                 Status:&nbsp;
@@ -204,7 +310,8 @@ export default async function ClinicEditorPage(
               Location
             </div>
             <div className="text-sm text-gray-800">
-              {[clinic.city, clinic.country].filter(Boolean).join(", ") || "—"}
+              {[clinic.city, clinic.country].filter(Boolean).join(", ") ||
+                "—"}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {clinic.address || "-"}
@@ -215,160 +322,293 @@ export default async function ClinicEditorPage(
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Draft status
             </div>
-            <div className="text-sm text-gray-800">
-              {(draft?.status as any) || "-"}
-            </div>
-            <div className="mt-1 text-xs text-gray-500">
+            <input
+              name="draft_status"
+              defaultValue={draft?.status ?? ""}
+              className="mt-1 w-full rounded border px-2 py-1 text-sm"
+              placeholder="draft / published / pending..."
+            />
+            <div className="mt-2 text-xs text-gray-500">
               Updated: {formatDate(draft?.updated_at as any)}
             </div>
           </div>
 
-          <div className="text-xs text-gray-500">
-            This page currently shows a read-only summary of the clinic
-            and its draft. Editing UI can be expanded here (basic info,
-            services, doctors, gallery, etc.) using the same data model
-            as in moderation.
+          <div className="space-y-2 text-xs text-gray-500">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Admin meta
+            </div>
+            <div className="space-y-1">
+              <label className="flex flex-col gap-1 text-xs">
+                <span>Clinic status</span>
+                <input
+                  name="clinic_status"
+                  defaultValue={clinic.status ?? ""}
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder="draft / published..."
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span>Moderation status</span>
+                <input
+                  name="clinic_moderation_status"
+                  defaultValue={clinic.moderation_status ?? ""}
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder="pending / approved..."
+                />
+              </label>
+              <label className="mt-1 flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  name="clinic_is_published"
+                  defaultChecked={!!clinic.is_published}
+                  className="h-4 w-4"
+                />
+                <span>Published on site</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
 
       {/* BASIC INFO / LOCATION */}
       <div className="space-y-8 rounded-2xl border bg-white p-6 shadow-sm">
+        {/* BASIC */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Basic information (draft)
+              Basic information
             </h2>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 text-sm">
             <div className="space-y-2">
-              <KV k="Name" v={basic.name ?? clinic.name} />
-              <KV k="Slug (draft)" v={basic.slug} />
-              <KV k="Specialty" v={basic.specialty} />
-              <KV k="Country" v={basic.country ?? clinic.country} />
-              <KV k="City" v={basic.city ?? clinic.city} />
-              <KV k="Province" v={basic.province} />
-              <KV k="District" v={basic.district} />
+              <Field label="Name">
+                <input
+                  name="clinic_name"
+                  defaultValue={basic.name ?? clinic.name}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="Slug">
+                <input
+                  name="clinic_slug"
+                  defaultValue={basic.slug ?? clinic.slug ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                  placeholder="new-clinic"
+                />
+              </Field>
+              <Field label="Specialty">
+                <input
+                  name="clinic_specialty"
+                  defaultValue={basic.specialty ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="Country">
+                <input
+                  name="clinic_country"
+                  defaultValue={basic.country ?? clinic.country ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="City">
+                <input
+                  name="clinic_city"
+                  defaultValue={basic.city ?? clinic.city ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="Province">
+                <input
+                  name="clinic_province"
+                  defaultValue={basic.province ?? clinic.province ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="District">
+                <input
+                  name="clinic_district"
+                  defaultValue={basic.district ?? clinic.district ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="Address (string)">
+                <input
+                  name="clinic_address"
+                  defaultValue={clinic.address ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                />
+              </Field>
             </div>
 
             <div className="space-y-3">
-              <KV k="Google Maps URL" v={location.mapUrl} />
-              <TextBlock label="Description" value={basic.description} />
-              <TextBlock label="Directions" value={location.directions} />
+              <Field label="Google Maps URL">
+                <input
+                  name="clinic_mapUrl"
+                  defaultValue={location.mapUrl ?? ""}
+                  className="w-full rounded border px-2 py-1.5 text-sm"
+                  placeholder="https://maps.google.com/..."
+                />
+              </Field>
+              <Field label="Description">
+                <textarea
+                  name="clinic_description"
+                  defaultValue={basic.description ?? ""}
+                  rows={4}
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </Field>
+              <Field label="Directions">
+                <textarea
+                  name="clinic_directions"
+                  defaultValue={location.directions ?? ""}
+                  rows={3}
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </Field>
             </div>
           </div>
         </section>
 
+        {/* SERVICES / DOCTORS / JSON FIELDS */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Services &amp; doctors (from draft)
+              Services, doctors &amp; other data
             </h2>
             <span className="text-xs text-gray-400">
-              {services.length} service(s) • {doctors.length} doctor(s)
+              JSON fields – edit carefully
             </span>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 text-sm">
-            <div>
-              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
-                Services
-              </div>
-              {!services.length ? (
-                <EmptyHint>No services specified in draft.</EmptyHint>
-              ) : (
-                <ul className="space-y-1 leading-relaxed">
-                  {services.map((s, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-0.5 h-1 w-1 flex-shrink-0 rounded-full bg-gray-400" />
-                      <span>
-                        <span className="font-medium">
-                          {s?.name || "-"}
-                        </span>
-                        {s?.price ? (
-                          <>
-                            {" "}
-                            — {s.price} {s?.currency || ""}
-                          </>
-                        ) : null}
-                        {s?.description ? (
-                          <span className="text-gray-600">
-                            {" "}
-                            • {s.description}
-                          </span>
-                        ) : null}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <Field label={`Services JSON (${services.length})`}>
+              <textarea
+                name="draft_services"
+                defaultValue={
+                  services.length
+                    ? JSON.stringify(services, null, 2)
+                    : ""
+                }
+                rows={10}
+                className="font-mono w-full rounded border px-3 py-2 text-xs"
+                placeholder='[ { "name": "My service", "price": 1000, "currency": "USD", "description": "..." } ]'
+              />
+            </Field>
 
-            <div>
-              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
-                Doctors
-              </div>
-              {!doctors.length ? (
-                <EmptyHint>No doctors specified in draft.</EmptyHint>
-              ) : (
-                <ul className="space-y-1 leading-relaxed">
-                  {doctors.map((d, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-0.5 h-1 w-1 flex-shrink-0 rounded-full bg-gray-400" />
-                      <span>
-                        <span className="font-medium">
-                          {d?.fullName || d?.name || "-"}
-                        </span>
-                        {d?.title ? <> — {d.title}</> : null}
-                        {d?.specialty ? (
-                          <span className="text-gray-600">
-                            {" "}
-                            • {d.specialty}
-                          </span>
-                        ) : null}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <Field label={`Doctors JSON (${doctors.length})`}>
+              <textarea
+                name="draft_doctors"
+                defaultValue={
+                  doctors.length
+                    ? JSON.stringify(doctors, null, 2)
+                    : ""
+                }
+                rows={10}
+                className="font-mono w-full rounded border px-3 py-2 text-xs"
+                placeholder='[ { "fullName": "Dr Name", "title": "Chief", "specialty": "Dentist" } ]'
+              />
+            </Field>
+
+            <Field label={`Hours JSON (${hours.length})`}>
+              <textarea
+                name="draft_hours"
+                defaultValue={
+                  hours.length ? JSON.stringify(hours, null, 2) : ""
+                }
+                rows={8}
+                className="font-mono w-full rounded border px-3 py-2 text-xs"
+                placeholder='[ { "day": "Monday", "status": "open", "start": "09:00", "end": "18:00" } ]'
+              />
+            </Field>
+
+            <Field label={`Gallery JSON (${gallery.length})`}>
+              <textarea
+                name="draft_gallery"
+                defaultValue={
+                  gallery.length
+                    ? JSON.stringify(gallery, null, 2)
+                    : ""
+                }
+                rows={8}
+                className="font-mono w-full rounded border px-3 py-2 text-xs"
+                placeholder='[ { "url": "https://...", "title": "Lobby" } ]'
+              />
+            </Field>
+
+            <Field label="Facilities JSON">
+              <textarea
+                name="draft_facilities"
+                defaultValue={
+                  facilities &&
+                  Object.keys(facilities).length > 0
+                    ? JSON.stringify(facilities, null, 2)
+                    : ""
+                }
+                rows={8}
+                className="font-mono w-full rounded border px-3 py-2 text-xs"
+                placeholder='{ "premises": ["Free Wi-Fi"], "clinic_services": ["Online consultation"], ... }'
+              />
+            </Field>
+
+            <Field label={`Payment methods JSON (${payments.length})`}>
+              <textarea
+                name="draft_pricing"
+                defaultValue={
+                  payments.length
+                    ? JSON.stringify(payments, null, 2)
+                    : ""
+                }
+                rows={8}
+                className="font-mono w-full rounded border px-3 py-2 text-xs"
+                placeholder='[ "Visa", "Cash", "BTC" ] или [ { "method": "Visa" }, ... ]'
+              />
+            </Field>
           </div>
+
+          <p className="text-xs text-gray-500">
+            Все поля выше полностью контролируют содержимое
+            профиля клиники (услуги, доктора, расписание, галерея,
+            доп. услуги и способы оплаты). Можно добавлять/удалять
+            элементы в JSON, после сохранения они попадут в
+            <code className="ml-1 font-mono">clinic_profile_drafts</code>
+            и будут использоваться системой так же, как драфты
+            модерации.
+          </p>
         </section>
-
-        {/* дальше можно расширять: facilities, hours, gallery, payments */}
       </div>
-    </div>
+
+      {/* ACTIONS */}
+      <div className="flex items-center justify-between border-t pt-4">
+        <div className="text-xs text-gray-500">
+          Press &ldquo;Save changes&rdquo; to update clinic and draft
+          in Supabase. Changes apply immediately.
+        </div>
+        <button
+          type="submit"
+          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+        >
+          Save changes
+        </button>
+      </div>
+    </form>
   );
 }
 
-function KV({ k, v }: { k: string; v?: string | null }) {
-  return (
-    <div className="flex gap-2 text-sm">
-      <div className="w-32 shrink-0 text-xs font-medium uppercase tracking-wide text-gray-500">
-        {k}
-      </div>
-      <div className="flex-1 text-gray-800">{v || "-"} </div>
-    </div>
-  );
-}
+/* ---------- небольшие UI-хелперы ---------- */
 
-function TextBlock({ label, value }: { label: string; value?: string | null }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+    <div className="space-y-1">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </div>
-      <div className="whitespace-pre-wrap rounded-lg border bg-gray-50/60 px-3 py-2 text-sm leading-relaxed text-gray-800">
-        {value || "—"}
-      </div>
-    </div>
-  );
-}
-
-function EmptyHint({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
       {children}
     </div>
   );
