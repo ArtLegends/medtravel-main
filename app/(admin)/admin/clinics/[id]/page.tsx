@@ -108,12 +108,10 @@ async function updateClinicDraft(formData: FormData) {
 
 /* ========== PAGE COMPONENT ========== */
 
-export default async function ClinicEditorPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const id = params.id;
+export default async function ClinicEditorPage(
+    { params }: { params: Promise<{ id: string }> }
+  ) {
+    const { id } = await params;
   const sb = createAdminClient();
 
   const [{ data: clinic, error: cErr }, { data: draft, error: dErr }] =
