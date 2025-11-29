@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { clinicPath } from "@/lib/clinic-url";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -231,6 +232,16 @@ export default async function ClinicEditorPage({
   const formatDate = (v?: string | null) =>
     v ? new Date(v).toLocaleString() : "-";
 
+  const publicPath =
+    clinic.slug &&
+    (clinicPath({
+      slug: clinic.slug,
+      country: clinic.country ?? undefined,
+      province: clinic.province ?? undefined,
+      city: clinic.city ?? undefined,
+      district: clinic.district ?? undefined,
+    }) || `/clinic/${clinic.slug}`);
+
   return (
     <form
       className="mx-auto max-w-6xl space-y-6 p-6"
@@ -250,9 +261,9 @@ export default async function ClinicEditorPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          {clinic.slug && (
+          {publicPath && (
             <Link
-              href={`/clinic/${clinic.slug}`}
+              href={publicPath}
               className="rounded-full border border-gray-200 px-3 py-1 text-gray-700 hover:bg-gray-50"
               target="_blank"
             >

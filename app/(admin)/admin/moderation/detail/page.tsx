@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/adminClient";
 import { approveClinic, rejectClinic } from "../actions";
+import { clinicPath } from "@/lib/clinic-url";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -85,6 +86,16 @@ export default async function ModerationDetail({
   const formatDateTime = (v?: string | null) =>
     v ? new Date(v).toLocaleString() : "-";
 
+    const publicPath =
+    clinic.slug &&
+    (clinicPath({
+      slug: clinic.slug,
+      country: clinic.country ?? undefined,
+      province: (clinic as any).province ?? undefined,
+      city: clinic.city ?? undefined,
+      district: (clinic as any).district ?? undefined,
+    }) || `/clinic/${clinic.slug}`);
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       {/* HEADER */}
@@ -99,9 +110,9 @@ export default async function ModerationDetail({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          {clinic.slug && (
+          {publicPath && (
             <Link
-              href={`/clinic/${clinic.slug}`}
+              href={publicPath}
               className="rounded-full border border-gray-200 px-3 py-1 text-gray-700 hover:bg-gray-50"
               target="_blank"
             >
