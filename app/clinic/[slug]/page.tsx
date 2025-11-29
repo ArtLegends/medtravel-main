@@ -24,16 +24,20 @@ export async function generateMetadata(
 
   // 2.1 min(price) из clinic_services
   let minPrice: number | null = null
+  let minCurrency: string | null = null
+
   if (clinic?.id) {
     const { data: minRow } = await sb
       .from('clinic_services')
-      .select('price')
+      .select('price, currency')
       .eq('clinic_id', clinic.id)
       .not('price', 'is', null)
       .order('price', { ascending: true })
       .limit(1)
       .maybeSingle()
-    if (minRow?.price != null) minPrice = Math.round(Number(minRow.price))
+
+    if (minRow?.price != null)    minPrice = Math.round(Number(minRow.price))
+    if (minRow?.currency != null) minCurrency = String(minRow.currency)
   }
 
   // 2.2 адрес: пробуем набор возможных полей + профили
@@ -122,7 +126,8 @@ export async function generateMetadata(
       district: clinic?.district ?? undefined,
     },
     minPrice,
-    address: addr, // ← теперь гарантированно пробуем вывести
+    address: addr,
+    currency: minCurrency ?? undefined,
   })
 
   const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://medtravel.me').replace(/\/+$/, '')

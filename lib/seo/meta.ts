@@ -25,29 +25,63 @@ export function localeFromPathname(pathname: string): Locale {
   return 'en'
 }
 
-// -------------------- ШАБЛОНЫ --------------------
-
-// Категории верхнего уровня (dentists / hair-transplant / plastic-surgery)
-function tplCategoryTitle(lng: Locale, catLabel: string, loc: string) {
-  switch (lng) {
-    case 'ru':
-      // «Лучшие стоматологические клиники в Turkey, Istanbul ▷ ...»
-      return `Лучшие ${catLabel} в ${loc} ▷ Доступная помощь за рубежом`
-    case 'pl':
-      return `Najlepsze ${catLabel} w ${loc} ▷ Tania opieka za granicą`
-    default:
-      return `Best ${catLabel} in ${loc} ▷ Affordable Care Abroad`
+function formatCurrencySymbol(code?: string | null) {
+  if (!code) return '€'
+  const c = code.toUpperCase()
+  switch (c) {
+    case 'EUR': return '€'
+    case 'USD': return '$'
+    case 'GBP': return '£'
+    case 'TRY': return '₺'
+    case 'PLN': return 'zł'
+    default:    return c
   }
 }
 
-function tplCategoryDesc(lng: Locale, catLabel: string, loc: string) {
+// -------------------- ШАБЛОНЫ --------------------
+
+// Категории верхнего уровня (dentists / hair-transplant / plastic-surgery)
+function tplCategoryTitle(lng: Locale, catLabel: string, loc?: string) {
+  const hasLoc = !!loc && loc.trim().length > 0
+
   switch (lng) {
     case 'ru':
-      return `Найдите лучшие ${catLabel} в ${loc} с проверенными отзывами пациентов. ✔️ Прозрачные цены, англоговорящие врачи и бесплатные консультации.`
+      return hasLoc
+        ? `Лучшие ${catLabel} в ${loc} ▷ Доступная помощь за рубежом`
+        : `Лучшие ${catLabel} с Medtravel ▷ Доступная помощь за рубежом`
     case 'pl':
-      return `Odkryj najlepsze ${catLabel} w ${loc} z opiniami pacjentów. ✔️ Przejrzyste ceny, anglojęzyczni specjaliści i 100% darmowe konsultacje.`
+      return hasLoc
+        ? `Najlepsze ${catLabel} w ${loc} ▷ Tania opieka za granicą`
+        : `Najlepsze ${catLabel} z Medtravel ▷ Tania opieka za granicą`
     default:
-      return `Discover Best ${catLabel} in ${loc} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
+      return hasLoc
+        ? `Best ${catLabel} in ${loc} ▷ Affordable Care Abroad`
+        : `Best ${catLabel} with Medtravel ▷ Affordable Care Abroad`
+  }
+}
+
+function tplCategoryDesc(lng: Locale, catLabel: string, loc?: string) {
+  const hasLoc = !!loc && loc.trim().length > 0
+
+  if (hasLoc) {
+    switch (lng) {
+      case 'ru':
+        return `Найдите лучшие ${catLabel} в ${loc} с проверенными отзывами пациентов. ✔️ Прозрачные цены, англоговорящие врачи и бесплатные консультации.`
+      case 'pl':
+        return `Odkryj najlepsze ${catLabel} w ${loc} z opiniami pacjentów. ✔️ Przejrzyste ceny, anglojęzyczni specjaliści i 100% darmowe konsultacje.`
+      default:
+        return `Discover Best ${catLabel} in ${loc} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
+    }
+  }
+
+  // без локации
+  switch (lng) {
+    case 'ru':
+      return `Найдите лучшие ${catLabel} с Medtravel. ✔️ Прозрачные цены, англоговорящие врачи и бесплатные консультации по всему миру.`
+    case 'pl':
+      return `Odkryj najlepsze ${catLabel} z Medtravel. ✔️ Przejrzyste ceny, anglojęzyczni specjaliści i darmowe konsultacje w popularnych destynacjach.`
+    default:
+      return `Discover Best ${catLabel} with Medtravel. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations in popular destinations.`
   }
 }
 
@@ -69,7 +103,7 @@ function tplTreatmentDesc(
   loc: string,
   min?: number | null,
   max?: number | null,
-  currency = '€'
+  currency?: string | null
 ) {
   const base =
     lng === 'ru'
@@ -78,43 +112,37 @@ function tplTreatmentDesc(
         ? `${treatment} w ${loc}. `
         : `${treatment} in ${loc}. `
 
+  const cur = formatCurrencySymbol(currency)
   let pricePart = ''
 
-  // ✅ спец-случай: одно значение
   if (min != null && max != null && Number(min) === Number(max)) {
     pricePart =
       lng === 'ru'
-        ? `Цены от ${min}${currency}. `
+        ? `Цены от ${min}${cur}. `
         : lng === 'pl'
-          ? `Ceny od ${min}${currency}. `
-          : `Prices from ${min}${currency}. `
-  }
-  // обычный диапазон
-  else if (min != null && max != null) {
+          ? `Ceny od ${min}${cur}. `
+          : `Prices from ${min}${cur}. `
+  } else if (min != null && max != null) {
     pricePart =
       lng === 'ru'
-        ? `Цены от ${min}${currency} до ${max}${currency}. `
+        ? `Цены от ${min}${cur} до ${max}${cur}. `
         : lng === 'pl'
-          ? `Ceny od ${min}${currency} do ${max}${currency}. `
-          : `Prices from ${min}${currency} to ${max}${currency}. `
-  }
-  // только min
-  else if (min != null) {
+          ? `Ceny od ${min}${cur} do ${max}${cur}. `
+          : `Prices from ${min}${cur} to ${max}${cur}. `
+  } else if (min != null) {
     pricePart =
       lng === 'ru'
-        ? `Цены от ${min}${currency}. `
+        ? `Цены от ${min}${cur}. `
         : lng === 'pl'
-          ? `Ceny od ${min}${currency}. `
-          : `Prices from ${min}${currency}. `
-  }
-  // только max
-  else if (max != null) {
+          ? `Ceny od ${min}${cur}. `
+          : `Prices from ${min}${cur}. `
+  } else if (max != null) {
     pricePart =
       lng === 'ru'
-        ? `Цены до ${max}${currency}. `
+        ? `Цены до ${max}${cur}. `
         : lng === 'pl'
-          ? `Ceny do ${max}${currency}. `
-          : `Prices up to ${max}${currency}. `
+          ? `Ceny do ${max}${cur}. `
+          : `Prices up to ${max}${cur}. `
   }
 
   const tail =
@@ -143,15 +171,18 @@ function tplClinicDesc(
   lng: Locale,
   clinicName: string,
   min?: number | null,
-  address?: string | null
+  address?: string | null,
+  currency?: string | null
 ) {
+  const cur = formatCurrencySymbol(currency)
+
   const minPart =
     min != null
       ? (lng === 'ru'
-          ? `Цены от ${min}€`
+          ? `Цены от ${min}${cur}`
           : lng === 'pl'
-            ? `Ceny od ${min}€`
-            : `Prices from ${min}€`)
+            ? `Ceny od ${min}${cur}`
+            : `Prices from ${min}${cur}`)
       : (lng === 'ru'
           ? `Прозрачные цены`
           : lng === 'pl'
@@ -183,9 +214,7 @@ function tplClinicDesc(
 export function buildCategoryMetadata(
   pathname: string,
   params: {
-    // читаемое название категории для шаблона (Dentistry, Hair Transplant, Plastic Surgery ...)
     categoryLabelEn: string
-    // переводы ярлыка категории для RU/PL (если есть)
     categoryLabelRu?: string
     categoryLabelPl?: string
     location?: LocationParts
@@ -194,7 +223,6 @@ export function buildCategoryMetadata(
   const locale = localeFromPathname(pathname)
   const loc = locToString(params.location)
 
-  // корректный ярлык категории под локаль
   const catLabel =
     locale === 'ru'
       ? (params.categoryLabelRu ?? params.categoryLabelEn)
@@ -202,8 +230,8 @@ export function buildCategoryMetadata(
         ? (params.categoryLabelPl ?? params.categoryLabelEn)
         : params.categoryLabelEn
 
-  const title = tplCategoryTitle(locale, catLabel, loc || 'Popular Destinations')
-  const description = tplCategoryDesc(locale, catLabel, loc || 'popular destinations')
+  const title = tplCategoryTitle(locale, catLabel, loc)
+  const description = tplCategoryDesc(locale, catLabel, loc)
 
   return duplicateToOgAndTwitter({ title, description })
 }
@@ -216,7 +244,7 @@ export function buildTreatmentMetadata(
     location?: LocationParts
     minPrice?: number | null
     maxPrice?: number | null
-    currency?: string // по умолчанию €
+    currency?: string | null
   }
 ): Metadata {
   const locale = localeFromPathname(pathname)
@@ -228,7 +256,7 @@ export function buildTreatmentMetadata(
     loc,
     params.minPrice ?? null,
     params.maxPrice ?? null,
-    params.currency ?? '€'
+    params.currency ?? null
   )
   return duplicateToOgAndTwitter({ title, description })
 }
@@ -241,12 +269,19 @@ export function buildClinicMetadata(
     location?: LocationParts
     minPrice?: number | null
     address?: string | null
+    currency?: string | null
   }
 ): Metadata {
   const locale = localeFromPathname(pathname)
   const loc = locToString(params.location) || ''
   const title = tplClinicTitle(locale, params.clinicName, loc)
-  const description = tplClinicDesc(locale, params.clinicName, params.minPrice ?? null, params.address ?? null)
+  const description = tplClinicDesc(
+    locale,
+    params.clinicName,
+    params.minPrice ?? null,
+    params.address ?? null,
+    params.currency ?? null
+  )
   return duplicateToOgAndTwitter({ title, description })
 }
 

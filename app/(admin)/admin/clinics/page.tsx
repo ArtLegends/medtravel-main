@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
+import { ConfirmDeleteButton } from '@/components/admin/ConfirmDeleteButtons';
 
 export const metadata = { title: 'Clinics • Admin' };
 
@@ -209,12 +210,12 @@ export default async function ClinicsPage(
             <input type="hidden" name="from" value={sp.from || ''} />
             <input type="hidden" name="to" value={sp.to || ''} />
             <input type="hidden" name="path" value="/admin/clinics" />
-            <button
-              className="rounded border px-3 py-1.5 text-sm bg-white hover:bg-slate-50 text-red-600"
+            <ConfirmDeleteButton
+              label="Delete all"
+              confirmMessage="Are you sure you want to delete ALL clinics in this filter (with all related data)? This action cannot be undone."
+              className="rounded border px-3 py-1.5 text-sm bg-white hover:bg-slate-50 text-red-600 disabled:opacity-50 disabled:pointer-events-none"
               disabled={total === 0}
-            >
-              Delete all
-            </button>
+            />
           </form>
         </div>
       </div>
@@ -228,7 +229,7 @@ export default async function ClinicsPage(
               <th className="p-3">City</th>
               <th className="p-3">Created</th>
               <th className="p-3">Status</th>
-              <th className="p-3 w-1">Actions</th>
+              <th className="p-3 w-1 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -236,19 +237,30 @@ export default async function ClinicsPage(
               <tr><td colSpan={6} className="p-6 text-center text-slate-500">No clinics found.</td></tr>
             ) : rows.map((r) => (
               <tr key={r.id} className="border-t">
-                <td className="p-3">{r.name}</td>
+                <td className="p-3">
+                  <a
+                    href={`/admin/clinics/${encodeURIComponent(r.id)}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {r.name}
+                  </a>
+                </td>
                 <td className="p-3">{r.country || '—'}</td>
                 <td className="p-3">{r.city || '—'}</td>
                 <td className="p-3">{new Date(r.created_at).toLocaleString()}</td>
                 <td className="p-3 capitalize">{(r.status || 'draft').toString()}</td>
                 <td className="p-3">
-                  <form action={deleteClinic}>
-                    <input type="hidden" name="clinicId" value={r.id} />
-                    <input type="hidden" name="path" value="/admin/clinics" />
-                    <button className="rounded border px-2 py-1 text-xs text-red-600 bg-white hover:bg-slate-50">
-                      Delete
-                    </button>
-                  </form>
+                  <div className="flex items-center justify-end">
+                    <form action={deleteClinic}>
+                      <input type="hidden" name="clinicId" value={r.id} />
+                      <input type="hidden" name="path" value="/admin/clinics" />
+                      <ConfirmDeleteButton
+                        label="Delete"
+                        confirmMessage="Delete this clinic and all related data? This cannot be undone."
+                        className="rounded border px-2 py-1 text-xs text-red-600 bg-white hover:bg-slate-50"
+                      />
+                    </form>
+                  </div>
                 </td>
               </tr>
             ))}

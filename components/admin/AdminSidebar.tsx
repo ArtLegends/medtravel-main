@@ -13,6 +13,7 @@ import {
   FileBarChart2,
   LifeBuoy,
 } from "lucide-react";
+import { Home } from "lucide-react";
 
 type Item = {
   label: string;
@@ -75,6 +76,18 @@ export default function AdminSidebar() {
           );
         })}
       </nav>
+
+      {/* Back to home */}
+      <div className="mt-4 px-2">
+        <Link
+          href="/"
+          className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition
+                     text-slate-300 hover:bg-slate-800/60 hover:text-white"
+        >
+          <Home className="h-4 w-4 opacity-90" />
+          <span>Back to home</span>
+        </Link>
+      </div>
 
       {/* Footer / Logout placeholder */}
       <div className="px-4 py-4 text-xs text-slate-500 border-t border-slate-800">

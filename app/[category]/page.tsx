@@ -70,49 +70,90 @@ export async function generateMetadata(
     ? sp.service.join(',').split(',').filter(Boolean)
     : (typeof sp.service === 'string' ? sp.service.split(',').filter(Boolean) : [])
 
-  // если нет локации — берём популярную по категории (для стабильных цен/локали)
+  // если нет локации — берём популярную по категории (для сетки / hero),
+  // но в мета без выбранных фильтров локацию не подставляем
   const fallbackLoc = await popularLocationForCategory(slug)
   const effLoc = hasAnyLocation ? { country, city, district } : fallbackLoc
 
+  // --------------------- чистая категория, без service ---------------------
   if (rawServices.length === 0) {
     return buildCategoryMetadata(`/${slug}`, {
       categoryLabelEn: nameEn,
       categoryLabelRu: nameRu,
       categoryLabelPl: namePl,
-      location: effLoc,
+      // локацию даём только если реально выбрана
+      location: hasAnyLocation ? effLoc : undefined,
     })
   }
 
-  // есть конкретная процедура(ы)
+  // --------------------- есть конкретная процедура(ы) ---------------------
   const sb = await createServerClient()
   const dict = await serviceLabels(sb, rawServices)
   const labels = rawServices.map(s => dict[s] ?? s.replace(/-/g, ' '))
-  const treatmentLabel = labels.length === 1 ? labels[0] : `${labels[0]} + ${labels.length - 1} more`
+  const treatmentLabel =
+    labels.length === 1 ? labels[0] : `${labels[0]} + ${labels.length - 1} more`
 
-  // диапазон цен для выбранной/подставленной локации
   let min: number | null = null
   let max: number | null = null
+  let currency: string | undefined
+
   try {
-    const { data } = await (await createServerClient())
-      .rpc('seo_treatment_price_range', {
-        p_category_slug: slug,             // по сигнатуре, но игнорится
-        p_service_slugs: rawServices.length ? rawServices : null,
-        p_city:     null,
-        p_country:  null,
-        p_district: null,
-      })
+    // rpc может вернуть min/max (+ возможно currency)
+    const { data } = await sb.rpc('seo_treatment_price_range', {
+      p_category_slug: slug,
+      p_service_slugs: rawServices.length ? rawServices : null,
+      p_city:     null,
+      p_country:  null,
+      p_district: null,
+    })
 
     const row = Array.isArray(data) ? data[0] : data
     if (row?.min != null) min = Math.round(Number(row.min))
     if (row?.max != null) max = Math.round(Number(row.max))
-  } catch {}
+
+    // пробуем несколько возможных имён поля с валютой
+    currency =
+      (row && (
+        row.currency ??
+        row.currency_code ??
+        row.min_currency ??
+        row.max_currency
+      )) || undefined
+
+    // если rpc валюту не дал — достаём её напрямую из clinic_services
+    if (!currency && rawServices.length > 0) {
+      const firstSlug = rawServices[0]
+
+      const { data: serviceRow } = await sb
+        .from('services')
+        .select('id')
+        .eq('slug', firstSlug)
+        .maybeSingle()
+
+      if (serviceRow?.id) {
+        const { data: csRow } = await sb
+          .from('clinic_services')
+          .select('currency')
+          .eq('service_id', serviceRow.id)
+          .not('currency', 'is', null)
+          .limit(1)
+          .maybeSingle()
+
+        if (csRow?.currency) {
+          currency = String(csRow.currency)
+        }
+      }
+    }
+  } catch {
+    // в случае ошибки просто оставим min/max как есть, а валюту — по умолчанию
+  }
 
   return buildTreatmentMetadata(`/${slug}`, {
     treatmentLabel,
-    location: effLoc,   // ← благодаря effLoc в title/desc не будет "Popular Destinations"
+    location: effLoc,
     minPrice: min,
     maxPrice: max,
-    currency: '€',
+    currency, // теперь это реальный код валюты (USD, EUR, TRY, ...)
   })
 }
 
