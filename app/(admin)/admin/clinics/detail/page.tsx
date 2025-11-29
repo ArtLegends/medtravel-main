@@ -1,4 +1,4 @@
-// app/(admin)/admin/clinics/[id]/page.tsx
+// app/(admin)/admin/clinics/detail/page.tsx
 
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
@@ -34,14 +34,35 @@ type DraftRow = {
   updated_at: string | null;
 };
 
+type SearchParams = {
+  id?: string;
+};
+
 export default async function ClinicEditorPage(
-  { params }: { params: Promise<{ id: string }> }
+  { searchParams }: { searchParams: Promise<SearchParams> }
 ) {
-  const { id } = await params;
+  const sp = await searchParams;
+  const id = sp.id;
+
+  if (!id) {
+    return (
+      <div className="p-6 space-y-4">
+        <h1 className="text-xl font-semibold">Clinic editor</h1>
+        <p className="text-sm text-gray-600">
+          Missing <code className="font-mono">id</code> query parameter.
+        </p>
+        <Link
+          href="/admin/clinics"
+          className="text-sm text-blue-600 hover:underline"
+        >
+          ← Back to list
+        </Link>
+      </div>
+    );
+  }
 
   const sb = createServiceClient();
 
-  // тянем клинику + черновик; НИГДЕ не вызываем notFound()
   const [{ data: clinic, error: clinicError }, { data: draft, error: draftError }] =
     await Promise.all([
       sb
@@ -56,7 +77,6 @@ export default async function ClinicEditorPage(
         .maybeSingle<DraftRow>(),
     ]);
 
-  // если прям ошибка Supabase — покажем её, но не 404
   if (clinicError || draftError) {
     return (
       <div className="p-6 space-y-4">
@@ -65,14 +85,16 @@ export default async function ClinicEditorPage(
           {clinicError && `clinics error: ${clinicError.message}\n\n`}
           {draftError && `drafts error: ${draftError.message}\n\n`}
         </pre>
-        <Link href="/admin/clinics" className="text-sm text-blue-600 hover:underline">
+        <Link
+          href="/admin/clinics"
+          className="text-sm text-blue-600 hover:underline"
+        >
           ← Back to list
         </Link>
       </div>
     );
   }
 
-  // если клиника не найдена — просто сообщение, а не notFound()
   if (!clinic) {
     return (
       <div className="p-6 space-y-4">
@@ -81,7 +103,10 @@ export default async function ClinicEditorPage(
           We could not find a clinic with id:{" "}
           <code className="font-mono">{id}</code>
         </p>
-        <Link href="/admin/clinics" className="text-sm text-blue-600 hover:underline">
+        <Link
+          href="/admin/clinics"
+          className="text-sm text-blue-600 hover:underline"
+        >
           ← Back to list
         </Link>
       </div>
@@ -114,7 +139,7 @@ export default async function ClinicEditorPage(
             {clinic.name || "(no name)"}
           </h1>
           <p className="text-sm text-gray-500">
-            Admin view & basic edit for clinic
+            Admin view &amp; basic edit for clinic
           </p>
         </div>
 
@@ -207,7 +232,7 @@ export default async function ClinicEditorPage(
         </div>
       </div>
 
-      {/* BASIC INFO / LOCATION (read-only preview for now) */}
+      {/* BASIC INFO / LOCATION */}
       <div className="space-y-8 rounded-2xl border bg-white p-6 shadow-sm">
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -238,7 +263,7 @@ export default async function ClinicEditorPage(
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Services & doctors (from draft)
+              Services &amp; doctors (from draft)
             </h2>
             <span className="text-xs text-gray-400">
               {services.length} service(s) • {doctors.length} doctor(s)
@@ -311,7 +336,7 @@ export default async function ClinicEditorPage(
           </div>
         </section>
 
-        {/* можно постепенно расширять: facilities, hours, gallery и т.п. */}
+        {/* дальше можно расширять: facilities, hours, gallery, payments */}
       </div>
     </div>
   );
@@ -323,7 +348,7 @@ function KV({ k, v }: { k: string; v?: string | null }) {
       <div className="w-32 shrink-0 text-xs font-medium uppercase tracking-wide text-gray-500">
         {k}
       </div>
-      <div className="flex-1 text-gray-800">{v || "-"}</div>
+      <div className="flex-1 text-gray-800">{v || "-"} </div>
     </div>
   );
 }
