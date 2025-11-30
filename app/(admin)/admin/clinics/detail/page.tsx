@@ -4,6 +4,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { clinicPath } from "@/lib/clinic-url";
+import ClinicDraftEditor from "@/components/admin/ClinicDraftEditor";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -206,27 +207,52 @@ export default async function ClinicEditorPage({
   }
 
   const basic = (draft?.basic_info ?? {}) as any;
+
   const services = (Array.isArray(draft?.services)
-    ? draft!.services
+    ? (draft!.services as any[])
     : []) as any[];
+
   const doctors = (Array.isArray(draft?.doctors)
-    ? draft!.doctors
+    ? (draft!.doctors as any[])
     : []) as any[];
+
   const hours = (Array.isArray(draft?.hours)
-    ? draft!.hours
+    ? (draft!.hours as any[])
     : []) as any[];
+
   const gallery = (Array.isArray(draft?.gallery)
-    ? draft!.gallery
+    ? (draft!.gallery as any[])
     : []) as any[];
-  const facilities = (draft?.facilities ?? {
-    premises: [],
-    clinic_services: [],
-    travel_services: [],
-    languages_spoken: [],
-  }) as any;
-  const payments = (Array.isArray(draft?.pricing)
-    ? draft!.pricing
-    : []) as any[];
+
+  const rawFacilities = (draft?.facilities ?? {}) as any;
+  const facilities = {
+    premises: Array.isArray(rawFacilities.premises)
+      ? rawFacilities.premises
+      : [],
+    clinic_services: Array.isArray(rawFacilities.clinic_services)
+      ? rawFacilities.clinic_services
+      : [],
+    travel_services: Array.isArray(rawFacilities.travel_services)
+      ? rawFacilities.travel_services
+      : [],
+    languages_spoken: Array.isArray(rawFacilities.languages_spoken)
+      ? rawFacilities.languages_spoken
+      : [],
+  };
+
+  const payments: string[] = Array.isArray(draft?.pricing)
+    ? (draft!.pricing as any[])
+        .map((x) => {
+          if (typeof x === "string") return x;
+          if (x && typeof x.method === "string") return x.method;
+          return null;
+        })
+        .filter(
+          (v: unknown): v is string =>
+            typeof v === "string" && v.trim().length > 0,
+        )
+    : [];
+
   const location = (draft?.location ?? {}) as any;
 
   const formatDate = (v?: string | null) =>
@@ -481,112 +507,15 @@ export default async function ClinicEditorPage({
           </div>
         </section>
 
-        {/* SERVICES / DOCTORS / JSON FIELDS */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Services, doctors &amp; other data
-            </h2>
-            <span className="text-xs text-gray-400">
-              JSON fields – edit carefully
-            </span>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 text-sm">
-            <Field label={`Services JSON (${services.length})`}>
-              <textarea
-                name="draft_services"
-                defaultValue={
-                  services.length
-                    ? JSON.stringify(services, null, 2)
-                    : ""
-                }
-                rows={10}
-                className="font-mono w-full rounded border px-3 py-2 text-xs"
-                placeholder='[ { "name": "My service", "price": 1000, "currency": "USD", "description": "..." } ]'
-              />
-            </Field>
-
-            <Field label={`Doctors JSON (${doctors.length})`}>
-              <textarea
-                name="draft_doctors"
-                defaultValue={
-                  doctors.length
-                    ? JSON.stringify(doctors, null, 2)
-                    : ""
-                }
-                rows={10}
-                className="font-mono w-full rounded border px-3 py-2 text-xs"
-                placeholder='[ { "fullName": "Dr Name", "title": "Chief", "specialty": "Dentist" } ]'
-              />
-            </Field>
-
-            <Field label={`Hours JSON (${hours.length})`}>
-              <textarea
-                name="draft_hours"
-                defaultValue={
-                  hours.length ? JSON.stringify(hours, null, 2) : ""
-                }
-                rows={8}
-                className="font-mono w-full rounded border px-3 py-2 text-xs"
-                placeholder='[ { "day": "Monday", "status": "open", "start": "09:00", "end": "18:00" } ]'
-              />
-            </Field>
-
-            <Field label={`Gallery JSON (${gallery.length})`}>
-              <textarea
-                name="draft_gallery"
-                defaultValue={
-                  gallery.length
-                    ? JSON.stringify(gallery, null, 2)
-                    : ""
-                }
-                rows={8}
-                className="font-mono w-full rounded border px-3 py-2 text-xs"
-                placeholder='[ { "url": "https://...", "title": "Lobby" } ]'
-              />
-            </Field>
-
-            <Field label="Facilities JSON">
-              <textarea
-                name="draft_facilities"
-                defaultValue={
-                  facilities &&
-                  Object.keys(facilities).length > 0
-                    ? JSON.stringify(facilities, null, 2)
-                    : ""
-                }
-                rows={8}
-                className="font-mono w-full rounded border px-3 py-2 text-xs"
-                placeholder='{ "premises": ["Free Wi-Fi"], "clinic_services": ["Online consultation"], ... }'
-              />
-            </Field>
-
-            <Field label={`Payment methods JSON (${payments.length})`}>
-              <textarea
-                name="draft_pricing"
-                defaultValue={
-                  payments.length
-                    ? JSON.stringify(payments, null, 2)
-                    : ""
-                }
-                rows={8}
-                className="font-mono w-full rounded border px-3 py-2 text-xs"
-                placeholder='[ "Visa", "Cash", "BTC" ] или [ { "method": "Visa" }, ... ]'
-              />
-            </Field>
-          </div>
-
-          <p className="text-xs text-gray-500">
-            Все поля выше полностью контролируют содержимое
-            профиля клиники (услуги, доктора, расписание, галерея,
-            доп. услуги и способы оплаты). Можно добавлять/удалять
-            элементы в JSON, после сохранения они попадут в
-            <code className="ml-1 font-mono">clinic_profile_drafts</code>
-            и будут использоваться системой так же, как драфты
-            модерации.
-          </p>
-        </section>
+        {/* SERVICES / DOCTORS / GALLERY / FACILITIES / PAYMENTS */}
+        <ClinicDraftEditor
+          initialServices={services}
+          initialDoctors={doctors}
+          initialHours={hours}
+          initialGallery={gallery}
+          initialFacilities={facilities}
+          initialPricing={payments}
+        />
       </div>
 
       {/* ACTIONS */}
