@@ -93,7 +93,7 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя — авторизация клиники или партнёра в отдельных модалках */
+/** Дропдаун гостя — выбор: клиника или партнёр */
 function ProfileDropdownGuest({
   onOpenCustomerAuth,
   onOpenPartnerAuth,
@@ -124,7 +124,7 @@ function ProfileDropdownGuest({
   );
 }
 
-/** Дропдаун авторизованного (клиника + опционально админ) */
+/** Дропдаун авторизованного */
 function ProfileDropdownAuth({
   session,
   role,
@@ -144,8 +144,9 @@ function ProfileDropdownAuth({
     router.refresh();
   }, [supabase, router]);
 
-  const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
-  const isPartner = role === "PARTNER";
+  const upperRole = String(role || "").toUpperCase();
+  const isAdmin = upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
+  const isPartner = upperRole === "PARTNER";
 
   return (
     <Dropdown placement="bottom-end">
@@ -177,37 +178,49 @@ function ProfileDropdownAuth({
           </p>
         </DropdownItem>
 
-        {/* My settings */}
-        <DropdownItem
-          key="settings"
-          onPress={() => router.push("/settings")}
-          startContent={<Icon icon="solar:settings-linear" width={16} />}
-        >
-          {tSafe(t, "navbar.mySettings", "My settings")}
-        </DropdownItem>
-
-        {/* My clinic (Customer panel) */}
-        <DropdownItem
-          key="my-clinic"
-          onPress={() => router.push("/customer")}
-          startContent={<Icon icon="solar:hospital-linear" width={16} />}
-        >
-          My clinic
-        </DropdownItem>
-
-        {/* Partner panel */}
         {isPartner ? (
-          <DropdownItem
-            key="partner-panel"
-            onPress={() => router.push("/partner")}
-            startContent={
-              <Icon icon="solar:users-group-two-rounded-linear" width={16} />
-            }
-          >
-            Partner panel
-          </DropdownItem>
+          <>
+            {/* Партнёрская панель */}
+            <DropdownItem
+              key="partner-dashboard"
+              onPress={() => router.push("/partner")}
+              startContent={
+                <Icon
+                  icon="solar:users-group-two-rounded-linear"
+                  width={16}
+                />
+              }
+            >
+              My dashboard
+            </DropdownItem>
+            <DropdownItem
+              key="partner-settings"
+              onPress={() => router.push("/partner/settings")}
+              startContent={<Icon icon="solar:settings-linear" width={16} />}
+            >
+              My settings
+            </DropdownItem>
+          </>
         ) : (
-          <></>
+          <>
+            {/* Обычные пользовательские настройки */}
+            <DropdownItem
+              key="settings"
+              onPress={() => router.push("/settings")}
+              startContent={<Icon icon="solar:settings-linear" width={16} />}
+            >
+              {tSafe(t, "navbar.mySettings", "My settings")}
+            </DropdownItem>
+
+            {/* Клиентская панель (кастомер) */}
+            <DropdownItem
+              key="my-clinic"
+              onPress={() => router.push("/customer")}
+              startContent={<Icon icon="solar:hospital-linear" width={16} />}
+            >
+              My clinic
+            </DropdownItem>
+          </>
         )}
 
         {/* Admin panel */}
@@ -219,9 +232,7 @@ function ProfileDropdownAuth({
           >
             {tSafe(t, "navbar.adminPanel", "Admin panel")}
           </DropdownItem>
-        ) : (
-          <></>
-        )}
+        ) : null}
 
         <DropdownItem
           key="logout"
@@ -241,10 +252,10 @@ export const Navbar = React.memo(() => {
   const { supabase, session, role } =
     useSupabase() as SupabaseContextType;
 
-    const pathname = usePathname() ?? "";
-    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-    const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
-    const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
+  const pathname = usePathname() ?? "";
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
+  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
 
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
   useMemo(() => getAccessibleProfileMenuItems(role), [role]);
@@ -325,7 +336,7 @@ export const Navbar = React.memo(() => {
             <ThemeSwitch />
           </NavbarItem>
           <NavbarItem className="px-2">
-          {session ? (
+            {session ? (
               <ProfileDropdownAuth
                 session={session}
                 role={role}
