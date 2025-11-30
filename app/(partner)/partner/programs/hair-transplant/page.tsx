@@ -3,6 +3,7 @@ import ProgramDetail, {
   } from "@/components/partner/ProgramDetail";
   
   const CONFIG: ProgramDetailConfig = {
+    key: "hair-transplant",
     name: "Hair Transplant",
     rewardRate: "5%",
     cookieLifetime: "90 days",

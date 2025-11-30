@@ -1942,6 +1942,69 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          is_read: boolean
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          is_read?: boolean
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          is_read?: boolean
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      partner_program_requests: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          program_key: string
+          ref_code: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          program_key: string
+          ref_code?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          program_key?: string
+          ref_code?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       patients: {
         Row: {
           clinic_id: string

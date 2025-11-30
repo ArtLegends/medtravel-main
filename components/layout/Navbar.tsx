@@ -34,6 +34,7 @@ import {
 } from "@/config/nav";
 import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
 import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
 
 // безопасный текст без жёсткой завязки на i18n
 const tSafe = (t: any, key: string, fallback: string) => {
@@ -335,6 +336,14 @@ export const Navbar = React.memo(() => {
           <NavbarItem>
             <ThemeSwitch />
           </NavbarItem>
+
+          {/* колокольчик только для авторизованных */}
+          {session && (
+            <NavbarItem>
+              <NotificationsBell />
+            </NavbarItem>
+          )}
+
           <NavbarItem className="px-2">
             {session ? (
               <ProfileDropdownAuth

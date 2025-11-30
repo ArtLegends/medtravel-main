@@ -10,7 +10,6 @@ const mainNav = [
   { label: "Reports", href: "/partner/reports" },
   { label: "Bookings", href: "/partner/bookings" },
   { label: "Finance", href: "/partner/finance" },
-  { label: "Settings", href: "/partner/settings" },
 ];
 
 const financeSubNav = [

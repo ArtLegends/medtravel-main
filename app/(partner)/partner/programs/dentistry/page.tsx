@@ -3,6 +3,7 @@ import ProgramDetail, {
   } from "@/components/partner/ProgramDetail";
   
   const CONFIG: ProgramDetailConfig = {
+    key: "dentistry",
     name: "Dentistry",
     rewardRate: "5%",
     cookieLifetime: "90 days",
