@@ -33,6 +33,7 @@ import {
   getAccessibleProfileMenuItems,
 } from "@/config/nav";
 import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
+import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
 
 // безопасный текст без жёсткой завязки на i18n
 const tSafe = (t: any, key: string, fallback: string) => {
@@ -92,8 +93,14 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя — только кнопка открытия модалки (клиника) */
-function ProfileDropdownGuest({ onOpenAuth }: { onOpenAuth: () => void }) {
+/** Дропдаун гостя — авторизация клиники или партнёра в отдельных модалках */
+function ProfileDropdownGuest({
+  onOpenCustomerAuth,
+  onOpenPartnerAuth,
+}: {
+  onOpenCustomerAuth: () => void;
+  onOpenPartnerAuth: () => void;
+}) {
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
@@ -106,8 +113,11 @@ function ProfileDropdownGuest({ onOpenAuth }: { onOpenAuth: () => void }) {
         </Button>
       </DropdownTrigger>
       <DropdownMenu aria-label="Guest Actions" variant="flat">
-        <DropdownItem key="signin" onPress={onOpenAuth}>
+        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
           Sign in / Sign up as clinic
+        </DropdownItem>
+        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
+          Sign in / Sign up as partner
         </DropdownItem>
       </DropdownMenu>
     </Dropdown>
@@ -135,6 +145,7 @@ function ProfileDropdownAuth({
   }, [supabase, router]);
 
   const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
+  const isPartner = role === "PARTNER";
 
   return (
     <Dropdown placement="bottom-end">
@@ -184,6 +195,21 @@ function ProfileDropdownAuth({
           My clinic
         </DropdownItem>
 
+        {/* Partner panel */}
+        {isPartner ? (
+          <DropdownItem
+            key="partner-panel"
+            onPress={() => router.push("/partner")}
+            startContent={
+              <Icon icon="solar:users-group-two-rounded-linear" width={16} />
+            }
+          >
+            Partner panel
+          </DropdownItem>
+        ) : (
+          <></>
+        )}
+
         {/* Admin panel */}
         {isAdmin ? (
           <DropdownItem
@@ -193,7 +219,9 @@ function ProfileDropdownAuth({
           >
             {tSafe(t, "navbar.adminPanel", "Admin panel")}
           </DropdownItem>
-        ) : null}
+        ) : (
+          <></>
+        )}
 
         <DropdownItem
           key="logout"
@@ -213,9 +241,10 @@ export const Navbar = React.memo(() => {
   const { supabase, session, role } =
     useSupabase() as SupabaseContextType;
 
-  const pathname = usePathname() ?? "";
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [authOpen, setAuthOpen] = React.useState(false);
+    const pathname = usePathname() ?? "";
+    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+    const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
+    const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
 
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
   useMemo(() => getAccessibleProfileMenuItems(role), [role]);
@@ -296,7 +325,7 @@ export const Navbar = React.memo(() => {
             <ThemeSwitch />
           </NavbarItem>
           <NavbarItem className="px-2">
-            {session ? (
+          {session ? (
               <ProfileDropdownAuth
                 session={session}
                 role={role}
@@ -305,7 +334,8 @@ export const Navbar = React.memo(() => {
               />
             ) : (
               <ProfileDropdownGuest
-                onOpenAuth={() => setAuthOpen(true)}
+                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
+                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
               />
             )}
           </NavbarItem>
@@ -329,10 +359,14 @@ export const Navbar = React.memo(() => {
         </NavbarMenu>
       </HeroUINavbar>
 
-      {/* Модалка авторизации кастомера (клиника) */}
+      {/* Модалки авторизации */}
       <CustomerAuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
+        open={customerAuthOpen}
+        onClose={() => setCustomerAuthOpen(false)}
+      />
+      <PartnerAuthModal
+        open={partnerAuthOpen}
+        onClose={() => setPartnerAuthOpen(false)}
       />
     </>
   );
