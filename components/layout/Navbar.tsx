@@ -146,8 +146,12 @@ function ProfileDropdownAuth({
   }, [supabase, router]);
 
   const upperRole = String(role || "").toUpperCase();
-  const isAdmin = upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
-  const isPartner = upperRole === "PARTNER";
+
+  // единая система ролей
+  const canAccessAdmin =
+    upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
+  const canAccessCustomer = upperRole === "CUSTOMER" || canAccessAdmin;
+  const canAccessPartner = upperRole === "PARTNER" || canAccessAdmin;
 
   return (
     <Dropdown placement="bottom-end">
@@ -179,53 +183,44 @@ function ProfileDropdownAuth({
           </p>
         </DropdownItem>
 
-        {isPartner ? (
-          <>
-            {/* Партнёрская панель */}
-            <DropdownItem
-              key="partner-dashboard"
-              onPress={() => router.push("/partner")}
-              startContent={
-                <Icon
-                  icon="solar:users-group-two-rounded-linear"
-                  width={16}
-                />
-              }
-            >
-              My dashboard
-            </DropdownItem>
-            <DropdownItem
-              key="partner-settings"
-              onPress={() => router.push("/partner/settings")}
-              startContent={<Icon icon="solar:settings-linear" width={16} />}
-            >
-              My settings
-            </DropdownItem>
-          </>
-        ) : (
-          <>
-            {/* Обычные пользовательские настройки */}
-            <DropdownItem
-              key="settings"
-              onPress={() => router.push("/settings")}
-              startContent={<Icon icon="solar:settings-linear" width={16} />}
-            >
-              {tSafe(t, "navbar.mySettings", "My settings")}
-            </DropdownItem>
+        {/* единые настройки для любой роли */}
+        <DropdownItem
+          key="settings"
+          onPress={() => router.push("/settings")}
+          startContent={<Icon icon="solar:settings-linear" width={16} />}
+        >
+          {tSafe(t, "navbar.mySettings", "My settings")}
+        </DropdownItem>
 
-            {/* Клиентская панель (кастомер) */}
-            <DropdownItem
-              key="my-clinic"
-              onPress={() => router.push("/customer")}
-              startContent={<Icon icon="solar:hospital-linear" width={16} />}
-            >
-              My clinic
-            </DropdownItem>
-          </>
-        )}
+        {/* Клиентская панель (кастомер) */}
+        {canAccessCustomer ? (
+          <DropdownItem
+            key="my-clinic"
+            onPress={() => router.push("/customer")}
+            startContent={<Icon icon="solar:hospital-linear" width={16} />}
+          >
+            My clinic
+          </DropdownItem>
+        ) : null}
+
+        {/* Партнёрская панель — доступна партнёру и админу */}
+        {canAccessPartner ? (
+          <DropdownItem
+            key="partner-dashboard"
+            onPress={() => router.push("/partner")}
+            startContent={
+              <Icon
+                icon="solar:users-group-two-rounded-linear"
+                width={16}
+              />
+            }
+          >
+            My dashboard
+          </DropdownItem>
+        ) : null}
 
         {/* Admin panel */}
-        {isAdmin ? (
+        {canAccessAdmin ? (
           <DropdownItem
             key="admin"
             onPress={() => router.push("/admin")}
@@ -355,7 +350,9 @@ export const Navbar = React.memo(() => {
             ) : (
               <ProfileDropdownGuest
                 onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
-                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
+                onOpenPartnerAuth={() =>
+                  setPartnerAuthOpen(true)
+                }
               />
             )}
           </NavbarItem>
