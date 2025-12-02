@@ -183,8 +183,17 @@ export async function submitForReview() {
 
   const safe = (v: unknown) => (typeof v === "string" ? v.trim() : null);
 
-  // mapUrl из location → map_embed_url в clinics
+  // mapUrl / directions из location
   const map_embed_url = safe(location.mapUrl);
+  const directions = safe(location.directions);
+
+  const location_json =
+    map_embed_url || directions
+      ? {
+          mapUrl: map_embed_url,
+          directions,
+        }
+      : null;
 
   // slug нормализация
   const slugify = (s: string) =>
@@ -209,6 +218,10 @@ export async function submitForReview() {
     map_embed_url,
     payments,
   };
+
+  if (location_json) {
+    clinicUpdate.location = location_json;
+  }
 
   // если клиника ещё НЕ опубликована – это первый сабмит на модерацию
   if (!alreadyPublished) {

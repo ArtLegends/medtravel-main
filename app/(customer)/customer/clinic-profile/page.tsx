@@ -87,6 +87,48 @@ type FacilitiesState = {
 
 type GalleryItem = { url: string; title?: string };
 
+// ==== COMMON CONSTANTS / HELPERS ====
+
+const COMMON_CURRENCIES = ["USD", "EUR", "GBP", "TRY", "AED", "SAR"];
+
+const PRESET_PAYMENT_METHODS = [
+  "Visa",
+  "Mastercard",
+  "American Express",
+  "Payoneer",
+  "Cash",
+  "BTC",
+  "ETH",
+  "USDT",
+];
+
+const PAYMENT_ICON_MAP: Record<string, { icon: string }> = {
+  default: { icon: "mdi:credit-card-outline" },
+  visa: { icon: "mdi:credit-card-outline" },
+  mastercard: { icon: "mdi:credit-card-outline" },
+  americanexpress: { icon: "mdi:credit-card-outline" },
+  amex: { icon: "mdi:credit-card-outline" },
+  payoneer: { icon: "mdi:credit-card-outline" },
+  cash: { icon: "mdi:cash-multiple" },
+  btc: { icon: "mdi:bitcoin" },
+  bitcoin: { icon: "mdi:bitcoin" },
+  eth: { icon: "mdi:ethereum" },
+  ethereum: { icon: "mdi:ethereum" },
+  usdt: { icon: "mdi:currency-usd-circle" },
+};
+
+function normalizePaymentKey(label: string) {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+}
+
+function normalizeAmenityLabel(label: string) {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 /* -------------------------------- Page -------------------------------- */
 
 export default function ClinicProfilePage() {
@@ -857,7 +899,8 @@ function ServicesSection({
 
   function handleSave() {
     if (!draft.name.trim()) return;
-    const next = {
+
+    const next: ServiceRow = {
       ...draft,
       currency: (draft.currency || "USD").toUpperCase(),
     };
@@ -873,7 +916,12 @@ function ServicesSection({
   return (
     <>
       <div className="text-lg font-semibold">Services</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <p className="mt-1 text-sm text-gray-500">
+        Add treatments, prices and currencies. Currency codes are stored in
+        uppercase (USD, EUR, etc.).
+      </p>
+
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field
           label="Service Name *"
           value={draft.name}
@@ -886,14 +934,55 @@ function ServicesSection({
           onChange={(v) => setDraft((d) => ({ ...d, price: v }))}
           placeholder="Enter price"
         />
-        <Field
-          label="Currency"
-          value={draft.currency}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, currency: v.toUpperCase() }))
-          }
-          placeholder="USD"
-        />
+
+        {/* Currency + аккордеон с популярными валютами */}
+        <div className="space-y-1">
+          <Field
+            label="Currency"
+            value={draft.currency}
+            onChange={(v) =>
+              setDraft((d) => ({ ...d, currency: v.toUpperCase() }))
+            }
+            placeholder="USD"
+          />
+          <details className="rounded-md border bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <summary className="flex cursor-pointer items-center justify-between list-none">
+              <span className="flex items-center gap-1">
+                <Icon
+                  icon="mdi:currency-usd-circle"
+                  className="h-4 w-4 text-sky-600"
+                />
+                <span>Common currencies</span>
+              </span>
+              <span className="text-[10px] uppercase tracking-wide">
+                Tap to expand
+              </span>
+            </summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {COMMON_CURRENCIES.map((code) => {
+                const active = draft.currency.toUpperCase() === code;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() =>
+                      setDraft((d) => ({ ...d, currency: code }))
+                    }
+                    className={clsx(
+                      "inline-flex items-center rounded-full border px-3 py-1 text-[11px]",
+                      active
+                        ? "border-sky-500 bg-sky-50 text-sky-700"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    {code}
+                  </button>
+                );
+              })}
+            </div>
+          </details>
+        </div>
+
         <Field
           label="Description"
           value={draft.description || ""}
@@ -902,7 +991,7 @@ function ServicesSection({
         />
       </div>
 
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-2 mt-3">
         <button
           onClick={handleSave}
           className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
@@ -1251,6 +1340,35 @@ const AMENITY_ICON_OPTIONS: {
   { value: "globe", label: "Global / international", icon: "mdi:earth" },
 ];
 
+const PRESET_PREMISES = [
+  "Private rooms",
+  "Operating rooms",
+  "Recovery rooms",
+  "ICU / intensive care",
+];
+
+const PRESET_CLINIC_SERVICES = [
+  "Consultation",
+  "Diagnosis",
+  "Treatment",
+  "Follow-up care",
+];
+
+const PRESET_TRAVEL_SERVICES = [
+  "Airport pick-up",
+  "Hotel booking",
+  "Clinic transfer",
+  "Translation assistance",
+];
+
+const PRESET_LANGUAGES = [
+  "English",
+  "Turkish",
+  "Russian",
+  "Arabic",
+  "Spanish",
+];
+
 function IconPicker({
   value,
   onChange,
@@ -1320,19 +1438,38 @@ function AmenityGroupField({
   placeholder,
   items,
   onChange,
+  suggestions,
 }: {
   label: string;
   placeholder: string;
   items: AmenityItem[];
   onChange: (items: AmenityItem[]) => void;
+  suggestions?: string[];
 }) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<string | undefined>(undefined);
 
-  function handleAdd() {
-    const v = name.trim();
+  const existingKeys = useMemo(
+    () => new Set(items.map((it) => normalizeAmenityLabel(it.label))),
+    [items]
+  );
+
+  function addAmenity(raw: string, iconOverride?: string) {
+    const v = raw.trim();
     if (!v) return;
-    onChange([...items, { label: v, icon }]);
+    const key = normalizeAmenityLabel(v);
+    if (!key || existingKeys.has(key)) {
+      // уже есть такой (с учётом регистра/пробелов) – не добавляем
+      return;
+    }
+    onChange([
+      ...items,
+      { label: v, icon: iconOverride ?? icon ?? undefined },
+    ]);
+  }
+
+  function handleAdd() {
+    addAmenity(name);
     setName("");
     setIcon(undefined);
   }
@@ -1356,6 +1493,46 @@ function AmenityGroupField({
           Add
         </button>
       </div>
+
+      {suggestions && suggestions.length > 0 && (
+        <details className="mt-1 rounded-md border bg-gray-50 px-3 py-2 text-[11px] text-gray-600">
+          <summary className="flex cursor-pointer items-center justify-between list-none">
+            <span className="flex items-center gap-1">
+              <Icon
+                icon="solar:menu-dots-bold"
+                className="h-4 w-4 text-sky-600"
+              />
+              <span>Choose from common options</span>
+            </span>
+            <span className="text-[9px] uppercase tracking-wide">
+              Tap to expand
+            </span>
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {suggestions.map((s) => {
+              const key = normalizeAmenityLabel(s);
+              const exists = existingKeys.has(key);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={exists}
+                  onClick={() => addAmenity(s)}
+                  className={clsx(
+                    "inline-flex items-center rounded-full border px-2.5 py-1",
+                    "text-[11px]",
+                    exists
+                      ? "border-gray-200 bg-gray-100 text-gray-400 cursor-default"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      )}
 
       {!items.length ? (
         <p className="mt-1 text-xs text-gray-400">No items yet.</p>
@@ -1623,43 +1800,55 @@ function AdditionalSection({
       <div className="text-lg font-semibold">
         Additional Services & Facilities
       </div>
+      <p className="mt-1 text-sm text-gray-500">
+        Choose common services from the lists or add your own custom items.
+      </p>
 
-      <AmenityGroupField
-        label="Premises"
-        placeholder="Operating rooms, recovery rooms, etc."
-        items={value.premises}
-        onChange={(items) => onChange({ ...value, premises: items })}
-      />
-      <div className="h-2" />
+      <div className="mt-4 grid gap-6 md:grid-cols-2">
+        {/* левая колонка */}
+        <div className="space-y-6">
+          <AmenityGroupField
+            label="Premises"
+            placeholder="Operating rooms, recovery rooms, etc."
+            items={value.premises}
+            onChange={(items) => onChange({ ...value, premises: items })}
+            suggestions={PRESET_PREMISES}
+          />
 
-      <AmenityGroupField
-        label="Clinic Services"
-        placeholder="Consultation, diagnosis, treatment, etc."
-        items={value.clinic_services}
-        onChange={(items) =>
-          onChange({ ...value, clinic_services: items })
-        }
-      />
-      <div className="h-2" />
+          <AmenityGroupField
+            label="Clinic Services"
+            placeholder="Consultation, diagnosis, treatment, etc."
+            items={value.clinic_services}
+            onChange={(items) =>
+              onChange({ ...value, clinic_services: items })
+            }
+            suggestions={PRESET_CLINIC_SERVICES}
+          />
+        </div>
 
-      <AmenityGroupField
-        label="Travel Services"
-        placeholder="Airport pickup, accommodation, etc."
-        items={value.travel_services}
-        onChange={(items) =>
-          onChange({ ...value, travel_services: items })
-        }
-      />
-      <div className="h-2" />
+        {/* правая колонка */}
+        <div className="space-y-6">
+          <AmenityGroupField
+            label="Travel Services"
+            placeholder="Airport pickup, accommodation, etc."
+            items={value.travel_services}
+            onChange={(items) =>
+              onChange({ ...value, travel_services: items })
+            }
+            suggestions={PRESET_TRAVEL_SERVICES}
+          />
 
-      <AmenityGroupField
-        label="Languages Spoken"
-        placeholder="English, Spanish, French, etc."
-        items={value.languages_spoken}
-        onChange={(items) =>
-          onChange({ ...value, languages_spoken: items })
-        }
-      />
+          <AmenityGroupField
+            label="Languages Spoken"
+            placeholder="English, Spanish, French, etc."
+            items={value.languages_spoken}
+            onChange={(items) =>
+              onChange({ ...value, languages_spoken: items })
+            }
+            suggestions={PRESET_LANGUAGES}
+          />
+        </div>
+      </div>
     </>
   );
 }
@@ -1957,25 +2146,91 @@ function PaymentsSection({
 }) {
   const [draft, setDraft] = useState("");
 
+  const existingKeys = useMemo(
+    () => new Set(rows.map((r) => normalizePaymentKey(r))),
+    [rows]
+  );
+
+  function handleAdd(raw: string) {
+    const label = raw.trim();
+    if (!label) return;
+    const key = normalizePaymentKey(label);
+    if (!key || existingKeys.has(key)) {
+      // уже есть такой метод (visa / VISA / Visa  и т.п.) – не добавляем
+      return;
+    }
+    onAdd(label);
+  }
+
   return (
     <>
       <div className="text-lg font-semibold">Payment Methods</div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <p className="mt-1 text-sm text-gray-500">
+        Select popular payment methods or add your own. We will try to avoid
+        duplicates even if the spelling is slightly different.
+      </p>
+
+      {/* Аккордеон с типовыми методами */}
+      <div className="mt-3">
+        <details className="rounded-md border bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <summary className="flex cursor-pointer items-center justify-between list-none">
+            <span className="flex items-center gap-1">
+              <Icon
+                icon="mdi:credit-card-outline"
+                className="h-4 w-4 text-sky-600"
+              />
+            <span>Common payment methods</span>
+            </span>
+            <span className="text-[10px] uppercase tracking-wide">
+              Tap to expand
+            </span>
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {PRESET_PAYMENT_METHODS.map((label) => {
+              const key = normalizePaymentKey(label);
+              const exists = existingKeys.has(key);
+              const def =
+                PAYMENT_ICON_MAP[key] ?? PAYMENT_ICON_MAP["default"];
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={exists}
+                  onClick={() => handleAdd(label)}
+                  className={clsx(
+                    "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px]",
+                    exists
+                      ? "border-gray-200 bg-gray-100 text-gray-400 cursor-default"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  <Icon
+                    icon={def.icon}
+                    className="h-4 w-4 text-sky-600"
+                  />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      </div>
+
+      {/* Кастомный инпут */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field
           label="Payment Method"
           value={draft}
           onChange={setDraft}
-          placeholder="e.g., Visa, Cash, Insurance"
+          placeholder="e.g., Bank transfer, Insurance"
         />
       </div>
       <button
         onClick={() => {
-          const v = draft.trim();
-          if (!v) return;
-          onAdd(v);
+          handleAdd(draft);
           setDraft("");
         }}
-        className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
+        className="mt-2 rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
       >
         + Add Payment Method
       </button>
@@ -1983,21 +2238,31 @@ function PaymentsSection({
       {!rows.length ? (
         <p className="mt-2 text-sm text-gray-400">No payment methods yet.</p>
       ) : (
-        <div className="mt-2 space-y-2">
-          {rows.map((p, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-            >
-              <div className="font-medium">{p}</div>
-              <button
-                onClick={() => onRemove(i)}
-                className="text-gray-500 hover:text-rose-600"
+        <div className="mt-3 space-y-2">
+          {rows.map((p, i) => {
+            const key = normalizePaymentKey(p);
+            const def = PAYMENT_ICON_MAP[key] ?? PAYMENT_ICON_MAP["default"];
+            return (
+              <div
+                key={`${p}-${i}`}
+                className="flex items-center justify-between rounded border px-3 py-2 text-sm"
               >
-                Delete
-              </button>
-            </div>
-          ))}
+                <div className="flex items-center gap-2">
+                  <Icon
+                    icon={def.icon}
+                    className="h-4 w-4 text-sky-600"
+                  />
+                  <span className="font-medium">{p}</span>
+                </div>
+                <button
+                  onClick={() => onRemove(i)}
+                  className="text-gray-500 hover:text-rose-600"
+                >
+                  Delete
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </>

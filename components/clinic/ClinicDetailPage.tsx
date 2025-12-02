@@ -20,6 +20,51 @@ type ReviewRow = { id: string; review: string | null; rating_overall: number | n
 
 type AmenityItem = { label: string; icon?: string | null };
 
+const PAYMENT_ICON_MAP = {
+  default: { icon: "mdi:credit-card-outline" },
+  visa: { icon: "mdi:credit-card-outline" },
+  mastercard: { icon: "mdi:credit-card-outline" },
+  americanexpress: { icon: "mdi:credit-card-outline" },
+  amex: { icon: "mdi:credit-card-outline" },
+  payoneer: { icon: "mdi:credit-card-outline" },
+  cash: { icon: "mdi:cash-multiple" },
+  btc: { icon: "mdi:bitcoin" },
+  bitcoin: { icon: "mdi:bitcoin" },
+  eth: { icon: "mdi:ethereum" },
+  ethereum: { icon: "mdi:ethereum" },
+  usdt: { icon: "mdi:currency-usd-circle" },
+} as const;
+
+function normalizePaymentKey(label: string) {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+}
+
+const CURRENCY_SIGN_MAP: Record<string, string> = {
+  usd: "$",
+  eur: "€",
+  gbp: "£",
+  try: "₺",
+  uah: "₴",
+  rub: "₽",
+  pln: "zł",
+  aed: "د.إ",
+  sar: "﷼",
+  chf: "CHF",
+  cad: "$",
+  aud: "$",
+};
+
+function formatServicePrice(price: any, currency: any): string {
+  const value = String(price ?? "").trim();
+  if (!value) return "—";
+  const code = String(currency ?? "").trim().toUpperCase();
+  if (!code) return value;
+  const sign = CURRENCY_SIGN_MAP[code.toLowerCase()] ?? code;
+  return `${value} ${sign}`;
+}
+
+type PaymentView = { label: string; key: string };
+
 function normalizeAmenityArray(raw: any): AmenityItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -146,30 +191,37 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
   const imgs: string[] = rawImages
     .map((v) => {
-      if (typeof v === 'string') return v;
-      if (v && typeof v.url === 'string') return v.url;
-      if (v && typeof v.image === 'string') return v.image;
-      if (v && typeof v.src === 'string') return v.src;
+      if (typeof v === "string") return v;
+      if (v && typeof v.url === "string") return v.url;
+      if (v && typeof v.image === "string") return v.image;
+      if (v && typeof v.src === "string") return v.src;
       return null;
     })
     .filter((v): v is string => !!v && v.trim().length > 0);
 
-    const paymentMethods: string[] = Array.isArray(extra.payments)
-    ? Array.from(
-        new Set(
-          extra.payments
-            .map((p: any) => {
-              if (typeof p === 'string') return p;
-              if (p && typeof p.method === 'string') return p.method;
-              if (p && typeof p.name === 'string') return p.name;
-              return null;
-            })
-            .filter(
-              (v: unknown): v is string =>
-                typeof v === 'string' && v.trim().length > 0
-            ),
-        ),
-      )
+  const paymentMethods: PaymentView[] = Array.isArray(extra.payments)
+    ? (() => {
+        const list: PaymentView[] = [];
+        const seen = new Set<string>();
+
+        for (const raw of extra.payments) {
+          let label: string | null = null;
+          if (typeof raw === "string") label = raw;
+          else if (raw && typeof raw.method === "string") label = raw.method;
+          else if (raw && typeof raw.name === "string") label = raw.name;
+
+          if (!label) continue;
+          const trimmed = label.trim();
+          if (!trimmed) continue;
+
+          const key = normalizePaymentKey(trimmed);
+          if (!key || seen.has(key)) continue;
+
+          seen.add(key);
+          list.push({ label: trimmed, key });
+        }
+        return list;
+      })()
     : [];
   
     const [open, setOpen] = useState(false)
@@ -258,7 +310,13 @@ export default function ClinicDetailPage({ clinic }: Props) {
   // адрес для отображения рядом с картой
   const address =
     clinic.location?.address ||
-    [clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ') || null;
+    [clinic.country, clinic.city, clinic.district].filter(Boolean).join(", ") ||
+    null;
+
+  const directionsText =
+    (clinic.location as any)?.directions ??
+    (clinic as any).directions ??
+    null;
 
   const mapSrc = useMemo(() => {
     const link =
@@ -276,7 +334,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const hasPhotos = imgs.length > 0;
   const hasAccreditations = accs.length > 0;
   const hasHours = Array.isArray((clinic as any).hours) && (clinic as any).hours.length > 0;
-  const hasLocation = Boolean(mapSrc || address);
+  const hasLocation = Boolean(mapSrc || address || directionsText);
 
   const sections = useMemo(() => {
     const s: { id: string; label: string }[] = [];
@@ -394,10 +452,8 @@ export default function ClinicDetailPage({ clinic }: Props) {
                 </thead>
                 <tbody className="divide-y text-sm">
                   {visibleServices.map((s: any) => {
-                    const desc = s?.description ?? s?.duration ?? '';
-                    const priceText = s?.price
-                      ? `${s.price}${s.currency ? ` ${s.currency}` : ''}`
-                      : '—';
+                    const desc = s?.description ?? s?.duration ?? "";
+                    const priceText = formatServicePrice(s?.price, s?.currency);
 
                     return (
                       <tr key={s.name}>
@@ -443,15 +499,24 @@ export default function ClinicDetailPage({ clinic }: Props) {
                   Accepted payment methods
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {paymentMethods.map((m) => (
-                    <span
-                      key={m}
-                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs md:text-sm"
-                    >
-                      {/* здесь можно позже навесить иконки по ключевым словам */}
-                      {m}
-                    </span>
-                  ))}
+                  {paymentMethods.map((m) => {
+                    const def =
+                      PAYMENT_ICON_MAP[
+                      m.key as keyof typeof PAYMENT_ICON_MAP
+                      ] ?? PAYMENT_ICON_MAP.default;
+                    return (
+                      <span
+                        key={m.key}
+                        className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs md:text-sm"
+                      >
+                        <Icon
+                          icon={def.icon}
+                          className="h-4 w-4 text-sky-600"
+                        />
+                        <span>{m.label}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -704,11 +769,24 @@ export default function ClinicDetailPage({ clinic }: Props) {
                   </div>
                 </div>
               ) : null}
+
+              {directionsText && (
+                <div className="mt-4 rounded-lg border bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                  <div className="mb-1 flex items-center gap-2 font-semibold">
+                    <Icon
+                      icon="solar:route-linear"
+                      className="h-4 w-4 text-sky-600"
+                    />
+                    <span>Directions &amp; transportation</span>
+                  </div>
+                  <p>{directionsText}</p>
+                </div>
+              )}
             </section>
           )}
 
           {/* Reports */}
-          <div className="pt-4">
+          <div className="pt-6 flex flex-col items-center gap-2">
             <button
               type="button"
               onClick={() => setReportOpen(true)}
@@ -716,6 +794,16 @@ export default function ClinicDetailPage({ clinic }: Props) {
             >
               Report
             </button>
+            <div className="flex max-w-xl items-center gap-2 text-center text-xs text-gray-500">
+              <Icon
+                icon="solar:shield-warning-bold"
+                className="h-4 w-4 text-amber-500"
+              />
+              <span>
+                If you notice inaccurate information, suspicious activity or
+                anything unusual on this page, please send us a report.
+              </span>
+            </div>
           </div>
 
           {/* ====== Reviews (preview) ====== */}
