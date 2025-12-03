@@ -23,6 +23,7 @@ type ClinicRow = {
   is_published: boolean | null;
   created_at: string;
   updated_at: string | null;
+  // возможны дополнительные jsonb-поля, они придут, но типом тут не описаны
 };
 
 type DraftRow = {
@@ -53,26 +54,19 @@ async function saveClinic(formData: FormData) {
 
   const sb = createServiceClient();
 
-  const str = (name: string) =>
-    String(formData.get(name) ?? "").trim();
+  const str = (name: string) => String(formData.get(name) ?? "").trim();
 
-  // --- обновляем основную запись clinics ---
-  const clinicUpdate: any = {
-    name: str("clinic_name") || null,
-    slug: str("clinic_slug") || null,
-    country: str("clinic_country") || null,
-    city: str("clinic_city") || null,
-    province: str("clinic_province") || null,
-    district: str("clinic_district") || null,
-    address: str("clinic_address") || null,
-    status: str("clinic_status") || null,
-    moderation_status: str("clinic_moderation_status") || null,
-    is_published: formData.get("clinic_is_published") === "on",
+  const parseJson = (field: string) => {
+    const raw = formData.get(field);
+    if (!raw) return null;
+    try {
+      return JSON.parse(String(raw));
+    } catch {
+      return null;
+    }
   };
 
-  await sb.from("clinics").update(clinicUpdate).eq("id", id);
-
-  // --- собираем basic_info / location для драфта ---
+  // --- basic info / location (используем и для clinics, и для drafts) ---
   const basic_info = {
     name: str("clinic_name") || null,
     slug: str("clinic_slug") || null,
@@ -89,42 +83,127 @@ async function saveClinic(formData: FormData) {
     directions: str("clinic_directions") || null,
   };
 
-  const parseJson = (field: string) => {
-    const raw = formData.get(field);
-    if (!raw) return null;
-    try {
-      return JSON.parse(String(raw));
-    } catch {
-      return null;
-    }
-  };
-
-  const services = parseJson("draft_services");
-  const doctors = parseJson("draft_doctors");
-  const hours = parseJson("draft_hours");
-  const gallery = parseJson("draft_gallery");
-  const facilities = parseJson("draft_facilities");
-  const pricing = parseJson("draft_pricing");
+  const address = str("clinic_address") || null;
+  const clinicStatus = str("clinic_status") || null;
+  const moderationStatus = str("clinic_moderation_status") || null;
   const draftStatus = str("draft_status") || null;
 
-  await sb
+  const services = (parseJson("draft_services") ?? []) as any[];
+  const doctors = (parseJson("draft_doctors") ?? []) as any[];
+  const hours = (parseJson("draft_hours") ?? []) as any[];
+  const gallery = (parseJson("draft_gallery") ?? []) as any[];
+  const facilities = (parseJson("draft_facilities") ?? {}) as any;
+  const pricing = (parseJson("draft_pricing") ?? []) as any[];
+  const accreditations = (parseJson("clinic_accreditations") ?? []) as any[];
+
+  // --- подготовка структур для clinics (jsonb) ---
+
+  const servicesForClinic = Array.isArray(services) ? services : [];
+
+  const doctorsForClinic = Array.isArray(doctors)
+    ? doctors.map((d) => ({
+        name: (d.fullName ?? d.name ?? "").trim(),
+        title: (d.title ?? "").trim(),
+        spec: (d.specialty ?? d.spec ?? "").trim(),
+      }))
+    : [];
+
+  const hoursForClinic = Array.isArray(hours)
+    ? hours.map((h) => ({
+        day: h.day ?? h.weekday ?? "",
+        status: h.status ?? null,
+        open: h.start ?? h.open ?? null,
+        close: h.end ?? h.close ?? null,
+      }))
+    : [];
+
+  const galleryForClinic = Array.isArray(gallery) ? gallery : [];
+
+  const amenitiesForClinic = {
+    premises: Array.isArray(facilities.premises) ? facilities.premises : [],
+    clinic_services: Array.isArray(facilities.clinic_services)
+      ? facilities.clinic_services
+      : [],
+    travel_services: Array.isArray(facilities.travel_services)
+      ? facilities.travel_services
+      : [],
+    languages_spoken: Array.isArray(facilities.languages_spoken)
+      ? facilities.languages_spoken
+      : [],
+  };
+
+  const paymentsForClinic = (Array.isArray(pricing) ? pricing : [])
+    .map((p) => {
+      if (typeof p === "string") return { method: p.trim() };
+      if (p && typeof p === "object") return p;
+      return null;
+    })
+    .filter(Boolean);
+
+  const accreditationsForClinic = Array.isArray(accreditations)
+    ? accreditations
+    : [];
+
+  // --- обновляем основную запись clinics ---
+  const clinicUpdate: any = {
+    name: basic_info.name,
+    slug: basic_info.slug,
+    specialty: basic_info.specialty,
+    about: basic_info.description,
+    country: basic_info.country,
+    city: basic_info.city,
+    province: basic_info.province,
+    district: basic_info.district,
+    address,
+    status: clinicStatus,
+    moderation_status: moderationStatus,
+    is_published: formData.get("clinic_is_published") === "on",
+    map_embed_url: location.mapUrl,
+    directions: location.directions,
+    services: servicesForClinic,
+    doctors: doctorsForClinic,
+    hours: hoursForClinic,
+    images: galleryForClinic,
+    gallery: galleryForClinic,
+    amenities: amenitiesForClinic,
+    payments: paymentsForClinic,
+    accreditations: accreditationsForClinic,
+  };
+
+  const { error: clinicError } = await sb
+    .from("clinics")
+    .update(clinicUpdate)
+    .eq("id", id);
+
+  if (clinicError) {
+    console.error("clinics update error", clinicError);
+    throw new Error("Failed to update clinic");
+  }
+
+  // --- сохраняем/обновляем draft ---
+  const { error: draftError } = await sb
     .from("clinic_profile_drafts")
     .upsert(
       {
         clinic_id: id,
         basic_info,
         location,
-        services: Array.isArray(services) ? services : services ?? [],
-        doctors: Array.isArray(doctors) ? doctors : doctors ?? [],
-        hours: Array.isArray(hours) ? hours : hours ?? [],
-        gallery: Array.isArray(gallery) ? gallery : gallery ?? [],
-        facilities: facilities ?? null,
-        pricing: Array.isArray(pricing) ? pricing : pricing ?? [],
+        services: servicesForClinic,
+        doctors: doctorsForClinic,
+        hours: hoursForClinic,
+        gallery: galleryForClinic,
+        facilities: amenitiesForClinic,
+        pricing: Array.isArray(pricing) ? pricing : [],
         status: draftStatus,
         updated_at: new Date().toISOString(),
       } as any,
       { onConflict: "clinic_id" } as any,
     );
+
+  if (draftError) {
+    console.error("clinic_profile_drafts upsert error", draftError);
+    throw new Error("Failed to update clinic draft");
+  }
 
   revalidatePath(`/admin/clinics/detail?id=${id}`);
 }
@@ -206,54 +285,120 @@ export default async function ClinicEditorPage({
     );
   }
 
-  const basic = (draft?.basic_info ?? {}) as any;
+  // ---- нормализация initial-данных из draft + clinics ----
+
+  const rawBasic = (draft?.basic_info ?? {}) as any;
+  const basic = {
+    name: rawBasic.name ?? clinic.name,
+    slug: rawBasic.slug ?? clinic.slug ?? "",
+    specialty: rawBasic.specialty ?? (clinic as any).specialty ?? "",
+    country: rawBasic.country ?? clinic.country ?? "",
+    city: rawBasic.city ?? clinic.city ?? "",
+    province: rawBasic.province ?? clinic.province ?? "",
+    district: rawBasic.district ?? clinic.district ?? "",
+    description: rawBasic.description ?? (clinic as any).about ?? "",
+  };
+
+  const rawLocationDraft = (draft?.location ?? {}) as any;
+  const location = {
+    mapUrl:
+      rawLocationDraft.mapUrl ??
+      (clinic as any).map_embed_url ??
+      "",
+    directions:
+      rawLocationDraft.directions ??
+      (clinic as any).directions ??
+      "",
+  };
 
   const services = (Array.isArray(draft?.services)
     ? (draft!.services as any[])
+    : Array.isArray((clinic as any).services)
+    ? ((clinic as any).services as any[])
     : []) as any[];
 
   const doctors = (Array.isArray(draft?.doctors)
     ? (draft!.doctors as any[])
+    : Array.isArray((clinic as any).doctors)
+    ? ((clinic as any).doctors as any[])
     : []) as any[];
 
   const hours = (Array.isArray(draft?.hours)
     ? (draft!.hours as any[])
+    : Array.isArray((clinic as any).hours)
+    ? ((clinic as any).hours as any[])
     : []) as any[];
 
   const gallery = (Array.isArray(draft?.gallery)
     ? (draft!.gallery as any[])
+    : Array.isArray((clinic as any).images)
+    ? ((clinic as any).images as any[])
+    : Array.isArray((clinic as any).gallery)
+    ? ((clinic as any).gallery as any[])
     : []) as any[];
 
-  const rawFacilities = (draft?.facilities ?? {}) as any;
+  const rawFacilitiesDraft = (draft?.facilities ?? {}) as any;
+  const rawAmenitiesClinic = ((clinic as any).amenities ?? {}) as any;
   const facilities = {
-    premises: Array.isArray(rawFacilities.premises)
-      ? rawFacilities.premises
+    premises: Array.isArray(rawFacilitiesDraft.premises)
+      ? rawFacilitiesDraft.premises
+      : Array.isArray(rawAmenitiesClinic.premises)
+      ? rawAmenitiesClinic.premises
       : [],
-    clinic_services: Array.isArray(rawFacilities.clinic_services)
-      ? rawFacilities.clinic_services
+    clinic_services: Array.isArray(rawFacilitiesDraft.clinic_services)
+      ? rawFacilitiesDraft.clinic_services
+      : Array.isArray(rawAmenitiesClinic.clinic_services)
+      ? rawAmenitiesClinic.clinic_services
       : [],
-    travel_services: Array.isArray(rawFacilities.travel_services)
-      ? rawFacilities.travel_services
+    travel_services: Array.isArray(rawFacilitiesDraft.travel_services)
+      ? rawFacilitiesDraft.travel_services
+      : Array.isArray(rawAmenitiesClinic.travel_services)
+      ? rawAmenitiesClinic.travel_services
       : [],
-    languages_spoken: Array.isArray(rawFacilities.languages_spoken)
-      ? rawFacilities.languages_spoken
+    languages_spoken: Array.isArray(rawFacilitiesDraft.languages_spoken)
+      ? rawFacilitiesDraft.languages_spoken
+      : Array.isArray(rawAmenitiesClinic.languages_spoken)
+      ? rawAmenitiesClinic.languages_spoken
       : [],
   };
 
-  const payments: string[] = Array.isArray(draft?.pricing)
-    ? (draft!.pricing as any[])
+  const payments: string[] = (() => {
+    // сначала пробуем черновик
+    if (Array.isArray(draft?.pricing)) {
+      return (draft!.pricing as any[])
         .map((x) => {
           if (typeof x === "string") return x;
           if (x && typeof x.method === "string") return x.method;
+          if (x && typeof x.name === "string") return x.name;
           return null;
         })
         .filter(
           (v: unknown): v is string =>
             typeof v === "string" && v.trim().length > 0,
-        )
-    : [];
+        );
+    }
 
-  const location = (draft?.location ?? {}) as any;
+    // иначе берём из clinics.payments
+    const raw = (clinic as any).payments;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((x: any) => {
+        if (typeof x === "string") return x;
+        if (x && typeof x.method === "string") return x.method;
+        if (x && typeof x.name === "string") return x.name;
+        return null;
+      })
+      .filter(
+        (v: unknown): v is string =>
+          typeof v === "string" && v.trim().length > 0,
+      );
+  })();
+
+  const accreditations: any[] = Array.isArray(
+    (clinic as any).accreditations,
+  )
+    ? ((clinic as any).accreditations as any[])
+    : [];
 
   const formatDate = (v?: string | null) =>
     v ? new Date(v).toLocaleString() : "-";
@@ -305,7 +450,7 @@ export default async function ClinicEditorPage({
         </div>
       </div>
 
-      {/* SUMMARY CARD (read-only + admin meta) */}
+      {/* SUMMARY CARD */}
       <div className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
@@ -316,7 +461,7 @@ export default async function ClinicEditorPage({
             <div className="text-xs text-gray-500">{clinic.slug}</div>
           </div>
 
-        <div className="space-y-1 text-sm">
+          <div className="space-y-1 text-sm">
             <div>
               <span className="text-xs uppercase tracking-wide text-gray-500">
                 Status:&nbsp;
@@ -359,12 +504,16 @@ export default async function ClinicEditorPage({
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Draft status
             </div>
-            <input
+            <select
               name="draft_status"
               defaultValue={draft?.status ?? ""}
               className="mt-1 w-full rounded border px-2 py-1 text-sm"
-              placeholder="draft / published / pending..."
-            />
+            >
+              <option value="">—</option>
+              <option value="draft">draft</option>
+              <option value="pending">pending</option>
+              <option value="published">published</option>
+            </select>
             <div className="mt-2 text-xs text-gray-500">
               Updated: {formatDate(draft?.updated_at as any)}
             </div>
@@ -377,21 +526,29 @@ export default async function ClinicEditorPage({
             <div className="space-y-1">
               <label className="flex flex-col gap-1 text-xs">
                 <span>Clinic status</span>
-                <input
+                <select
                   name="clinic_status"
-                  defaultValue={clinic.status ?? ""}
+                  defaultValue={clinic.status ?? "draft"}
                   className="rounded border px-2 py-1 text-sm"
-                  placeholder="draft / published..."
-                />
+                >
+                  <option value="">—</option>
+                  <option value="draft">draft</option>
+                  <option value="published">published</option>
+                  <option value="hidden">hidden</option>
+                </select>
               </label>
               <label className="flex flex-col gap-1 text-xs">
                 <span>Moderation status</span>
-                <input
+                <select
                   name="clinic_moderation_status"
-                  defaultValue={clinic.moderation_status ?? ""}
+                  defaultValue={clinic.moderation_status ?? "pending"}
                   className="rounded border px-2 py-1 text-sm"
-                  placeholder="pending / approved..."
-                />
+                >
+                  <option value="">—</option>
+                  <option value="pending">pending</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                </select>
               </label>
               <label className="mt-1 flex items-center gap-2 text-xs">
                 <input
@@ -407,7 +564,7 @@ export default async function ClinicEditorPage({
         </div>
       </div>
 
-      {/* BASIC INFO / LOCATION */}
+      {/* BASIC INFO / LOCATION / ВСЁ ОСТАЛЬНОЕ */}
       <div className="space-y-8 rounded-2xl border bg-white p-6 shadow-sm">
         {/* BASIC */}
         <section className="space-y-4">
@@ -422,14 +579,14 @@ export default async function ClinicEditorPage({
               <Field label="Name">
                 <input
                   name="clinic_name"
-                  defaultValue={basic.name ?? clinic.name}
+                  defaultValue={basic.name ?? ""}
                   className="w-full rounded border px-2 py-1.5 text-sm"
                 />
               </Field>
               <Field label="Slug">
                 <input
                   name="clinic_slug"
-                  defaultValue={basic.slug ?? clinic.slug ?? ""}
+                  defaultValue={basic.slug ?? ""}
                   className="w-full rounded border px-2 py-1.5 text-sm"
                   placeholder="new-clinic"
                 />
@@ -444,28 +601,28 @@ export default async function ClinicEditorPage({
               <Field label="Country">
                 <input
                   name="clinic_country"
-                  defaultValue={basic.country ?? clinic.country ?? ""}
+                  defaultValue={basic.country ?? ""}
                   className="w-full rounded border px-2 py-1.5 text-sm"
                 />
               </Field>
               <Field label="City">
                 <input
                   name="clinic_city"
-                  defaultValue={basic.city ?? clinic.city ?? ""}
+                  defaultValue={basic.city ?? ""}
                   className="w-full rounded border px-2 py-1.5 text-sm"
                 />
               </Field>
               <Field label="Province">
                 <input
                   name="clinic_province"
-                  defaultValue={basic.province ?? clinic.province ?? ""}
+                  defaultValue={basic.province ?? ""}
                   className="w-full rounded border px-2 py-1.5 text-sm"
                 />
               </Field>
               <Field label="District">
                 <input
                   name="clinic_district"
-                  defaultValue={basic.district ?? clinic.district ?? ""}
+                  defaultValue={basic.district ?? ""}
                   className="w-full rounded border px-2 py-1.5 text-sm"
                 />
               </Field>
@@ -507,7 +664,7 @@ export default async function ClinicEditorPage({
           </div>
         </section>
 
-        {/* SERVICES / DOCTORS / GALLERY / FACILITIES / PAYMENTS */}
+        {/* SERVICES / DOCTORS / HOURS / GALLERY / FACILITIES / PAYMENTS / ACCREDITATIONS */}
         <ClinicDraftEditor
           initialServices={services}
           initialDoctors={doctors}
@@ -515,6 +672,7 @@ export default async function ClinicEditorPage({
           initialGallery={gallery}
           initialFacilities={facilities}
           initialPricing={payments}
+          initialAccreditations={accreditations}
         />
       </div>
 

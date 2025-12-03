@@ -35,6 +35,12 @@ type Facilities = {
   languages_spoken: string[];
 };
 
+type Accreditation = {
+  name: string;
+  logo_url?: string;
+  description?: string;
+};
+
 // pricing храним как массив строк (названия методов)
 type Props = {
   initialServices: Service[];
@@ -43,6 +49,7 @@ type Props = {
   initialGallery: GalleryItem[];
   initialFacilities: Facilities;
   initialPricing: string[];
+  initialAccreditations: Accreditation[];
 };
 
 export default function ClinicDraftEditor({
@@ -52,6 +59,7 @@ export default function ClinicDraftEditor({
   initialGallery,
   initialFacilities,
   initialPricing,
+  initialAccreditations,
 }: Props) {
   const [services, setServices] = React.useState<Service[]>(
     initialServices ?? [],
@@ -74,6 +82,9 @@ export default function ClinicDraftEditor({
   const [payments, setPayments] = React.useState<string[]>(
     initialPricing ?? [],
   );
+  const [accreditations, setAccreditations] = React.useState<
+    Accreditation[]
+  >(initialAccreditations ?? []);
 
   // ---- helpers ----
   const updateService = (i: number, patch: Partial<Service>) =>
@@ -128,6 +139,23 @@ export default function ClinicDraftEditor({
   const removePayment = (i: number) =>
     setPayments((prev) => prev.filter((_, idx) => idx !== i));
 
+  const addAccreditation = () =>
+    setAccreditations((prev) => [
+      ...prev,
+      { name: "", logo_url: "", description: "" },
+    ]);
+
+  const updateAccreditation = (
+    i: number,
+    patch: Partial<Accreditation>,
+  ) =>
+    setAccreditations((prev) =>
+      prev.map((a, idx) => (idx === i ? { ...a, ...patch } : a)),
+    );
+
+  const removeAccreditation = (i: number) =>
+    setAccreditations((prev) => prev.filter((_, idx) => idx !== i));
+
   const days = [
     "Monday",
     "Tuesday",
@@ -147,6 +175,7 @@ export default function ClinicDraftEditor({
   const pricingJson = JSON.stringify(
     payments.filter((p) => p.trim().length > 0),
   );
+  const accreditationsJson = JSON.stringify(accreditations ?? []);
 
   return (
     <>
@@ -157,6 +186,11 @@ export default function ClinicDraftEditor({
       <input type="hidden" name="draft_gallery" value={galleryJson} />
       <input type="hidden" name="draft_facilities" value={facilitiesJson} />
       <input type="hidden" name="draft_pricing" value={pricingJson} />
+      <input
+        type="hidden"
+        name="clinic_accreditations"
+        value={accreditationsJson}
+      />
 
       {/* SERVICES & DOCTORS */}
       <section className="space-y-4">
@@ -182,7 +216,12 @@ export default function ClinicDraftEditor({
                 onClick={() =>
                   setServices((prev) => [
                     ...prev,
-                    { name: "", price: null, currency: "USD", description: "" },
+                    {
+                      name: "",
+                      price: null,
+                      currency: "USD",
+                      description: "",
+                    },
                   ])
                 }
               >
@@ -622,6 +661,93 @@ export default function ClinicDraftEditor({
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ACCREDITATIONS */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Accreditations &amp; certifications
+        </h2>
+
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-400">
+            {accreditations.length} accreditation(s)
+          </span>
+          <button
+            type="button"
+            className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
+            onClick={addAccreditation}
+          >
+            + Add accreditation
+          </button>
+        </div>
+
+        {!accreditations.length && (
+          <p className="text-xs text-gray-400">
+            No accreditations yet.
+          </p>
+        )}
+
+        <div className="space-y-2">
+          {accreditations.map((a, i) => (
+            <div
+              key={i}
+              className="space-y-2 rounded-lg border bg-gray-50/60 p-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-600">
+                  Accreditation #{i + 1}
+                </span>
+                <button
+                  type="button"
+                  className="text-xs text-red-500 hover:underline"
+                  onClick={() => removeAccreditation(i)}
+                >
+                  Remove
+                </button>
+              </div>
+              <label className="space-y-1">
+                <span className="text-xs text-gray-500">Name</span>
+                <input
+                  className="w-full rounded border px-2 py-1 text-sm"
+                  value={a.name ?? ""}
+                  onChange={(e) =>
+                    updateAccreditation(i, { name: e.target.value })
+                  }
+                  placeholder="e.g. JCI Accredited"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-gray-500">Logo URL</span>
+                <input
+                  className="w-full rounded border px-2 py-1 text-sm"
+                  value={a.logo_url ?? ""}
+                  onChange={(e) =>
+                    updateAccreditation(i, {
+                      logo_url: e.target.value,
+                    })
+                  }
+                  placeholder="https://..."
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-gray-500">
+                  Description
+                </span>
+                <textarea
+                  className="w-full rounded border px-2 py-1 text-sm"
+                  rows={2}
+                  value={a.description ?? ""}
+                  onChange={(e) =>
+                    updateAccreditation(i, {
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </label>
+            </div>
+          ))}
         </div>
       </section>
     </>
