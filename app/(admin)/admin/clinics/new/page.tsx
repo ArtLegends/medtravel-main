@@ -4,6 +4,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import { uploadClinicImages } from './actions';
 import { Icon } from '@iconify/react';
 import { AMENITY_ICON_DEFS, AMENITY_ICON_MAP } from '@/lib/amenityIcons';
+import { PAYMENT_ICON_MAP, normalizePaymentKey } from '@/lib/paymentIcons';
 
 type TabKey = 'basic' | 'services' | 'gallery' | 'location' | 'doctors' | 'additional';
 
@@ -1211,18 +1212,32 @@ function Additional({
         <EmptyOrList
           emptyText="No payment methods added yet."
           rows={payments}
-          render={(r, i) => (
-            <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-              <div>{r}</div>
-              <button
-                type="button"
-                onClick={() => onRemovePayment(i)}
-                className="text-xs text-rose-600 hover:text-rose-700"
-              >
-                Remove
-              </button>
-            </div>
-          )}
+          render={(label, i) => {
+            const key = normalizePaymentKey(label) as keyof typeof PAYMENT_ICON_MAP | "default";
+            const def =
+              PAYMENT_ICON_MAP[key as keyof typeof PAYMENT_ICON_MAP] ??
+              PAYMENT_ICON_MAP.default;
+
+            return (
+              <div className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <Icon
+                    icon={def.icon}
+                    className="h-4 w-4 text-sky-600"
+                    aria-hidden="true"
+                  />
+                  <span>{label}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemovePayment(i)}
+                  className="text-xs text-rose-600 hover:text-rose-700"
+                >
+                  Remove
+                </button>
+              </div>
+            );
+          }}
         />
       </div>
 

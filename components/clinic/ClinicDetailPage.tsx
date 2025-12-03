@@ -13,31 +13,13 @@ import { clinicPath } from '@/lib/clinic-url'
 import { clinicHref } from '@/lib/clinic-url';
 import { Icon } from '@iconify/react';
 import { AMENITY_ICON_MAP } from '@/lib/amenityIcons';
+import { PAYMENT_ICON_MAP, normalizePaymentKey } from '@/lib/paymentIcons';
 
 type Props = { clinic: Clinic };
 
 type ReviewRow = { id: string; review: string | null; rating_overall: number | null; created_at: string | null };
 
 type AmenityItem = { label: string; icon?: string | null };
-
-const PAYMENT_ICON_MAP = {
-  default: { icon: "mdi:credit-card-outline" },
-  visa: { icon: "mdi:credit-card-outline" },
-  mastercard: { icon: "mdi:credit-card-outline" },
-  americanexpress: { icon: "mdi:credit-card-outline" },
-  amex: { icon: "mdi:credit-card-outline" },
-  payoneer: { icon: "mdi:credit-card-outline" },
-  cash: { icon: "mdi:cash-multiple" },
-  btc: { icon: "mdi:bitcoin" },
-  bitcoin: { icon: "mdi:bitcoin" },
-  eth: { icon: "mdi:ethereum" },
-  ethereum: { icon: "mdi:ethereum" },
-  usdt: { icon: "mdi:currency-usd-circle" },
-} as const;
-
-function normalizePaymentKey(label: string) {
-  return label.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
-}
 
 const CURRENCY_SIGN_MAP: Record<string, string> = {
   usd: "$",
