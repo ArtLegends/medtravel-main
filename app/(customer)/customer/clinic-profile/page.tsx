@@ -65,6 +65,11 @@ type ServiceRow = {
   description?: string;
 };
 
+// диапазон и шаг для слайдера цены
+const PRICE_MIN = 0;
+const PRICE_MAX = 50000;
+const PRICE_STEP = 10;
+
 type DoctorRow = {
   fullName: string;
   title?: string;
@@ -892,6 +897,14 @@ function ServicesSection({
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
+  // парсим цену из строки, чтобы слайдер не падал даже при странном формате
+  const sliderValue = React.useMemo(() => {
+    const raw = draft.price ?? "";
+    const parsed = parseInt(String(raw).replace(/[^\d]/g, ""), 10);
+    if (!Number.isFinite(parsed)) return PRICE_MIN;
+    return Math.min(PRICE_MAX, Math.max(PRICE_MIN, parsed));
+  }, [draft.price]);
+
   function resetDraft() {
     setDraft({ name: "", price: "", currency: "USD", description: "" });
     setEditingIndex(null);
@@ -902,6 +915,22 @@ function ServicesSection({
 
     const next: ServiceRow = {
       ...draft,
+      // цена хранится как «чистое число» в строке
+      price:
+        draft.price && draft.price.toString().trim().length
+          ? String(
+              Math.min(
+                PRICE_MAX,
+                Math.max(
+                  PRICE_MIN,
+                  parseInt(
+                    draft.price.toString().replace(/[^\d]/g, ""),
+                    10,
+                  ) || 0,
+                ),
+              ),
+            )
+          : "",
       currency: (draft.currency || "USD").toUpperCase(),
     };
 
@@ -917,25 +946,86 @@ function ServicesSection({
     <>
       <div className="text-lg font-semibold">Services</div>
       <p className="mt-1 text-sm text-gray-500">
-        Add treatments, prices and currencies. Currency codes are stored in
-        uppercase (USD, EUR, etc.).
+        Add treatments, prices and currencies. Use the slider or type the price
+        manually. Currency codes are stored in uppercase (USD, EUR, etc.).
       </p>
 
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Название услуги */}
         <Field
           label="Service Name *"
           value={draft.name}
           onChange={(v) => setDraft((d) => ({ ...d, name: v }))}
           placeholder="Enter service name"
         />
-        <Field
-          label="Price"
-          value={draft.price || ""}
-          onChange={(v) => setDraft((d) => ({ ...d, price: v }))}
-          placeholder="Enter price"
-        />
 
-        {/* Currency + аккордеон с популярными валютами */}
+        {/* ЦЕНА: слайдер + инпут "от" */}
+        <div className="space-y-2">
+          <label className="text-[13px] text-gray-600">Price from</label>
+
+          {/* слайдер в синем цвете, как на сайте */}
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between text-[12px] text-gray-500">
+              <span>
+                Min: {PRICE_MIN.toLocaleString()} {draft.currency.toUpperCase()}
+              </span>
+              <span>
+                Max: {PRICE_MAX.toLocaleString()} {draft.currency.toUpperCase()}
+              </span>
+            </div>
+
+            <input
+              type="range"
+              min={PRICE_MIN}
+              max={PRICE_MAX}
+              step={PRICE_STEP}
+              value={sliderValue}
+              onChange={(e) => {
+                const v = Number(e.target.value) || 0;
+                setDraft((d) => ({ ...d, price: String(v) }));
+              }}
+              className="w-full accent-blue-600"
+            />
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">From</span>
+              <input
+                type="number"
+                className="w-32 rounded-md border px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+                value={draft.price ?? ""}
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setDraft((d) => ({ ...d, price: "" }));
+                    return;
+                  }
+                  const parsed = parseInt(
+                    raw.toString().replace(/[^\d]/g, ""),
+                    10,
+                  );
+                  if (!Number.isFinite(parsed)) return;
+                  const clamped = Math.min(
+                    PRICE_MAX,
+                    Math.max(PRICE_MIN, parsed),
+                  );
+                  setDraft((d) => ({ ...d, price: String(clamped) }));
+                }}
+              />
+              <span className="text-sm text-gray-500">
+                {draft.currency.toUpperCase()}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-gray-400">
+              Drag the slider or enter the amount. We store only the numeric
+              value of the price.
+            </p>
+          </div>
+        </div>
+
+        {/* Валюта с выбором популярных, как было */}
         <div className="space-y-1">
           <Field
             label="Currency"
@@ -950,7 +1040,7 @@ function ServicesSection({
               <span className="flex items-center gap-1">
                 <Icon
                   icon="mdi:currency-usd-circle"
-                  className="h-4 w-4 text-sky-600"
+                  className="h-4 w-4 text-blue-600"
                 />
                 <span>Common currencies</span>
               </span>
@@ -971,8 +1061,8 @@ function ServicesSection({
                     className={clsx(
                       "inline-flex items-center rounded-full border px-3 py-1 text-[11px]",
                       active
-                        ? "border-sky-500 bg-sky-50 text-sky-700"
-                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
                     )}
                   >
                     {code}
@@ -983,6 +1073,7 @@ function ServicesSection({
           </details>
         </div>
 
+        {/* Описание услуги */}
         <Field
           label="Description"
           value={draft.description || ""}
@@ -991,6 +1082,7 @@ function ServicesSection({
         />
       </div>
 
+      {/* Кнопки сохранить/отмена */}
       <div className="flex items-center gap-2 mt-3">
         <button
           onClick={handleSave}
@@ -1010,6 +1102,7 @@ function ServicesSection({
         )}
       </div>
 
+      {/* список услуг как был, редактирование / удаление не ломаем */}
       {!rows.length ? (
         <p className="mt-3 text-sm text-gray-400">No services added yet.</p>
       ) : (
@@ -1034,7 +1127,12 @@ function ServicesSection({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    setDraft(r);
+                    setDraft({
+                      name: r.name,
+                      price: r.price ?? "",
+                      currency: r.currency || "USD",
+                      description: r.description || "",
+                    });
                     setEditingIndex(i);
                   }}
                   className="text-gray-500 hover:text-blue-600 text-sm"
