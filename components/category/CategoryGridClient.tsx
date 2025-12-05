@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browserClient";
-// import CategoryFilters from "./CategoryFilters"; // ❌ не используем в этой версии
+// import CategoryFilters from "./CategoryFilters";
 import { clinicPath } from "@/lib/clinic-url";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 type ServiceMap = Record<string, string>;
 
@@ -118,13 +119,24 @@ function useUrlState() {
 
 export default function CategoryGridClient({
   categorySlug,
+  categoryName,
 }: {
   categorySlug: string;
+  categoryName?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const {
-    page, sort, country, province, city, district, services,
-    setParams, setPage, resetAll, buildHref,
+    page,
+    sort,
+    country,
+    province,
+    city,
+    district,
+    services,
+    setParams,
+    setPage,
+    resetAll,
+    buildHref,
   } = useUrlState();
 
   const [svcMap, setSvcMap] = useState<ServiceMap>({}); // <— словарь slug→name
@@ -252,6 +264,17 @@ export default function CategoryGridClient({
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
         {/* Листинг слева */}
         <div className="space-y-4">
+          {/* === Хлебные крошки над первым блоком карточек === */}
+          <Breadcrumbs
+            items={[
+              { label: "Home page", href: "/" },
+              {
+                label: categoryName ??
+                  (categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1)),
+              },
+            ]}
+          />
+
           {/* Скелетон/список */}
           {loading && items.length === 0 ? (
             Array.from({ length: 6 }).map((_, i) => (

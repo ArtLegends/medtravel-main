@@ -14,6 +14,9 @@ import { clinicHref } from '@/lib/clinic-url';
 import { Icon } from '@iconify/react';
 import { AMENITY_ICON_MAP } from '@/lib/amenityIcons';
 import { PAYMENT_ICON_MAP, normalizePaymentKey } from '@/lib/paymentIcons';
+import Breadcrumbs from '@/components/Breadcrumbs';
+
+type CategoryLite = { id: number; name: string; slug: string };
 
 type Props = { clinic: Clinic };
 
@@ -206,8 +209,10 @@ export default function ClinicDetailPage({ clinic }: Props) {
       })()
     : [];
   
-    const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [clickedService, setClickedService] = useState<string>('')
+
+  const [primaryCategory, setPrimaryCategory] = useState<CategoryLite | null>(null);
 
   // из данных клиники получаем список названий услуг:
   const servicesFromClinic = useMemo(
@@ -336,6 +341,38 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const supabase = useMemo(() => createClient(), []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      // 1. берём первую связь clinic_categories
+      const { data: link } = await supabase
+        .from('clinic_categories')
+        .select('category_id')
+        .eq('clinic_id', clinic.id)
+        .order('category_id', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled || !link?.category_id) return;
+
+      // 2. тянем саму категорию
+      const { data: cat } = await supabase
+        .from('categories')
+        .select('id, name, slug')
+        .eq('id', link.category_id)
+        .maybeSingle();
+
+      if (!cancelled && cat) {
+        setPrimaryCategory(cat as CategoryLite);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, clinic.id]);
+
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllDoctors, setShowAllDoctors] = useState(false);
 
@@ -373,6 +410,26 @@ export default function ClinicDetailPage({ clinic }: Props) {
     return () => { cancelled = true; };
   }, [supabase, clinic.id]);
 
+  const breadcrumbsItems = useMemo(
+    () => {
+      const items: { label: string; href?: string }[] = [
+        { label: 'Home page', href: '/' },
+      ];
+
+      if (primaryCategory) {
+        items.push({
+          label: primaryCategory.name,
+          href: `/${primaryCategory.slug}`,
+        });
+      }
+
+      items.push({ label: clinic.name });
+
+      return items;
+    },
+    [primaryCategory, clinic.name],
+  );
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10">
       {/* ===== HERO ===== */}
@@ -384,6 +441,13 @@ export default function ClinicDetailPage({ clinic }: Props) {
           <div className="rounded-xl border bg-white/95 shadow-sm backdrop-blur pointer-events-auto">
             <SectionNav sections={sections} />
           </div>
+        </div>
+      </div>
+
+      {/* ===== BREADCRUMBS (под навбаром клиники) ===== */}
+      <div className="relative inset-x-0 z-[50] pt-3">
+        <div className="mx-auto max-w-6xl px-4">
+          <Breadcrumbs items={breadcrumbsItems} />
         </div>
       </div>
 

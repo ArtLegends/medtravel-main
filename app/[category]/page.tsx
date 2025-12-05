@@ -172,7 +172,8 @@ export default async function Page({ params }: { params: Promise<Params> }) {
     <>
       <CategoryHero title={`Best ${titleName} Clinics in Popular Destinations`} categoryName={titleName} />
       <CategoryWhy />
-      <CategoryGrid categorySlug={slug} />
+      {/* хлебные крошки уже рисуются внутри CategoryGrid */}
+      <CategoryGrid categorySlug={slug} categoryName={titleName} />
     </>
   )
 }
