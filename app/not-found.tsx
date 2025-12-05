@@ -3,8 +3,8 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main className="min-h-[70vh] bg-gray-50">
-      <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-16 text-center">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50">
+      <main className="mx-auto max-w-md px-4 text-center">
         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
           404 error
         </p>
@@ -24,13 +24,13 @@ export default function NotFound() {
             Go to Home page
           </Link>
           <Link
-            href="/#categories"
-            className="rounded-full border border-gray-300 px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-white"
+            href="/"
+            className="rounded-full border border-gray-300 px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
           >
             Browse categories
           </Link>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
