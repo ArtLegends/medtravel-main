@@ -23,12 +23,6 @@ export default function NotFound() {
           >
             Go to Home page
           </Link>
-          <Link
-            href="/"
-            className="rounded-full border border-gray-300 px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            Browse categories
-          </Link>
         </div>
       </main>
     </div>

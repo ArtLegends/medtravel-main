@@ -278,10 +278,10 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const languagesSpoken = normalizeAmenityArray(amenities.languages_spoken);
 
   const hasAmenities =
-    premises.length ||
-    clinicServices.length ||
-    travelServices.length ||
-    languagesSpoken.length;
+    premises.length > 0 ||
+    clinicServices.length > 0 ||
+    travelServices.length > 0 ||
+    languagesSpoken.length > 0;
 
   // Accreditations
   const accs = useMemo(() => {
