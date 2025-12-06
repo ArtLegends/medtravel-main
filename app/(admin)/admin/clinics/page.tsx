@@ -42,7 +42,7 @@ async function getRows(searchParams: Search) {
   if (from) q = q.gte("created_at", from);
   if (to) q = q.lte("created_at", to);
 
-  // фильтр по имени клиники
+  // фильтр по названию клиники
   if (nameQuery) {
     q = q.ilike("name", `%${nameQuery}%`);
   }
@@ -166,15 +166,7 @@ async function deleteAll(formData: FormData) {
   redirect(path);
 }
 
-function DateFilter({
-  from,
-  to,
-  q,
-}: {
-  from?: string;
-  to?: string;
-  q?: string;
-}) {
+function DateFilter({ from, to, q }: { from?: string; to?: string; q?: string }) {
   return (
     <form className="flex items-end gap-2" action="/admin/clinics" method="get">
       <label className="text-sm">
@@ -286,13 +278,93 @@ export default async function ClinicsPage({
 
         <div className="flex items-center gap-3">
           <DateFilter from={sp.from} to={sp.to} q={sp.q} />
-          {/* ... остальное без изменений ... */}
+          <form action={deleteAll}>
+            <input type="hidden" name="from" value={sp.from || ""} />
+            <input type="hidden" name="to" value={sp.to || ""} />
+            <input type="hidden" name="path" value="/admin/clinics" />
+            <ConfirmDeleteButton
+              label="Delete all"
+              confirmMessage="Are you sure you want to delete ALL clinics in this filter (with all related data)? This action cannot be undone."
+              className="rounded border bg-white px-3 py-1.5 text-sm text-red-600 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50"
+              disabled={total === 0}
+            />
+          </form>
         </div>
       </div>
 
-      {/* ... таблица ... */}
+      <div className="overflow-x-auto rounded-lg border bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left">
+            <tr>
+              <th className="p-3">Name</th>
+              <th className="p-3">Country</th>
+              <th className="p-3">City</th>
+              <th className="p-3">Created</th>
+              <th className="p-3">Status</th>
+              <th className="p-3 w-1 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="p-6 text-center text-slate-500"
+                >
+                  No clinics found.
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="p-3">
+                    {/* ссылка ведёт на /admin/clinics/detail?id=... */}
+                    <Link
+                      href={`/admin/clinics/detail?id=${encodeURIComponent(
+                        r.id,
+                      )}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="p-3">{r.country || "—"}</td>
+                  <td className="p-3">{r.city || "—"}</td>
+                  <td className="p-3">
+                    {new Date(r.created_at).toLocaleString()}
+                  </td>
+                  <td className="p-3 capitalize">
+                    {(r.status || "draft").toString()}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <form action={deleteClinic}>
+                        <input
+                          type="hidden"
+                          name="clinicId"
+                          value={r.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="path"
+                          value="/admin/clinics"
+                        />
+                        <ConfirmDeleteButton
+                          label="Delete"
+                          confirmMessage="Delete this clinic and all related data? This cannot be undone."
+                          className="rounded border bg-white px-2 py-1 text-xs text-red-600 hover:bg-slate-50"
+                        />
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify_between">
         <div className="text-sm text-slate-600">Total: {total}</div>
         <Pager
           page={page}
