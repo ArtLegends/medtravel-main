@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '@iconify/react';
 
 type UiContact = 'Email' | 'Phone' | 'WhatsApp' | 'Telegram';
 
@@ -20,6 +21,8 @@ type Props = {
   preselectedService?: string;
 };
 
+const PHONE_STORAGE_KEY = 'mt_phone_history';
+
 export default function ConsultationModal({
   open,
   onClose,
@@ -37,13 +40,18 @@ export default function ConsultationModal({
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [storedPhones, setStoredPhones] = useState<string[]>([]);
+  const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
+
   const serviceOptions = useMemo(
     () => Array.from(new Set((services ?? []).filter(Boolean))),
-    [services]
+    [services],
   );
 
+  // при открытии — подтянуть историю телефонов и сбросить форму
   useEffect(() => {
     if (!open) return;
+
     setError(null);
     setDone(false);
     setLoading(false);
@@ -51,8 +59,27 @@ export default function ConsultationModal({
     setPhone('');
     setContact('');
     setService(preselectedService ?? '');
+
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(PHONE_STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          setStoredPhones(
+            arr
+              .map((v) => String(v).trim())
+              .filter(Boolean)
+              .slice(0, 5),
+          );
+        }
+      }
+    } catch {
+      // ignore
+    }
   }, [open, preselectedService]);
 
+  // закрытие по ESC/клик снаружи
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -68,6 +95,22 @@ export default function ConsultationModal({
       window.removeEventListener('mousedown', onClick);
     };
   }, [open, onClose]);
+
+  function rememberPhone(value: string) {
+    if (typeof window === 'undefined') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    setStoredPhones((prev) => {
+      const next = [trimmed, ...prev.filter((p) => p !== trimmed)].slice(0, 5);
+      try {
+        window.localStorage.setItem(PHONE_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,13 +133,14 @@ export default function ConsultationModal({
           name,
           phone,
           // ВАЖНО: отправляем ровно как требует CHECK
-          contact_method: contact,          // 'Email' | 'Phone' | 'WhatsApp' | 'Telegram'
-          origin: 'service',                // допустимое значение по CHECK
+          contact_method: contact, // 'Email' | 'Phone' | 'WhatsApp' | 'Telegram'
+          origin: 'service', // допустимое значение по CHECK
         }),
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error || 'Request failed');
 
+      rememberPhone(phone);
       setDone(true);
     } catch (err: any) {
       setError(err?.message || 'Something went wrong. Please try again.');
@@ -108,43 +152,57 @@ export default function ConsultationModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-3">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4">
       <div
         ref={dlgRef}
-        className="max-w-[480px] rounded-lg bg-white p-4 shadow-xl md:p-6"
+        className="w-full max-w-[640px] rounded-2xl bg-white p-5 shadow-2xl md:p-8"
         role="dialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h3 className="text-center text-xl font-semibold md:text-2xl">
-              Sign up for a consultation
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="flex items-center gap-2 text-xl font-semibold md:text-2xl">
+              <Icon
+                icon="solar:stethoscope-linear"
+                className="h-5 w-5 text-emerald-600"
+                aria-hidden="true"
+              />
+              <span>Sign up for a consultation</span>
             </h3>
-            <p className="mt-1 text-center text-sm text-gray-500">
-              We will find the best solution to your problem
+            <p className="text-sm text-gray-500">
+              Tell us a bit about yourself and the treatment you’re interested in. We’ll match you
+              with the best option.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="ml-3 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
             aria-label="Close"
           >
-            ✕
+            <Icon icon="solar:close-circle-linear" className="h-5 w-5" />
           </button>
         </div>
 
         {done ? (
-          <div className="rounded-md bg-emerald-50 p-4 text-sm text-emerald-700">
-            Your request has been sent. We’ll contact you shortly.
+          <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">
+            Your request has been sent. We’ll contact you shortly to clarify the details.
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Your Name</label>
+              <label
+                htmlFor="clinic-consult-name"
+                className="mb-1 block text-sm font-medium text-gray-800"
+              >
+                Your Name
+              </label>
               <input
+                id="clinic-consult-name"
+                name="name"
+                autoComplete="name"
                 type="text"
                 placeholder="Enter your name"
-                className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -152,55 +210,115 @@ export default function ConsultationModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium">Phone Number</label>
-              <input
-                type="tel"
-                placeholder="Enter your phone number"
-                className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
+              <label
+                htmlFor="clinic-consult-phone"
+                className="mb-1 block text-sm font-medium text-gray-800"
+              >
+                Phone Number
+              </label>
+              <div className="relative">
+                <input
+                  id="clinic-consult-phone"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  placeholder="Enter your phone number"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onFocus={() => storedPhones.length && setShowPhoneSuggestions(true)}
+                  onBlur={() => {
+                    setTimeout(() => setShowPhoneSuggestions(false), 120);
+                  }}
+                  required
+                />
+
+                {showPhoneSuggestions && storedPhones.length > 0 && (
+                  <ul className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-auto rounded-lg border border-gray-200 bg-white text-sm shadow-lg">
+                    {storedPhones.map((p) => (
+                      <li key={p}>
+                        <button
+                          type="button"
+                          className="flex w-full px-3 py-2 text-left hover:bg-gray-50"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setPhone(p);
+                            setShowPhoneSuggestions(false);
+                          }}
+                        >
+                          {p}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Saved numbers will appear here as suggestions if you’ve used this form before.
+              </p>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium">Preferred Contact Method</label>
+              <label
+                htmlFor="clinic-consult-contact"
+                className="mb-1 block text-sm font-medium text-gray-800"
+              >
+                Preferred Contact Method
+              </label>
               <div className="relative">
                 <select
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
+                  id="clinic-consult-contact"
+                  name="contact_method"
+                  className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
                   value={contact}
                   onChange={(e) => setContact(e.target.value as UiContact | '')}
                 >
                   <option value="">Select the best way to contact you</option>
-                  {CONTACT_OPTIONS.map(v => (
-                    <option key={v} value={v}>{v}</option>
+                  {CONTACT_OPTIONS.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
                   ))}
                 </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none text-gray-400">▾</span>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  ▾
+                </span>
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium">Service Interested In</label>
+              <label
+                htmlFor="clinic-consult-service"
+                className="mb-1 block text-sm font-medium text-gray-800"
+              >
+                Service Interested In
+              </label>
               <select
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
+                id="clinic-consult-service"
+                name="service"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
                 value={service}
                 onChange={(e) => setService(e.target.value)}
                 required
               >
                 <option value="">The service that interested you</option>
-                {serviceOptions.map(s => (
-                  <option key={s} value={s}>{s}</option>
+                {serviceOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {error && <div className="rounded-md bg-rose-50 p-2 text-sm text-rose-700">{error}</div>}
+            {error && (
+              <div className="rounded-md bg-rose-50 p-2 text-sm text-rose-700">{error}</div>
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded bg-teal-500 px-4 py-3 font-medium text-white transition hover:bg-teal-600 disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'Sending…' : 'Schedule Your Appointment'}
             </button>

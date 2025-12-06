@@ -13,15 +13,25 @@ export default async function Page(
   const sb = await createServerClient();
   const { data: clinic, error } = await sb
     .from('clinics')
-    .select('id, name')
+    .select('id, name, slug, country, province, city, district')
     .eq('slug', slug)
     .maybeSingle();
 
-  if (error) {
-    // можно залогировать, но для страницы — 404
+  if (error || !clinic) {
     return notFound();
   }
-  if (!clinic) return notFound();
 
-  return <ReviewForm clinicId={clinic.id} clinicName={clinic.name} />;
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
+      <ReviewForm
+        clinicId={clinic.id}
+        clinicName={clinic.name}
+        clinicSlug={clinic.slug}
+        clinicCountry={clinic.country}
+        clinicProvince={clinic.province}
+        clinicCity={clinic.city}
+        clinicDistrict={clinic.district}
+      />
+    </div>
+  );
 }

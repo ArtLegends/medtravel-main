@@ -1,10 +1,13 @@
 // components/bookings/admin/BookingsModal.tsx
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Icon } from '@iconify/react';
 
 const CONTACT_VALUES = ['Email', 'Phone', 'WhatsApp', 'Telegram'] as const;
 type ContactOpt = (typeof CONTACT_VALUES)[number];
+
+const PHONE_STORAGE_KEY = 'mt_phone_history';
 
 export default function BookingsModal({
   open,
@@ -22,6 +25,32 @@ export default function BookingsModal({
   const [service, setService] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<null | 'ok' | 'err'>(null);
+
+  // подсказки по телефонам
+  const [storedPhones, setStoredPhones] = useState<string[]>([]);
+  const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
+
+  // загрузить историю телефонов при первом открытии
+  useEffect(() => {
+    if (!open) return;
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(PHONE_STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          setStoredPhones(
+            arr
+              .map((v) => String(v).trim())
+              .filter(Boolean)
+              .slice(0, 5),
+          );
+        }
+      }
+    } catch {
+      // игнорим
+    }
+  }, [open]);
 
   // сброс при открытии + проставляем выбранную категорию
   useEffect(() => {
@@ -51,6 +80,22 @@ export default function BookingsModal({
     };
   }, [open, onClose]);
 
+  function rememberPhone(value: string) {
+    if (typeof window === 'undefined') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    setStoredPhones((prev) => {
+      const next = [trimmed, ...prev.filter((p) => p !== trimmed)].slice(0, 5);
+      try {
+        window.localStorage.setItem(PHONE_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -65,6 +110,7 @@ export default function BookingsModal({
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setDone('ok');
+      rememberPhone(phone);
     } catch {
       setDone('err');
     } finally {
@@ -75,29 +121,49 @@ export default function BookingsModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-3">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4">
       <div
         ref={dlgRef}
-        className="w-100 max-w-[560px] rounded-lg bg-white p-6 shadow-xl"
+        className="w-full max-w-[640px] rounded-2xl bg-white p-6 shadow-2xl md:p-8"
         role="dialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex items-start justify-between">
-          <h3 className="text-xl font-semibold">Request a Free Consultation</h3>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="flex items-center gap-2 text-xl font-semibold md:text-2xl">
+              <Icon
+                icon="solar:calendar-linear"
+                className="h-5 w-5 text-emerald-600"
+                aria-hidden="true"
+              />
+              <span>Request a Free Consultation</span>
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Leave your contact details and we’ll help you schedule a suitable time.
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
             aria-label="Close"
           >
-            ✕
+            <Icon icon="solar:close-circle-linear" className="h-5 w-5" />
           </button>
         </div>
 
         <form className="space-y-4" onSubmit={submit}>
           <div>
-            <label className="mb-1 block text-sm font-medium">Your Name</label>
+            <label
+              htmlFor="admin-booking-name"
+              className="mb-1 block text-sm font-medium text-gray-800"
+            >
+              Your Name
+            </label>
             <input
-              className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
+              id="admin-booking-name"
+              name="name"
+              autoComplete="name"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
               placeholder="Enter your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -106,43 +172,100 @@ export default function BookingsModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Phone Number</label>
-            <input
-              className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
-              placeholder="Enter your phone number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">Preferred Contact Method</label>
-            <select
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
-              value={contact}
-              onChange={(e) => setContact(e.target.value as ContactOpt | '')}
-              required
+            <label
+              htmlFor="admin-booking-phone"
+              className="mb-1 block text-sm font-medium text-gray-800"
             >
-              <option value="">Select the best way to contact you</option>
-              {CONTACT_VALUES.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
+              Phone Number
+            </label>
+            <div className="relative">
+              <input
+                id="admin-booking-phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                placeholder="Enter your phone number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onFocus={() => storedPhones.length && setShowPhoneSuggestions(true)}
+                onBlur={() => {
+                  // небольшая задержка, чтобы успеть кликнуть по подсказке
+                  setTimeout(() => setShowPhoneSuggestions(false), 120);
+                }}
+                required
+              />
+              {showPhoneSuggestions && storedPhones.length > 0 && (
+                <ul className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-auto rounded-lg border border-gray-200 bg-white text-sm shadow-lg">
+                  {storedPhones.map((p) => (
+                    <li key={p}>
+                      <button
+                        type="button"
+                        className="flex w-full px-3 py-2 text-left hover:bg-gray-50"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setPhone(p);
+                          setShowPhoneSuggestions(false);
+                        }}
+                      >
+                        {p}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              We may contact you by call or messenger depending on your preference.
+            </p>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Service Interested In</label>
+            <label
+              htmlFor="admin-booking-contact"
+              className="mb-1 block text-sm font-medium text-gray-800"
+            >
+              Preferred Contact Method
+            </label>
+            <div className="relative">
+              <select
+                id="admin-booking-contact"
+                name="contact_method"
+                className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                value={contact}
+                onChange={(e) => setContact(e.target.value as ContactOpt | '')}
+                required
+              >
+                <option value="">Select the best way to contact you</option>
+                {CONTACT_VALUES.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                ▾
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="admin-booking-service"
+              className="mb-1 block text-sm font-medium text-gray-800"
+            >
+              Service Interested In
+            </label>
             <input
-              className="w-full rounded border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-teal-400"
+              id="admin-booking-service"
+              name="service"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
               placeholder="The service that interested you"
               value={service}
               onChange={(e) => setService(e.target.value)}
               required
             />
-            {/* это input, а не select: нам важна простая категория/название; приходит в /api/bookings как service */}
           </div>
 
           {done === 'ok' && (
@@ -159,7 +282,7 @@ export default function BookingsModal({
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-teal-500 px-4 py-3 font-medium text-white transition hover:bg-teal-600 disabled:opacity-60"
+            className="mt-2 w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'Sending…' : 'Schedule Your Appointment'}
           </button>

@@ -1,9 +1,9 @@
 // components/SearchBar.tsx
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { clinicPath } from '@/lib/clinic-url'
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { clinicPath } from '@/lib/clinic-url';
 
 type SearchItem = {
   id: string;
@@ -24,18 +24,28 @@ interface Props {
   placeholder?: string;
 }
 
-export default function SearchBar({ value, onChangeAction, placeholder = "Search clinics..." }: Props) {
+const FALLBACK_IMG =
+  'https://images.unsplash.com/photo-1584982751601-97dcc0972d8f?q=80&w=800&auto=format&fit=crop';
+
+export default function SearchBar({
+  value,
+  onChangeAction,
+  placeholder = 'Search clinics...',
+}: Props) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<SearchItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
 
-  // простая защита от спама: 200 мс
   const debouncedValue = useDebounce(value, 200);
 
   useEffect(() => {
-    if (!debouncedValue || debouncedValue.trim().length < 2) {
+    const q = debouncedValue?.trim() ?? '';
+
+    if (!q || q.length < 2) {
       setItems([]);
       setOpen(false);
+      setLoading(false);
       controllerRef.current?.abort();
       return;
     }
@@ -44,76 +54,162 @@ export default function SearchBar({ value, onChangeAction, placeholder = "Search
     const ctl = new AbortController();
     controllerRef.current = ctl;
 
-    fetch(`/api/search?q=${encodeURIComponent(debouncedValue)}&limit=8`, { signal: ctl.signal })
+    setLoading(true);
+
+    fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`, { signal: ctl.signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: SearchItem[]) => {
-        setItems(Array.isArray(data) ? data : []);
+        const safe = Array.isArray(data) ? data : [];
+        setItems(safe);
         setOpen(true);
       })
-      .catch(() => {
-        // ignore aborted / network errors
+      .catch((err: any) => {
+        if (err?.name === 'AbortError') return;
+        setItems([]);
+        setOpen(false);
+      })
+      .finally(() => {
+        setLoading(false);
       });
 
     return () => ctl.abort();
   }, [debouncedValue]);
 
-  const empty = useMemo(() => open && items.length === 0, [open, items.length]);
+  const empty = useMemo(() => open && !loading && items.length === 0, [open, loading, items.length]);
+
+  const handleClear = () => {
+    onChangeAction('');
+    setItems([]);
+    setOpen(false);
+  };
+
+  const formatLocation = (it: SearchItem) => {
+    const parts = [it.city, it.country].filter(Boolean);
+    if (parts.length) return parts.join(', ');
+    return it.country || it.city || '';
+  };
 
   return (
     <div className="relative">
-      <input
-        type="search"
-        className="w-full px-4 py-2 rounded border outline-none focus:ring-2 focus:ring-primary"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChangeAction(e.target.value)}
-        onFocus={() => items.length > 0 && setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 120)} // чтобы клик по пункту успел сработать
-      />
+      {/* input c иконками */}
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+          🔍
+        </span>
+
+        <input
+          type="text"
+          inputMode="search"
+          className="w-full rounded-lg border border-gray-300 bg-white/90 px-9 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChangeAction(e.target.value)}
+          onFocus={() => items.length > 0 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              handleClear();
+            }
+          }}
+        />
+
+        {value && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-xs text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Clear search"
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
       {/* dropdown */}
       {open && (
-        <div className="absolute left-0 right-0 mt-2 rounded-lg border bg-content1 shadow-lg overflow-hidden z-50">
-          {items.map((it) => (
-            <Link
-              key={it.id}
-              href={
-                it.href ||
-                clinicPath({
-                  slug: it.slug,               // убедись, что это поле есть в айтеме
-                  country: it.country,
-                  province: it.province,
-                  city: it.city,
-                  district: it.district,
-                })
-              }
-              className="flex items-center gap-3 p-3 hover:bg-content2 transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              {/* thumb */}
-              <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-md bg-gray-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={it.image_url || ""}
-                  alt={it.name}
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      "https://images.unsplash.com/photo-1584982751601-97dcc0972d8f?q=80&w=1200&auto=format&fit=crop";
-                  }}
-                />
-              </div>
+        <div className="absolute left-0 right-0 mt-3 max-h-80 overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 shadow-xl backdrop-blur-sm z-50">
+          {/* header */}
+          {(loading || items.length > 0) && (
+            <div className="flex items-center justify-between border-b px-4 py-2 text-xs text-gray-500">
+              <span>Search results</span>
+              {debouncedValue && (
+                <span className="truncate max-w-[55%]">
+                  for <span className="font-medium">&ldquo;{debouncedValue}&rdquo;</span>
+                </span>
+              )}
+            </div>
+          )}
 
-              {/* text */}
-              <div className="min-w-0">
-                <div className="truncate font-medium text-foreground">{it.name}</div>
-                {it.category && <div className="text-sm text-muted-foreground">{it.category}</div>}
-              </div>
-            </Link>
-          ))}
+          {/* loading */}
+          {loading && (
+            <div className="px-4 py-3 text-sm text-gray-500">Searching…</div>
+          )}
 
+          {/* list */}
+          {!loading &&
+            items.map((it) => (
+              <Link
+                key={it.id}
+                href={
+                  it.href ||
+                  clinicPath({
+                    slug: it.slug,
+                    country: it.country,
+                    province: it.province,
+                    city: it.city,
+                    district: it.district,
+                  })
+                }
+                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                {/* thumb */}
+                <div className="flex h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={it.image_url || FALLBACK_IMG}
+                    alt={it.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
+                    }}
+                  />
+                </div>
+
+                {/* text */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-gray-900">
+                      {it.name}
+                    </p>
+                    {it.category && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                        {it.category}
+                      </span>
+                    )}
+                  </div>
+                  {formatLocation(it) && (
+                    <p className="mt-0.5 truncate text-xs text-gray-500">
+                      {formatLocation(it)}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+
+          {/* empty state */}
           {empty && (
-            <div className="px-4 py-3 text-sm text-muted-foreground text-center select-none">No results</div>
+            <div className="px-4 py-4 text-center text-sm text-gray-500">
+              No clinics found. Try another keyword or city.
+            </div>
+          )}
+
+          {/* footer */}
+          {!loading && items.length > 0 && (
+            <div className="border-t px-4 py-2 text-xs text-gray-400">
+              Showing up to 8 results
+            </div>
           )}
         </div>
       )}

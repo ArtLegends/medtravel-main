@@ -36,9 +36,8 @@ export default function NewClinicForm() {
     setOk(null);
     setErr(null);
 
-    // простая валидация
     if (!data.clinicName || !data.firstName || !data.lastName || !data.email) {
-      setErr('Please fill required fields.');
+      setErr('Please fill in all required fields.');
       return;
     }
 
@@ -50,58 +49,70 @@ export default function NewClinicForm() {
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error('Request failed');
-      setOk('Thank you! We received your request.');
+      setOk('Thank you! We received your request and will get back to you soon.');
       setData(initial);
-    } catch (e) {
+    } catch {
       setErr('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
-  const on = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setData((s) => ({ ...s, [k]: e.target.value }));
+  const on =
+    (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setData((s) => ({ ...s, [k]: e.target.value }));
+
+  const inputClasses =
+    'w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100';
 
   return (
     <form
       onSubmit={onSubmit}
-      className="space-y-8"
-      aria-describedby={err ? 'form-error' : undefined}
+      className="mx-auto max-w-4xl space-y-8"
+      aria-describedby={err ? 'new-clinic-error' : undefined}
     >
       {/* Company */}
-      <div className="rounded-xl border bg-white">
-        <div className="border-b px-6 py-4 text-lg font-semibold">
-          <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
-            🏢
-          </span>
-          Company
-        </div>
+      <section className="rounded-2xl border bg-white shadow-sm">
+        <header className="flex items-center justify-between border-b px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-lg">
+              🏥
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                Company
+              </h2>
+              <p className="text-xs text-gray-500">
+                Basic information about your clinic.
+              </p>
+            </div>
+          </div>
+        </header>
 
         <div className="space-y-5 p-6">
-          {/* Clinic Name */}
           <div>
-            <label className="mb-1 block text-sm font-medium">Clinic Name</label>
+            <label className="mb-1 block text-sm font-medium">
+              Clinic Name <span className="text-red-500">*</span>
+            </label>
             <input
               value={data.clinicName}
               onChange={on('clinicName')}
               placeholder="Enter clinic name"
-              className="w-full rounded-md border px-4 py-2"
+              className={inputClasses}
               required
             />
           </div>
 
-          {/* Address */}
           <div>
             <label className="mb-1 block text-sm font-medium">Address</label>
             <input
               value={data.address}
               onChange={on('address')}
               placeholder="Enter address"
-              className="w-full rounded-md border px-4 py-2"
+              className={inputClasses}
             />
           </div>
 
-          {/* Country + City */}
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">Country</label>
@@ -109,7 +120,7 @@ export default function NewClinicForm() {
                 value={data.country}
                 onChange={on('country')}
                 placeholder="Enter country"
-                className="w-full rounded-md border px-4 py-2"
+                className={inputClasses}
               />
             </div>
             <div>
@@ -118,41 +129,54 @@ export default function NewClinicForm() {
                 value={data.city}
                 onChange={on('city')}
                 placeholder="Enter city"
-                className="w-full rounded-md border px-4 py-2"
+                className={inputClasses}
               />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Contact Person */}
-      <div className="rounded-xl border bg-white">
-        <div className="border-b px-6 py-4 text-lg font-semibold">
-          <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
-            👤
-          </span>
-          Contact Person
-        </div>
+      <section className="rounded-2xl border bg-white shadow-sm">
+        <header className="flex items-center justify-between border-b px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-lg">
+              👤
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                Contact Person
+              </h2>
+              <p className="text-xs text-gray-500">
+                Who should we contact regarding this application?
+              </p>
+            </div>
+          </div>
+        </header>
 
         <div className="space-y-5 p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">First Name</label>
+              <label className="mb-1 block text-sm font-medium">
+                First Name <span className="text-red-500">*</span>
+              </label>
               <input
                 value={data.firstName}
                 onChange={on('firstName')}
                 placeholder="Enter first name"
-                className="w-full rounded-md border px-4 py-2"
+                className={inputClasses}
                 required
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Last Name</label>
+              <label className="mb-1 block text-sm font-medium">
+                Last Name <span className="text-red-500">*</span>
+              </label>
               <input
                 value={data.lastName}
                 onChange={on('lastName')}
                 placeholder="Enter last name"
-                className="w-full rounded-md border px-4 py-2"
+                className={inputClasses}
                 required
               />
             </div>
@@ -165,40 +189,55 @@ export default function NewClinicForm() {
                 value={data.phone}
                 onChange={on('phone')}
                 placeholder="Enter phone number"
-                className="w-full rounded-md border px-4 py-2"
+                className={inputClasses}
                 type="tel"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Email</label>
+              <label className="mb-1 block text-sm font-medium">
+                Email <span className="text-red-500">*</span>
+              </label>
               <input
                 value={data.email}
                 onChange={on('email')}
                 placeholder="Enter email"
-                className="w-full rounded-md border px-4 py-2"
+                className={inputClasses}
                 type="email"
                 required
               />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Submit */}
-      <div className="pt-2">
+      <div className="pt-2 text-center">
         <button
           disabled={loading}
-          className="mx-auto block w-40 rounded-md bg-teal-600 px-4 py-2 font-medium text-white hover:bg-teal-700 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-teal-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-60 md:w-48"
         >
           {loading ? 'Sending…' : 'Submit'}
         </button>
 
-        {ok && <p className="mt-3 text-center text-sm text-emerald-600">{ok}</p>}
+        {ok && (
+          <p className="mt-3 text-sm text-emerald-600" role="status">
+            {ok}
+          </p>
+        )}
         {err && (
-          <p id="form-error" className="mt-3 text-center text-sm text-rose-600">
+          <p
+            id="new-clinic-error"
+            className="mt-3 text-sm text-rose-600"
+            role="alert"
+          >
             {err}
           </p>
         )}
+
+        <p className="mt-2 text-xs text-gray-500">
+          By submitting this form, you agree that MedTravel may contact you
+          regarding partnership details.
+        </p>
       </div>
     </form>
   );
