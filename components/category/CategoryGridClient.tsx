@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browserClient";
-// import CategoryFilters from "./CategoryFilters";
 import { clinicPath } from "@/lib/clinic-url";
+import { clinicHref } from "@/lib/clinic-url"; // ← добавили
 import Breadcrumbs from "@/components/Breadcrumbs";
 
 type ServiceMap = Record<string, string>;
@@ -22,6 +22,7 @@ type CatalogItem = {
   category_id: number;
   service_slugs: string[];
   rating: number | null;
+  image_url?: string | null;
 };
 
 type Facets = {
@@ -78,7 +79,6 @@ function useUrlState() {
         next.set(k, v);
       }
     });
-    // при изменении фильтров — сбрасываем страницу
     if (
       "country" in patch ||
       "province" in patch ||
@@ -117,6 +117,42 @@ function useUrlState() {
   };
 }
 
+// форматируем локацию клиники
+function formatLocationClinic(
+  c: Pick<CatalogItem, "city" | "country" | "province" | "district">
+) {
+  const parts = [c.city, c.province, c.country].filter(Boolean);
+  return parts.join(", ");
+}
+
+// короткий тизер-описание
+function buildTeaser(
+  c: CatalogItem,
+  labelOf: (slug: string) => string
+): string {
+  const location = formatLocationClinic(c);
+  const serviceNames = c.service_slugs
+    .slice(0, 3)
+    .map(labelOf)
+    .filter(Boolean);
+
+  const sentences: string[] = [];
+
+  if (location) {
+    sentences.push(`${c.name} is a clinic located in ${location}.`);
+  } else {
+    sentences.push(`${c.name} is a clinic from our trusted network.`);
+  }
+
+  if (serviceNames.length) {
+    sentences.push(`It offers treatments such as ${serviceNames.join(", ")}.`);
+  }
+
+  const text = sentences.join(" ");
+  if (text.length <= 260) return text;
+  return text.slice(0, 260).replace(/\s+\S*$/, "") + "…";
+}
+
 export default function CategoryGridClient({
   categorySlug,
   categoryName,
@@ -133,27 +169,30 @@ export default function CategoryGridClient({
     city,
     district,
     services,
-    setParams,
     setPage,
     resetAll,
     buildHref,
   } = useUrlState();
 
-  const [svcMap, setSvcMap] = useState<ServiceMap>({}); // <— словарь slug→name
+  const [svcMap, setSvcMap] = useState<ServiceMap>({});
 
-  // грузим словарь услуг один раз (или можно по facets.services)
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      const { data } = await supabase.from('services').select('slug,name').limit(1000);
+      const { data } = await supabase
+        .from("services")
+        .select("slug,name")
+        .limit(1000);
       if (!cancelled) {
         const map: ServiceMap = {};
-        for (const r of (data ?? [])) map[r.slug] = r.name;
+        for (const r of data ?? []) map[r.slug] = r.name;
         setSvcMap(map);
       }
     }
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [supabase]);
 
   const [loading, setLoading] = useState(true);
@@ -162,7 +201,6 @@ export default function CategoryGridClient({
   const [total, setTotal] = useState(0);
   const [facets, setFacets] = useState<Facets>({});
 
-  // КЭШ «первого» набора фасетов (без фильтров) — база для «Popular …»
   const initialFacetsRef = useRef<Facets | null>(null);
   const hasAnyFilter = !!(
     country ||
@@ -172,7 +210,6 @@ export default function CategoryGridClient({
     services.length
   );
 
-  // Локальные поиски в сайдбаре
   const [locationQuery, setLocationQuery] = useState("");
   const [treatmentQuery, setTreatmentQuery] = useState("");
 
@@ -181,6 +218,7 @@ export default function CategoryGridClient({
     async function run() {
       setLoading(true);
       setError(null);
+
       const { data, error } = await supabase.rpc("catalog_browse_basic", {
         p_category_slug: categorySlug,
         p_country: country ?? null,
@@ -194,6 +232,7 @@ export default function CategoryGridClient({
       });
 
       if (cancelled) return;
+
       if (error) {
         setError(error.message);
         setItems([]);
@@ -202,18 +241,51 @@ export default function CategoryGridClient({
         setLoading(false);
         return;
       }
+
       const row = Array.isArray(data)
         ? (data[0] as RpcRow | undefined)
         : (data as RpcRow | undefined);
-      setItems(row?.items ?? []);
+
+      const baseItems: CatalogItem[] = row?.items ?? [];
       setTotal(Number(row?.total_count ?? 0));
       setFacets(row?.facets ?? {});
-      // сохраняем «базовые» фасеты (только когда фильтров нет)
+
+      // Подтягиваем cover из clinic_images
+      let enrichedItems: CatalogItem[] = baseItems;
+      try {
+        if (baseItems.length) {
+          const ids = baseItems.map((c) => c.id);
+          const { data: imgs } = await supabase
+            .from("clinic_images")
+            .select("clinic_id,url,sort,created_at")
+            .in("clinic_id", ids)
+            .order("sort", { ascending: true, nullsFirst: true })
+            .order("created_at", { ascending: false, nullsFirst: true });
+
+          const imgMap = new Map<string, string>();
+          (imgs ?? []).forEach((row: any) => {
+            const url = (row?.url || "").trim();
+            if (!url) return;
+            if (!imgMap.has(row.clinic_id)) imgMap.set(row.clinic_id, url);
+          });
+
+          enrichedItems = baseItems.map((c) => ({
+            ...c,
+            image_url: imgMap.get(c.id) ?? null,
+          }));
+        }
+      } catch {
+        enrichedItems = baseItems;
+      }
+
       if (!hasAnyFilter && row?.facets && !initialFacetsRef.current) {
         initialFacetsRef.current = row.facets;
       }
+
+      setItems(enrichedItems);
       setLoading(false);
     }
+
     run();
     return () => {
       cancelled = true;
@@ -232,9 +304,8 @@ export default function CategoryGridClient({
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const labelOf = (slug: string) => svcMap[slug] ?? slug.replace(/-/g,' ');
+  const labelOf = (slug: string) => svcMap[slug] ?? slug.replace(/-/g, " ");
 
-  // База для популярных — либо закэшированные «первичные», либо текущие фасеты
   const baseFacets = initialFacetsRef.current ?? facets;
 
   const popularCitiesAll = (baseFacets.cities ?? []).filter(Boolean) as string[];
@@ -242,7 +313,6 @@ export default function CategoryGridClient({
     Boolean
   ) as string[];
 
-  // Клиентская фильтрация по инпутам сайдбара + лимит 5
   const popularCities = popularCitiesAll
     .filter((c) => c.toLowerCase().includes(locationQuery.toLowerCase()))
     .slice(0, 5);
@@ -251,7 +321,6 @@ export default function CategoryGridClient({
     .filter((s) => s.toLowerCase().includes(treatmentQuery.toLowerCase()))
     .slice(0, 5);
 
-  // Тоггл ссылок для services в сайдбаре (множественный выбор)
   const toggleServiceHref = (slug: string) => {
     const set = new Set(services);
     set.has(slug) ? set.delete(slug) : set.add(slug);
@@ -264,23 +333,23 @@ export default function CategoryGridClient({
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
         {/* Листинг слева */}
         <div className="space-y-4">
-          {/* === Хлебные крошки над первым блоком карточек === */}
           <Breadcrumbs
             items={[
               { label: "Home page", href: "/" },
               {
-                label: categoryName ??
-                  (categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1)),
+                label:
+                  categoryName ??
+                  (categorySlug.charAt(0).toUpperCase() +
+                    categorySlug.slice(1)),
               },
             ]}
           />
 
-          {/* Скелетон/список */}
           {loading && items.length === 0 ? (
             Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-36 animate-pulse rounded-2xl border bg-white"
+                className="h-40 animate-pulse rounded-2xl border bg-white"
               />
             ))
           ) : error ? (
@@ -292,49 +361,132 @@ export default function CategoryGridClient({
               No clinics found
             </div>
           ) : (
-            items.map((c) => (
-              <Link
-                key={c.slug}
-                href={clinicPath({
+            items.map((c) => {
+              const clinicUrl = clinicHref({
+                slug: c.slug,
+                country: c.country,
+                province: c.province,
+                city: c.city,
+                district: c.district,
+              });
+
+              // корректный путь на страницу заявки
+              const quoteUrl = clinicHref(
+                {
                   slug: c.slug,
                   country: c.country,
                   province: c.province,
                   city: c.city,
                   district: c.district,
-                })}
-                className="block rounded-2xl border bg-white p-5 transition hover:shadow-md"
-              >
-                <div className="text-lg font-semibold">{c.name}</div>
-                <div className="mt-1 text-sm text-gray-600">
-                  {[c.country, c.city].filter(Boolean).join(" • ")}
-                </div>
-                {c.service_slugs?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {c.service_slugs.slice(0, 5).map((t) => {
-                      const active = services.includes(t);
-                      return (
-                        <span
-                          key={t}
-                          className={
-                            `rounded-full px-3 py-1 text-xs border
-               ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-gray-100'}`
+                },
+                "inquiry"
+              );
+
+              const locationLabel = formatLocationClinic(c);
+              const teaser = buildTeaser(c, labelOf);
+
+              return (
+                <article
+                  key={c.id}
+                  className="rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row">
+                    {/* Изображение */}
+                    <Link
+                      href={clinicUrl}
+                      className="md:w-48 md:min-w-[12rem]"
+                    >
+                      <div className="h-40 w-full overflow-hidden rounded-xl bg-gray-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={
+                            c.image_url ??
+                            "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
                           }
-                          title={t}
+                          alt={c.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </Link>
+
+                    {/* Контент */}
+                    <div className="flex-1 space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <Link
+                            href={clinicUrl}
+                            className="text-lg font-semibold text-gray-900 hover:underline"
+                          >
+                            {c.name}
+                          </Link>
+                          {locationLabel && (
+                            <p className="mt-1 text-sm text-gray-500">
+                              {locationLabel}
+                            </p>
+                          )}
+                        </div>
+
+                        <Link
+                          href={quoteUrl}
+                          className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
                         >
-                          {labelOf(t)}
-                        </span>
-                      );
-                    })}
+                          Claim your free quote
+                        </Link>
+                      </div>
+
+                      {/* Описание + Read more */}
+                      {teaser && (
+                        <p className="text-sm text-gray-600">
+                          {teaser}{" "}
+                          <Link
+                            href={clinicUrl}
+                            className="font-medium text-teal-700 hover:underline"
+                          >
+                            Read more
+                          </Link>
+                        </p>
+                      )}
+
+                      {/* Услуги – старый визуал (pills) + лимит и More treatments */}
+                      {c.service_slugs?.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {c.service_slugs.slice(0, 4).map((t) => {
+                            const active = services.includes(t);
+                            return (
+                              <span
+                                key={t}
+                                className={`rounded-full border px-3 py-1 text-xs ${
+                                  active
+                                    ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                                    : "border-gray-200 bg-gray-100 text-gray-700"
+                                }`}
+                                title={t}
+                              >
+                                {labelOf(t)}
+                              </span>
+                            );
+                          })}
+                          {c.service_slugs.length > 4 && (
+                            <Link
+                              href={clinicUrl}
+                              className="text-xs font-medium text-teal-700 hover:underline"
+                            >
+                              More treatments
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </Link>
-            ))
+                </article>
+              );
+            })
           )}
 
           {/* Пагинация */}
           <div className="mt-4 flex items-center justify-center gap-2">
             <button
-              className="rounded-full border px-3 py-1 disabled:opacity-50"
+              className="rounded-full border px-3 py-1 text-sm disabled:opacity-50"
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page <= 1 || loading}
             >
@@ -344,7 +496,7 @@ export default function CategoryGridClient({
               Page {page} of {totalPages}
             </span>
             <button
-              className="rounded-full border px-3 py-1 disabled:opacity-50"
+              className="rounded-full border px-3 py-1 text-sm disabled:opacity-50"
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages || loading}
             >
@@ -353,7 +505,7 @@ export default function CategoryGridClient({
           </div>
         </div>
 
-        {/* Сайдбар справа — «популярные» всегда из baseFacets, не исчезают */}
+        {/* Сайдбар справа */}
         <aside className="space-y-6">
           <div className="rounded-2xl border bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
@@ -368,19 +520,24 @@ export default function CategoryGridClient({
               </button>
             </div>
             <input
-              className="w-full rounded-xl border px-3 py-2"
+              className="w-full rounded-xl border px-3 py-2 text-sm"
               placeholder="Type to filter locations"
               value={locationQuery}
               onChange={(e) => setLocationQuery(e.target.value)}
             />
-            <h3 className="mt-4 text-lg font-semibold">Popular locations</h3>
-            <ul className="mt-2 space-y-2">
+            <h3 className="mt-4 text-sm font-semibold">Popular locations</h3>
+            <ul className="mt-2 space-y-2 text-sm">
               {popularCities.map((l) => {
-                const isActive = city && l.toLowerCase() === city.toLowerCase();
+                const isActive =
+                  city && l.toLowerCase() === city.toLowerCase();
                 return (
                   <li key={l}>
                     <Link
-                      className={isActive ? 'font-semibold text-blue-700 underline' : 'text-blue-600 hover:underline'}
+                      className={
+                        isActive
+                          ? "font-semibold text-blue-700 underline"
+                          : "text-blue-600 hover:underline"
+                      }
                       href={buildHref({ city: l })}
                     >
                       {l}
@@ -388,27 +545,33 @@ export default function CategoryGridClient({
                   </li>
                 );
               })}
-              {popularCities.length === 0 && <li className="text-sm text-gray-500">No matches.</li>}
+              {popularCities.length === 0 && (
+                <li className="text-xs text-gray-500">No matches.</li>
+              )}
             </ul>
           </div>
 
           <div className="rounded-2xl border bg-white p-5">
             <div className="mb-3 text-sm font-semibold">Search treatments</div>
             <input
-              className="w-full rounded-xl border px-3 py-2"
+              className="w-full rounded-xl border px-3 py-2 text-sm"
               placeholder="Type to filter treatments"
               value={treatmentQuery}
               onChange={(e) => setTreatmentQuery(e.target.value)}
             />
-            <h3 className="mt-4 text-lg font-semibold">Popular treatments</h3>
-            <ul className="mt-2 space-y-2">
+            <h3 className="mt-4 text-sm font-semibold">Popular treatments</h3>
+            <ul className="mt-2 space-y-2 text-sm">
               {popularServices.map((t) => {
-                const slug = t.toLowerCase().replace(/\s+/g, "-"); // если facets отдает имя; если уже slug — оставьте t
+                const slug = t.toLowerCase().replace(/\s+/g, "-");
                 const isActive = services.includes(slug);
                 return (
                   <li key={t}>
                     <Link
-                      className={`hover:underline ${isActive ? 'font-semibold text-blue-700' : 'text-blue-600'}`}
+                      className={
+                        isActive
+                          ? "font-semibold text-blue-700 hover:underline"
+                          : "text-blue-600 hover:underline"
+                      }
                       href={toggleServiceHref(slug)}
                       title="Toggle treatment filter"
                     >
@@ -418,7 +581,7 @@ export default function CategoryGridClient({
                 );
               })}
               {popularServices.length === 0 && (
-                <li className="text-sm text-gray-500">No matches.</li>
+                <li className="text-xs text-gray-500">No matches.</li>
               )}
             </ul>
           </div>

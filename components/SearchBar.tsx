@@ -75,7 +75,10 @@ export default function SearchBar({
     return () => ctl.abort();
   }, [debouncedValue]);
 
-  const empty = useMemo(() => open && !loading && items.length === 0, [open, loading, items.length]);
+  const empty = useMemo(
+    () => open && !loading && items.length === 0,
+    [open, loading, items.length],
+  );
 
   const handleClear = () => {
     onChangeAction('');
@@ -134,7 +137,7 @@ export default function SearchBar({
             <div className="flex items-center justify-between border-b px-4 py-2 text-xs text-gray-500">
               <span>Search results</span>
               {debouncedValue && (
-                <span className="truncate max-w-[55%]">
+                <span className="max-w-[55%] truncate">
                   for <span className="font-medium">&ldquo;{debouncedValue}&rdquo;</span>
                 </span>
               )}
@@ -148,55 +151,64 @@ export default function SearchBar({
 
           {/* list */}
           {!loading &&
-            items.map((it) => (
-              <Link
-                key={it.id}
-                href={
-                  it.href ||
-                  clinicPath({
-                    slug: it.slug,
-                    country: it.country,
-                    province: it.province,
-                    city: it.city,
-                    district: it.district,
-                  })
-                }
-                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                {/* thumb */}
-                <div className="flex h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={it.image_url || FALLBACK_IMG}
-                    alt={it.name}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
-                    }}
-                  />
-                </div>
+            items.map((it) => {
+              const location = formatLocation(it);
 
-                {/* text */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-gray-900">
-                      {it.name}
-                    </p>
-                    {it.category && (
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                        {it.category}
-                      </span>
-                    )}
+              return (
+                <Link
+                  key={it.id}
+                  href={
+                    it.href ||
+                    clinicPath({
+                      slug: it.slug,
+                      country: it.country,
+                      province: it.province,
+                      city: it.city,
+                      district: it.district,
+                    })
+                  }
+                  className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
+                  onClick={() => setOpen(false)}
+                >
+                  {/* thumb */}
+                  <div className="flex h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={it.image_url || FALLBACK_IMG}
+                      alt={it.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
+                      }}
+                    />
                   </div>
-                  {formatLocation(it) && (
-                    <p className="mt-0.5 truncate text-xs text-gray-500">
-                      {formatLocation(it)}
-                    </p>
-                  )}
-                </div>
-              </Link>
-            ))}
+
+                  {/* text + badge */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      {/* слева: название + локация в колонку */}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900 text-left">
+                          {it.name}
+                        </p>
+                        {location && (
+                          <p className="mt-0.5 truncate text-xs text-gray-500 text-left">
+                            {location}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* справа: бейдж категории, выровнен по правому краю */}
+                      {it.category && (
+                        <span className="ml-2 inline-flex flex-shrink-0 items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                          {it.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
 
           {/* empty state */}
           {empty && (
