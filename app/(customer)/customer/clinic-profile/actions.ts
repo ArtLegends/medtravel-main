@@ -64,7 +64,9 @@ export async function getDraft() {
   // тянем клинику, чтобы знать статус / опубликована ли
   const { data: clinic, error: clinicErr } = await client
     .from("clinics")
-    .select("id, is_published, moderation_status, status")
+    .select(
+      "id, is_published, moderation_status, status, slug, country, province, city, district"
+    )
     .eq("id", clinicId)
     .maybeSingle();
 

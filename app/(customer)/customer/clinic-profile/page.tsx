@@ -18,6 +18,7 @@ import {
   uploadDoctorImage,
   uploadAccreditationLogo,
 } from "./actions";
+import { clinicHref } from "@/lib/clinic-url";
 
 type SectionKey =
   | "basic"
@@ -172,6 +173,11 @@ export default function ClinicProfilePage() {
     is_published: boolean;
     moderation_status: string | null;
     status: string | null;
+    slug: string | null;
+    country: string | null;
+    province: string | null;
+    city: string | null;
+    district: string | null;
   } | null>(null);
 
   // загрузка драфта
@@ -193,6 +199,11 @@ export default function ClinicProfilePage() {
               is_published: !!clinic.is_published,
               moderation_status: clinic.moderation_status ?? null,
               status: clinic.status ?? null,
+              slug: clinic.slug ?? null,
+              country: clinic.country ?? null,
+              province: clinic.province ?? null,
+              city: clinic.city ?? null,
+              district: clinic.district ?? null,
             });
           }
         
@@ -349,6 +360,21 @@ export default function ClinicProfilePage() {
       : "bg-gray-100 text-gray-700 border border-gray-200";
   
   const isPublished = !!clinicMeta?.is_published;
+
+  const clinicPublicHref = useMemo(() => {
+    if (!clinicMeta?.is_published || !clinicMeta.slug) return null;
+    try {
+      return clinicHref({
+        slug: clinicMeta.slug,
+        country: clinicMeta.country ?? undefined,
+        province: clinicMeta.province ?? undefined,
+        city: clinicMeta.city ?? undefined,
+        district: clinicMeta.district ?? undefined,
+      });
+    } catch {
+      return null;
+    }
+  }, [clinicMeta]);
   
   const sidebarPrimaryLabel = isPublished ? "Update Clinic" : "Publish Clinic";
   const submitButtonLabel = isPublished ? "Update Clinic" : "Submit for Review";
@@ -399,34 +425,53 @@ export default function ClinicProfilePage() {
           </Card>
 
           <Card className="p-4 space-y-3">
-            <button
-              disabled={publishDisabled || isPending}
-              onClick={() => {
-                startTransition(async () => {
-                  await saveDraftSection("basic_info", basic);
-                  await saveDraftSection("services", services);
-                  await saveDraftSection("doctors", doctors);
-                  await saveDraftSection("facilities", additional);
-                  await saveDraftSection("hours", hours);
-                  await saveDraftSection("gallery", gallery);
-                  await saveDraftSection("location", location);
-                  await saveDraftSection("pricing", payments);
-                  await submitForReview();
-                });
-              }}
-              className={clsx(
-                "w-full rounded-md px-3 py-2 text-white font-medium transition",
-                publishDisabled
-                  ? "bg-blue-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700"
+            <div className="flex flex-col gap-2">
+              <button
+                disabled={publishDisabled || isPending}
+                onClick={() => {
+                  startTransition(async () => {
+                    await saveDraftSection("basic_info", basic);
+                    await saveDraftSection("services", services);
+                    await saveDraftSection("doctors", doctors);
+                    await saveDraftSection("facilities", additional);
+                    await saveDraftSection("hours", hours);
+                    await saveDraftSection("gallery", gallery);
+                    await saveDraftSection("location", location);
+                    await saveDraftSection("pricing", payments);
+                    await submitForReview();
+                  });
+                }}
+                className={clsx(
+                  "w-full rounded-md px-3 py-2 text-white font-medium transition",
+                  publishDisabled
+                    ? "bg-blue-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                )}
+              >
+                {isPending
+                  ? isPublished
+                    ? "Updating..."
+                    : "Publishing..."
+                  : sidebarPrimaryLabel}
+              </button>
+
+              {/* Кнопка "My clinic" – только когда клиника уже опубликована */}
+              {clinicPublicHref && (
+                <a
+                  href={clinicPublicHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-1 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  <Icon
+                    icon="solar:external-link-linear"
+                    className="h-4 w-4"
+                  />
+                  <span>My clinic</span>
+                </a>
               )}
-            >
-              {isPending
-                ? isPublished
-                  ? "Updating..."
-                  : "Publishing..."
-                : sidebarPrimaryLabel}
-            </button>
+            </div>
+
             <p className="text-xs text-gray-500">
               Complete all required sections to enable publishing or updating
             </p>

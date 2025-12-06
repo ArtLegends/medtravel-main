@@ -14,6 +14,7 @@ import {
 
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
+import { clinicHref } from "@/lib/clinic-url";
 
 type NotificationRow = {
   id: string;
@@ -89,6 +90,48 @@ export default function NotificationsBell() {
           {url && (
             <div className="text-xs text-default-500 break-all">
               Referral link: {url}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (n.type === "clinic_approved") {
+      const data = n.data ?? {};
+      const clinicName = data?.name ?? "your clinic";
+
+      let clinicUrl: string | null = null;
+      try {
+        if (data?.slug) {
+          clinicUrl = clinicHref({
+            slug: data.slug,
+            country: data.country ?? undefined,
+            province: data.province ?? undefined,
+            city: data.city ?? undefined,
+            district: data.district ?? undefined,
+          });
+        }
+      } catch {
+        clinicUrl = null;
+      }
+
+      return (
+        <div className="space-y-1 text-left">
+          <div className="text-sm font-medium">
+            Your clinic{" "}
+            <span className="font-semibold">{clinicName}</span> has
+            been published.
+          </div>
+          {clinicUrl && (
+            <div className="text-xs text-default-500">
+              <a
+                href={clinicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline"
+              >
+                Open clinic page
+              </a>
             </div>
           )}
         </div>

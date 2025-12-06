@@ -85,7 +85,41 @@ export async function approveClinic(formData: FormData) {
     throw clinicsUpdateError;
   }
 
-  // 3) помечаем драфт как published (если таблица/колонка существуют)
+  // 3) уведомление владельцу клиники о публикации
+  try {
+    const { data: clinicRow, error: ownerErr } = await supabase
+      .from("clinics")
+      .select(
+        "id, owner_id, name, slug, country, province, city, district"
+      )
+      .eq("id", clinicId)
+      .maybeSingle();
+
+    if (ownerErr) {
+      console.error("load clinic for notification error:", ownerErr);
+    }
+
+    if (clinicRow?.owner_id) {
+      await supabase.from("notifications").insert({
+        user_id: clinicRow.owner_id,
+        type: "clinic_approved",
+        is_read: false,
+        data: {
+          clinic_id: clinicRow.id,
+          name: clinicRow.name,
+          slug: clinicRow.slug,
+          country: clinicRow.country,
+          province: clinicRow.province,
+          city: clinicRow.city,
+          district: clinicRow.district,
+        },
+      });
+    }
+  } catch (e) {
+    console.warn("clinic_approved notification insert error:", e);
+  }
+
+  // 4) помечаем драфт как published (если таблица/колонка существуют)
   try {
     await supabase
       .from("clinic_profile_drafts")
@@ -95,7 +129,7 @@ export async function approveClinic(formData: FormData) {
     console.warn("clinic_profile_drafts publish update warning:", e);
   }
 
-  // 4) перерисовать очередь модерации
+  // 5) перерисовать очередь модерации
   revalidatePath("/admin/moderation");
 }
 
