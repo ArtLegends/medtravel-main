@@ -123,13 +123,23 @@ const Body = z.object({
 /** map weekday tokens → [1..7] */
 function normalizeWeekdays(token: string): number[] {
   const mapName: Record<string, number> = {
-    mon: 1, monday: 1,
-    tue: 2, tues: 2, tuesday: 2,
-    wed: 3, wednesday: 3,
-    thu: 4, thur: 4, thurs: 4, thursday: 4,
-    fri: 5, friday: 5,
-    sat: 6, saturday: 6,
-    sun: 7, sunday: 7,
+    mon: 1,
+    monday: 1,
+    tue: 2,
+    tues: 2,
+    tuesday: 2,
+    wed: 3,
+    wednesday: 3,
+    thu: 4,
+    thur: 4,
+    thurs: 4,
+    thursday: 4,
+    fri: 5,
+    friday: 5,
+    sat: 6,
+    saturday: 6,
+    sun: 7,
+    sunday: 7,
   };
   const clean = token.trim().toLowerCase().replace(/\s+/g, '');
   if (/^\d+$/.test(clean)) {
@@ -140,21 +150,23 @@ function normalizeWeekdays(token: string): number[] {
   if (range.length === 2 && mapName[range[0]] && mapName[range[1]]) {
     const a = mapName[range[0]];
     const b = mapName[range[1]];
-    if (a <= b) return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+    if (a <= b) {
+      return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+    }
   }
   if (mapName[clean]) return [mapName[clean]];
   return [];
 }
 
 /** parse "9:00 AM - 6:00 PM" → {open:'09:00:00', close:'18:00:00'}; "Closed" → {is_closed:true} */
-function parseTimeSpan(s?: string): {
-  open: string | null;
-  close: string | null;
-  is_closed: boolean;
-} {
+function parseTimeSpan(
+  s?: string,
+): { open: string | null; close: string | null; is_closed: boolean } {
   const text = (s || '').trim();
   if (!text) return { open: null, close: null, is_closed: false };
-  if (/^closed$/i.test(text)) return { open: null, close: null, is_closed: true };
+  if (/^closed$/i.test(text)) {
+    return { open: null, close: null, is_closed: true };
+  }
 
   const m = text.match(
     /^\s*([0-9: ]+(?:am|pm)?)\s*[-–—]\s*([0-9: ]+(?:am|pm)?)\s*$/i,
@@ -206,63 +218,16 @@ export async function POST(req: Request) {
     const parsed = Body.parse(await req.json());
     const sb = createServiceClient();
 
-    /* ---- подготовим структуры, которые нужны и для clinics.jsonb, и для draft ---- */
-
-    const basicInfo = {
-      name: parsed.clinic.name,
-      slug: parsed.clinic.slug || slugify(parsed.clinic.name),
-      specialty: parsed.clinic.specialty,
-      country: parsed.clinic.country,
-      city: parsed.clinic.city,
-      province: parsed.clinic.region ?? null,
-      district: parsed.clinic.district ?? null,
-      description: parsed.clinic.about,
-    };
-
-    const location = {
-      mapUrl: parsed.clinic.map_embed_url ?? null,
-      directions: null as string | null, // в API пока нет directions
-    };
-
-    const servicesJson = parsed.services.map((s) => ({
-      name: s.name,
-      description: s.desc ?? null,
-      price: s.price ?? null,
-      currency: s.currency,
-    }));
-
-    const doctorsJson = parsed.doctors.map((d) => ({
-      name: d.name,
-      title: d.title ?? null,
-      specialty: d.spec ?? null,
-      spec: d.spec ?? null,
-      photo_url: d.photo ?? null,
-      photoUrl: d.photo ?? null,
-      bio: d.bio ?? null,
-      languages: [] as string[],
-    }));
-
-    const hoursJson = parsed.hours.map((h) => ({
-      day: h.day,
-      time: h.time ?? '',
-    }));
-
-    const galleryJson = parsed.images.map((im, index) => ({
-      url: im.url,
-      title: im.title ?? null,
-      sort: index,
-    }));
-
+    // ---- 1) create clinic ----
     const isPublished = parsed.clinic.status === 'Published';
     const status = isPublished ? 'published' : 'draft';
 
-    // ---- 1) create clinic ----
     const { data: clinicRow, error: clinicErr } = await sb
       .from('clinics')
       .insert([
         {
           name: parsed.clinic.name,
-          slug: basicInfo.slug,
+          slug: parsed.clinic.slug || slugify(parsed.clinic.name),
           about: parsed.clinic.about,
           address: parsed.clinic.address,
           country: parsed.clinic.country,
@@ -281,14 +246,6 @@ export async function POST(req: Request) {
           amenities: parsed.clinic.amenities,
           payments: parsed.clinic.payments,
 
-          // jsonb поля для details (services/doctors/hours/gallery)
-          services: servicesJson,
-          doctors: doctorsJson,
-          hours: hoursJson,
-          images: galleryJson,
-          gallery: galleryJson,
-          // ВАЖНО: БЕЗ поля accreditations — такой колонки в clinics нет
-
           status,
           is_published: isPublished,
           verified_by_medtravel: true,
@@ -306,7 +263,7 @@ export async function POST(req: Request) {
         const { data: existingClinic } = await sb
           .from('clinics')
           .select('id')
-          .eq('slug', basicInfo.slug)
+          .eq('slug', parsed.clinic.slug || slugify(parsed.clinic.name))
           .maybeSingle();
 
         if (existingClinic?.id) {
@@ -375,7 +332,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // ---- 3) images (clinic_images) ----
+    // ---- 3) images ----
     if (parsed.images.length) {
       const imgRows = parsed.images.map((im, index) => ({
         clinic_id: clinicId,
@@ -396,7 +353,7 @@ export async function POST(req: Request) {
         clinic_id: clinicId,
         name: d.name,
         title: d.title ?? null,
-        position: d.spec ?? d.title ?? null,
+        position: d.title ?? null,
         bio: d.bio ?? null,
         languages: '{}', // пустой text[]
         photo_url: d.photo ?? null,
@@ -425,16 +382,19 @@ export async function POST(req: Request) {
           )
           .select('id')
           .single();
+
         if (svcErr || !svc) {
           return NextResponse.json(
             { error: svcErr?.message ?? 'Service upsert failed' },
             { status: 400 },
           );
         }
+
         const priceNum =
           s.price && s.price.trim() !== ''
             ? Number(s.price.replace(',', '.'))
             : null;
+
         const { error: linkErr } = await sb
           .from('clinic_services')
           .upsert(
@@ -448,6 +408,7 @@ export async function POST(req: Request) {
             ],
             { onConflict: 'clinic_id,service_id' },
           );
+
         if (linkErr) {
           return NextResponse.json({ error: linkErr.message }, { status: 400 });
         }
@@ -463,9 +424,11 @@ export async function POST(req: Request) {
         close: string | null;
         is_closed: boolean;
       }[] = [];
+
       for (const h of parsed.hours) {
         const wds = normalizeWeekdays(h.day);
         const times = parseTimeSpan(h.time);
+
         for (const wd of wds) {
           rows.push({
             clinic_id: clinicId,
@@ -476,6 +439,7 @@ export async function POST(req: Request) {
           });
         }
       }
+
       if (rows.length) {
         const { error } = await sb
           .from('clinic_hours')
@@ -503,52 +467,24 @@ export async function POST(req: Request) {
           )
           .select('id')
           .single();
+
         if (accErr || !acc) {
           return NextResponse.json(
             { error: accErr?.message ?? 'Accreditation upsert failed' },
             { status: 400 },
           );
         }
+
         const { error: linkErr } = await sb
           .from('clinic_accreditations')
           .upsert(
             [{ clinic_id: clinicId, accreditation_id: acc.id }],
             { onConflict: 'clinic_id,accreditation_id' },
           );
+
         if (linkErr) {
           return NextResponse.json({ error: linkErr.message }, { status: 400 });
         }
-      }
-    }
-
-    // ---- 8) clinic_profile_drafts: сырые данные для details/редактора ----
-    {
-      const { error: draftErr } = await sb
-        .from('clinic_profile_drafts')
-        .upsert(
-          {
-            clinic_id: clinicId,
-            basic_info: basicInfo,
-            location,
-            services: servicesJson,
-            doctors: doctorsJson,
-            hours: hoursJson,
-            gallery: galleryJson,
-            facilities: parsed.clinic.amenities,
-            pricing: parsed.clinic.payments,
-            status,
-            updated_at: new Date().toISOString(),
-            // СЮДА НЕ ПИШЕМ accreditations, чтобы не ловить ошибку,
-            // если в clinic_profile_drafts нет такой колонки.
-          } as any,
-          { onConflict: 'clinic_id' } as any,
-        );
-
-      if (draftErr) {
-        return NextResponse.json(
-          { error: draftErr.message ?? 'Clinic draft upsert failed' },
-          { status: 400 },
-        );
       }
     }
 

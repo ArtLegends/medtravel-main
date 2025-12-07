@@ -411,11 +411,6 @@ async function saveClinic(formData: FormData) {
     map_embed_url: location.mapUrl,
     amenities: amenitiesForClinic,
     payments: paymentsForClinic,
-    // jsonb для фронта
-    doctors: doctorsForDb,
-    images: galleryForClinic,
-    gallery: galleryForClinic,
-    // ВНИМАНИЕ: НЕ пишем поле accreditations — колонки в clinics нет
   };
 
   const { error: clinicError } = await sb
