@@ -25,7 +25,7 @@ type ClinicRow = {
   is_published: boolean | null;
   created_at: string;
   updated_at: string | null;
-  // jsonb поля
+  // jsonb поля (из старого импорта / драфтов)
   services?: any;
   doctors?: any;
   hours?: any;
@@ -189,28 +189,27 @@ async function saveClinic(formData: FormData) {
   const moderationStatus = str("clinic_moderation_status") || null;
   const draftStatus = str("draft_status") || null;
 
-  // --- СЫРЫЕ JSON из формы (то, что уйдёт в clinic_profile_drafts) ---
+  // --- СЫРОЕ JSON из формы (то, что уйдёт в clinic_profile_drafts) ---
   const rawServices = (parseJson("draft_services") ?? []) as any[];
   const rawDoctors = (parseJson("draft_doctors") ?? []) as any[];
   const rawHours = (parseJson("draft_hours") ?? []) as any[];
   const rawGallery = (parseJson("draft_gallery") ?? []) as any[];
   const rawFacilities = (parseJson("draft_facilities") ?? {}) as any;
   const rawPricing = (parseJson("draft_pricing") ?? []) as any[];
-  const rawAccreditations = (parseJson("clinic_accreditations") ?? []) as any[];
+  const rawAccreditations = (parseJson("clinic_accreditations") ??
+    []) as any[];
 
   // --- НОРМАЛИЗОВАННЫЕ структуры ДЛЯ ТАБЛИЦ ---
 
-  // services → как есть, мы нормализуем только по месту
   const servicesForDb = Array.isArray(rawServices) ? rawServices : [];
 
-  // doctors → для clinic_staff
   const doctorsForDb = Array.isArray(rawDoctors)
     ? rawDoctors.map((d) => {
         const name = (d.fullName ?? d.name ?? "").trim();
         const title = (d.title ?? "").trim();
         const spec = (d.specialty ?? d.spec ?? "").trim();
 
-        // языки: либо массив строк, либо строка "en, tr"
+        // языки: массив строк или строка "en, tr"
         let langs: string[] = [];
         if (Array.isArray(d.languages)) {
           langs = d.languages
@@ -241,7 +240,6 @@ async function saveClinic(formData: FormData) {
       })
     : [];
 
-  // hours → для clinic_hours
   const hoursForDb = Array.isArray(rawHours)
     ? rawHours
         .map((h) => {
@@ -252,10 +250,8 @@ async function saveClinic(formData: FormData) {
           const status = h.status ?? "open";
           const isClosed = status === "closed";
 
-          const openStr: string | null =
-            h.start ?? h.open ?? null; // "09:00"
-          const closeStr: string | null =
-            h.end ?? h.close ?? null; // "17:00"
+          const openStr: string | null = h.start ?? h.open ?? null;
+          const closeStr: string | null = h.end ?? h.close ?? null;
 
           const open = isClosed ? null : toTime(openStr);
           const close = isClosed ? null : toTime(closeStr);
@@ -278,8 +274,8 @@ async function saveClinic(formData: FormData) {
         .filter((x): x is NonNullable<typeof x> => x !== null)
     : [];
 
-  // gallery → для clinic_images
   const galleryForDb = Array.isArray(rawGallery) ? rawGallery : [];
+
   const amenitiesForClinic = {
     premises: Array.isArray(rawFacilities.premises)
       ? rawFacilities.premises
@@ -295,7 +291,6 @@ async function saveClinic(formData: FormData) {
       : [],
   };
 
-  // payments → clinics.payments
   const paymentsForClinic = (Array.isArray(rawPricing) ? rawPricing : [])
     .map((p) => {
       if (typeof p === "string") return { method: p.trim() };
@@ -416,28 +411,47 @@ async function saveClinic(formData: FormData) {
         if (!Number.isNaN(parsed)) priceNum = parsed;
       }
 
-      const { data: svc, error: svcErr } = await sb
+      // ищем сервис по имени, если нет — создаём
+      const { data: existingSvc, error: svcSelErr } = await sb
         .from("services")
-        .upsert(
-          { name, slug: slugify(name), description: desc } as any,
-          { onConflict: "name" } as any,
-        )
         .select("id")
-        .single();
+        .eq("name", name)
+        .maybeSingle();
 
-      if (svcErr || !svc) throw svcErr || new Error("Service upsert failed");
+      if (svcSelErr) throw svcSelErr;
 
-      const { error: linkErr } = await sb
-        .from("clinic_services")
-        .upsert(
-          {
-            clinic_id: id,
-            service_id: svc.id as number,
-            price: priceNum,
-            currency,
-          } as any,
-          { onConflict: "clinic_id,service_id" } as any,
-        );
+      let serviceId: number;
+      if (existingSvc?.id) {
+        serviceId = existingSvc.id as number;
+        // можно обновить описание/slug для консистентности
+        await sb
+          .from("services")
+          .update({ description: desc, slug: slugify(name) } as any)
+          .eq("id", serviceId);
+      } else {
+        const { data: createdSvc, error: svcInsErr } = await sb
+          .from("services")
+          .insert(
+            {
+              name,
+              slug: slugify(name),
+              description: desc,
+            } as any,
+          )
+          .select("id")
+          .single();
+
+        if (svcInsErr || !createdSvc)
+          throw svcInsErr || new Error("Service insert failed");
+        serviceId = createdSvc.id as number;
+      }
+
+      const { error: linkErr } = await sb.from("clinic_services").insert({
+        clinic_id: id,
+        service_id: serviceId,
+        price: priceNum,
+        currency,
+      } as any);
 
       if (linkErr) throw linkErr;
     }
@@ -457,16 +471,12 @@ async function saveClinic(formData: FormData) {
 
     const imageRows = galleryForDb
       .map((g, index) => {
-        const url =
-          (g?.url ?? g?.src ?? g?.imageUrl ?? "").trim();
+        const url = (g?.url ?? g?.src ?? g?.imageUrl ?? "").trim();
         if (!url) return null;
         return {
           clinic_id: id,
           url,
-          title:
-            (g?.title ??
-              g?.alt ??
-              null) as string | null,
+          title: (g?.title ?? g?.alt ?? null) as string | null,
           sort: index,
           created_at: new Date().toISOString(),
         };
@@ -557,27 +567,47 @@ async function saveClinic(formData: FormData) {
           ? a.description.trim()
           : null;
 
-      const { data: acc, error: accErr } = await sb
+      // ищем аккредитацию по имени, если нет — создаём
+      const { data: existingAcc, error: accSelErr } = await sb
         .from("accreditations")
-        .upsert(
-          { name, logo_url: logoUrl, description: desc } as any,
-          { onConflict: "name" } as any,
-        )
         .select("id")
-        .single();
+        .eq("name", name)
+        .maybeSingle();
 
-      if (accErr || !acc)
-        throw accErr || new Error("Accreditation upsert failed");
+      if (accSelErr) throw accSelErr;
+
+      let accreditationId: number;
+      if (existingAcc?.id) {
+        accreditationId = existingAcc.id as number;
+        await sb
+          .from("accreditations")
+          .update({ logo_url: logoUrl, description: desc } as any)
+          .eq("id", accreditationId);
+      } else {
+        const { data: createdAcc, error: accInsErr } = await sb
+          .from("accreditations")
+          .insert(
+            {
+              name,
+              logo_url: logoUrl,
+              description: desc,
+              slug: slugify(name),
+            } as any,
+          )
+          .select("id")
+          .single();
+
+        if (accInsErr || !createdAcc)
+          throw accInsErr || new Error("Accreditation insert failed");
+        accreditationId = createdAcc.id as number;
+      }
 
       const { error: linkErr } = await sb
         .from("clinic_accreditations")
-        .upsert(
-          {
-            clinic_id: id,
-            accreditation_id: acc.id as number,
-          } as any,
-          { onConflict: "clinic_id,accreditation_id" } as any,
-        );
+        .insert({
+          clinic_id: id,
+          accreditation_id: accreditationId,
+        } as any);
 
       if (linkErr) throw linkErr;
     }
@@ -708,8 +738,7 @@ export default async function ClinicEditorPage({
 
   const rawLocationDraft = (draft?.location ?? {}) as any;
   const location = {
-    mapUrl:
-      rawLocationDraft.mapUrl ?? (clinic as any).map_embed_url ?? "",
+    mapUrl: rawLocationDraft.mapUrl ?? (clinic as any).map_embed_url ?? "",
     directions:
       rawLocationDraft.directions ?? (clinic as any).directions ?? "",
   };
@@ -795,9 +824,7 @@ export default async function ClinicEditorPage({
       );
   })();
 
-  const accreditations: any[] = Array.isArray(
-    (clinic as any).accreditations,
-  )
+  const accreditations: any[] = Array.isArray((clinic as any).accreditations)
     ? ((clinic as any).accreditations as any[])
     : [];
 
