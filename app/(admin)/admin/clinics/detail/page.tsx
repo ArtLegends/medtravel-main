@@ -9,6 +9,8 @@ import ClinicDraftEditor from "@/components/admin/ClinicDraftEditor";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const CLINIC_BUCKET = "clinics";
+
 type ClinicRow = {
   id: string;
   name: string;
@@ -23,7 +25,17 @@ type ClinicRow = {
   is_published: boolean | null;
   created_at: string;
   updated_at: string | null;
-  // возможны дополнительные jsonb-поля, они придут, но типом тут не описаны
+  // jsonb поля
+  services?: any;
+  doctors?: any;
+  hours?: any;
+  images?: any;
+  gallery?: any;
+  amenities?: any;
+  payments?: any;
+  accreditations?: any;
+  map_embed_url?: string | null;
+  directions?: string | null;
 };
 
 type DraftRow = {
@@ -44,6 +56,60 @@ type SearchParams = {
   id?: string;
 };
 
+/* ---------- helpers ---------- */
+
+function strFromForm(formData: FormData, name: string) {
+  return String(formData.get(name) ?? "").trim();
+}
+
+function parseJsonField(formData: FormData, field: string) {
+  const raw = formData.get(field);
+  if (!raw) return null;
+  try {
+    return JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+}
+
+function randomKey() {
+  return Math.random().toString(36).slice(2);
+}
+
+async function uploadImageToClinicsBucket(
+  sb: ReturnType<typeof createServiceClient>,
+  file: File,
+  pathPrefix: string,
+) {
+  if (!file || file.size === 0) return null;
+
+  const extFromName = () => {
+    const parts = file.name.split(".");
+    if (parts.length < 2) return "jpg";
+    const ext = parts.pop()!;
+    return ext.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  };
+
+  const ext = extFromName();
+  const filePath = `${pathPrefix}/${Date.now()}-${randomKey()}.${ext}`;
+
+  const { error: uploadError } = await sb.storage
+    .from(CLINIC_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || "image/jpeg",
+    });
+
+  if (uploadError) {
+    console.error("storage upload error", uploadError);
+    throw new Error("Failed to upload image");
+  }
+
+  const { data } = sb.storage.from(CLINIC_BUCKET).getPublicUrl(filePath);
+  return data.publicUrl;
+}
+
 /* ---------- server action: сохранить клинику + драфт ---------- */
 
 async function saveClinic(formData: FormData) {
@@ -54,47 +120,108 @@ async function saveClinic(formData: FormData) {
 
   const sb = createServiceClient();
 
-  const str = (name: string) => String(formData.get(name) ?? "").trim();
-
-  const parseJson = (field: string) => {
-    const raw = formData.get(field);
-    if (!raw) return null;
-    try {
-      return JSON.parse(String(raw));
-    } catch {
-      return null;
-    }
-  };
-
-  // --- basic info / location (используем и для clinics, и для drafts) ---
+  // --- basic info / location ---
   const basic_info = {
-    name: str("clinic_name") || null,
-    slug: str("clinic_slug") || null,
-    specialty: str("clinic_specialty") || null,
-    country: str("clinic_country") || null,
-    city: str("clinic_city") || null,
-    province: str("clinic_province") || null,
-    district: str("clinic_district") || null,
-    description: str("clinic_description") || null,
+    name: strFromForm(formData, "clinic_name") || null,
+    slug: strFromForm(formData, "clinic_slug") || null,
+    specialty: strFromForm(formData, "clinic_specialty") || null,
+    country: strFromForm(formData, "clinic_country") || null,
+    city: strFromForm(formData, "clinic_city") || null,
+    province: strFromForm(formData, "clinic_province") || null,
+    district: strFromForm(formData, "clinic_district") || null,
+    description: strFromForm(formData, "clinic_description") || null,
   };
 
   const location = {
-    mapUrl: str("clinic_mapUrl") || null,
-    directions: str("clinic_directions") || null,
+    mapUrl: strFromForm(formData, "clinic_mapUrl") || null,
+    directions: strFromForm(formData, "clinic_directions") || null,
   };
 
-  const address = str("clinic_address") || null;
-  const clinicStatus = str("clinic_status") || null;
-  const moderationStatus = str("clinic_moderation_status") || null;
-  const draftStatus = str("draft_status") || null;
+  const address = strFromForm(formData, "clinic_address") || null;
+  const clinicStatus = strFromForm(formData, "clinic_status") || null;
+  const moderationStatus =
+    strFromForm(formData, "clinic_moderation_status") || null;
+  const draftStatus = strFromForm(formData, "draft_status") || null;
 
-  const services = (parseJson("draft_services") ?? []) as any[];
-  const doctors = (parseJson("draft_doctors") ?? []) as any[];
-  const hours = (parseJson("draft_hours") ?? []) as any[];
-  const gallery = (parseJson("draft_gallery") ?? []) as any[];
-  const facilities = (parseJson("draft_facilities") ?? {}) as any;
-  const pricing = (parseJson("draft_pricing") ?? []) as any[];
-  const accreditations = (parseJson("clinic_accreditations") ?? []) as any[];
+  // raw JSON из скрытых полей
+  let services = (parseJsonField(formData, "draft_services") ??
+    []) as any[];
+  let doctors = (parseJsonField(formData, "draft_doctors") ??
+    []) as any[];
+  let hours = (parseJsonField(formData, "draft_hours") ?? []) as any[];
+  let gallery = (parseJsonField(formData, "draft_gallery") ??
+    []) as any[];
+  const facilities = (parseJsonField(formData, "draft_facilities") ??
+    {}) as any;
+  const pricing = (parseJsonField(formData, "draft_pricing") ??
+    []) as any[];
+  let accreditations = (parseJsonField(
+    formData,
+    "clinic_accreditations",
+  ) ?? []) as any[];
+
+  // --- обработка загрузок: gallery / doctors / accreditations ---
+
+  // 1) Gallery: максимум 10, каждая картинка либо URL, либо upload
+  if (!Array.isArray(gallery)) gallery = [];
+  if (gallery.length > 10) gallery = gallery.slice(0, 10);
+
+  for (let i = 0; i < gallery.length; i++) {
+    const file = formData.get(`gallery_file_${i}`) as File | null;
+    if (file && file.size > 0) {
+      const url = await uploadImageToClinicsBucket(
+        sb,
+        file,
+        `clinic-${id}/gallery`,
+      );
+      if (url) {
+        gallery[i] = {
+          ...(gallery[i] ?? {}),
+          url,
+        };
+      }
+    }
+  }
+
+  // 2) Doctors: image URL + upload + description
+  if (!Array.isArray(doctors)) doctors = [];
+  for (let i = 0; i < doctors.length; i++) {
+    const file = formData.get(`doctor_image_${i}`) as File | null;
+    if (file && file.size > 0) {
+      const url = await uploadImageToClinicsBucket(
+        sb,
+        file,
+        `clinic-${id}/doctors`,
+      );
+      if (url) {
+        doctors[i] = {
+          ...(doctors[i] ?? {}),
+          image_url: url,
+        };
+      }
+    }
+  }
+
+  // 3) Accreditations: logo URL + upload
+  if (!Array.isArray(accreditations)) accreditations = [];
+  for (let i = 0; i < accreditations.length; i++) {
+    const file = formData.get(
+      `accreditation_logo_${i}`,
+    ) as File | null;
+    if (file && file.size > 0) {
+      const url = await uploadImageToClinicsBucket(
+        sb,
+        file,
+        `clinic-${id}/accreditations`,
+      );
+      if (url) {
+        accreditations[i] = {
+          ...(accreditations[i] ?? {}),
+          logo_url: url,
+        };
+      }
+    }
+  }
 
   // --- подготовка структур для clinics (jsonb) ---
 
@@ -105,6 +232,14 @@ async function saveClinic(formData: FormData) {
         name: (d.fullName ?? d.name ?? "").trim(),
         title: (d.title ?? "").trim(),
         spec: (d.specialty ?? d.spec ?? "").trim(),
+        description:
+          typeof d.description === "string"
+            ? d.description.trim()
+            : null,
+        image_url:
+          typeof d.image_url === "string" && d.image_url.trim().length
+            ? d.image_url.trim()
+            : null,
       }))
     : [];
 
@@ -120,7 +255,9 @@ async function saveClinic(formData: FormData) {
   const galleryForClinic = Array.isArray(gallery) ? gallery : [];
 
   const amenitiesForClinic = {
-    premises: Array.isArray(facilities.premises) ? facilities.premises : [],
+    premises: Array.isArray(facilities.premises)
+      ? facilities.premises
+      : [],
     clinic_services: Array.isArray(facilities.clinic_services)
       ? facilities.clinic_services
       : [],
@@ -168,6 +305,7 @@ async function saveClinic(formData: FormData) {
     amenities: amenitiesForClinic,
     payments: paymentsForClinic,
     accreditations: accreditationsForClinic,
+    updated_at: new Date().toISOString(),
   };
 
   const { error: clinicError } = await sb
@@ -183,22 +321,19 @@ async function saveClinic(formData: FormData) {
   // --- сохраняем/обновляем draft ---
   const { error: draftError } = await sb
     .from("clinic_profile_drafts")
-    .upsert(
-      {
-        clinic_id: id,
-        basic_info,
-        location,
-        services: servicesForClinic,
-        doctors: doctorsForClinic,
-        hours: hoursForClinic,
-        gallery: galleryForClinic,
-        facilities: amenitiesForClinic,
-        pricing: Array.isArray(pricing) ? pricing : [],
-        status: draftStatus,
-        updated_at: new Date().toISOString(),
-      } as any,
-      { onConflict: "clinic_id" } as any,
-    );
+    .upsert({
+      clinic_id: id,
+      basic_info,
+      location,
+      services: servicesForClinic,
+      doctors: doctorsForClinic,
+      hours: hoursForClinic,
+      gallery: galleryForClinic,
+      facilities: amenitiesForClinic,
+      pricing: Array.isArray(pricing) ? pricing : [],
+      status: draftStatus,
+      updated_at: new Date().toISOString(),
+    } as any); // без onConflict — не ловим ошибку отсутствия unique по clinic_id
 
   if (draftError) {
     console.error("clinic_profile_drafts upsert error", draftError);
@@ -220,7 +355,7 @@ export default async function ClinicEditorPage({
 
   if (!id) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 p-6">
         <h1 className="text-xl font-semibold">Clinic editor</h1>
         <p className="text-sm text-gray-600">
           Missing <code className="font-mono">id</code> query parameter.
@@ -251,7 +386,7 @@ export default async function ClinicEditorPage({
 
   if (clinicError || draftError) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 p-6">
         <h1 className="text-xl font-semibold">Clinic editor error</h1>
         <pre className="whitespace-pre-wrap rounded-lg bg-red-50 p-4 text-xs text-red-700">
           {clinicError && `clinics error: ${clinicError.message}\n\n`}
@@ -269,7 +404,7 @@ export default async function ClinicEditorPage({
 
   if (!clinic) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 p-6">
         <h1 className="text-xl font-semibold">Clinic not found</h1>
         <p className="text-sm text-gray-600">
           We could not find a clinic with id:{" "}
@@ -302,13 +437,9 @@ export default async function ClinicEditorPage({
   const rawLocationDraft = (draft?.location ?? {}) as any;
   const location = {
     mapUrl:
-      rawLocationDraft.mapUrl ??
-      (clinic as any).map_embed_url ??
-      "",
+      rawLocationDraft.mapUrl ?? (clinic as any).map_embed_url ?? "",
     directions:
-      rawLocationDraft.directions ??
-      (clinic as any).directions ??
-      "",
+      rawLocationDraft.directions ?? (clinic as any).directions ?? "",
   };
 
   const services = (Array.isArray(draft?.services)
@@ -363,7 +494,6 @@ export default async function ClinicEditorPage({
   };
 
   const payments: string[] = (() => {
-    // сначала пробуем черновик
     if (Array.isArray(draft?.pricing)) {
       return (draft!.pricing as any[])
         .map((x) => {
@@ -378,7 +508,6 @@ export default async function ClinicEditorPage({
         );
     }
 
-    // иначе берём из clinics.payments
     const raw = (clinic as any).payments;
     if (!Array.isArray(raw)) return [];
     return raw
@@ -564,7 +693,7 @@ export default async function ClinicEditorPage({
         </div>
       </div>
 
-      {/* BASIC INFO / LOCATION / ВСЁ ОСТАЛЬНОЕ */}
+      {/* BASIC INFO + EDITOR */}
       <div className="space-y-8 rounded-2xl border bg-white p-6 shadow-sm">
         {/* BASIC */}
         <section className="space-y-4">
@@ -574,7 +703,7 @@ export default async function ClinicEditorPage({
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 text-sm">
+          <div className="grid gap-6 text-sm md:grid-cols-2">
             <div className="space-y-2">
               <Field label="Name">
                 <input
@@ -679,8 +808,8 @@ export default async function ClinicEditorPage({
       {/* ACTIONS */}
       <div className="flex items-center justify-between border-t pt-4">
         <div className="text-xs text-gray-500">
-          Press &ldquo;Save changes&rdquo; to update clinic and draft
-          in Supabase. Changes apply immediately.
+          Press &ldquo;Save changes&rdquo; to update clinic and draft in
+          Supabase. Changes apply immediately.
         </div>
         <button
           type="submit"
@@ -693,7 +822,7 @@ export default async function ClinicEditorPage({
   );
 }
 
-/* ---------- небольшие UI-хелперы ---------- */
+/* ---------- UI helper ---------- */
 
 function Field({
   label,

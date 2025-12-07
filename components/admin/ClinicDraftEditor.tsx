@@ -14,6 +14,8 @@ type Doctor = {
   fullName?: string;
   title?: string;
   specialty?: string;
+  description?: string | null;
+  image_url?: string | null;
 };
 
 type Hour = {
@@ -177,6 +179,8 @@ export default function ClinicDraftEditor({
   );
   const accreditationsJson = JSON.stringify(accreditations ?? []);
 
+  const canAddMoreImages = gallery.length < 10;
+
   return (
     <>
       {/* hidden inputs для server action saveClinic */}
@@ -203,7 +207,7 @@ export default function ClinicDraftEditor({
           </span>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 text-sm">
+        <div className="grid gap-6 text-sm md:grid-cols-2">
           {/* Services */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -326,7 +330,13 @@ export default function ClinicDraftEditor({
                 onClick={() =>
                   setDoctors((prev) => [
                     ...prev,
-                    { fullName: "", title: "", specialty: "" },
+                    {
+                      fullName: "",
+                      title: "",
+                      specialty: "",
+                      description: "",
+                      image_url: "",
+                    },
                   ])
                 }
               >
@@ -364,7 +374,9 @@ export default function ClinicDraftEditor({
 
                 <div className="grid gap-2 md:grid-cols-2">
                   <label className="space-y-1 md:col-span-2">
-                    <span className="text-xs text-gray-500">Full name</span>
+                    <span className="text-xs text-gray-500">
+                      Full name
+                    </span>
                     <input
                       className="w-full rounded border px-2 py-1 text-sm"
                       value={d.fullName ?? ""}
@@ -384,7 +396,9 @@ export default function ClinicDraftEditor({
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-xs text-gray-500">Specialty</span>
+                    <span className="text-xs text-gray-500">
+                      Specialty
+                    </span>
                     <input
                       className="w-full rounded border px-2 py-1 text-sm"
                       value={d.specialty ?? ""}
@@ -392,6 +406,54 @@ export default function ClinicDraftEditor({
                         updateDoctor(i, { specialty: e.target.value })
                       }
                     />
+                  </label>
+
+                  <label className="space-y-1 md:col-span-2">
+                    <span className="text-xs text-gray-500">
+                      Description
+                    </span>
+                    <textarea
+                      className="w-full rounded border px-2 py-1 text-sm"
+                      rows={2}
+                      value={d.description ?? ""}
+                      onChange={(e) =>
+                        updateDoctor(i, {
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+
+                  <label className="space-y-1 md:col-span-2">
+                    <span className="text-xs text-gray-500">
+                      Image URL
+                    </span>
+                    <input
+                      className="w-full rounded border px-2 py-1 text-sm"
+                      value={d.image_url ?? ""}
+                      onChange={(e) =>
+                        updateDoctor(i, {
+                          image_url: e.target.value,
+                        })
+                      }
+                      placeholder="https://..."
+                    />
+                  </label>
+
+                  <label className="space-y-1 md:col-span-2">
+                    <span className="text-xs text-gray-500">
+                      Upload image (optional)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      name={`doctor_image_${i}`}
+                      className="w-full rounded border px-2 py-1 text-sm"
+                    />
+                    <span className="text-[10px] text-gray-400">
+                      If a file is selected, it will replace the image
+                      URL on save.
+                    </span>
                   </label>
                 </div>
               </div>
@@ -406,28 +468,12 @@ export default function ClinicDraftEditor({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Working hours
           </h2>
-          <button
-            type="button"
-            className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
-            onClick={() =>
-              setHours((prev) => [
-                ...prev,
-                {
-                  day: days[(prev.length || 0) % days.length],
-                  status: "open",
-                  start: "",
-                  end: "",
-                },
-              ])
-            }
-          >
-            + Add day
-          </button>
+          {/* По ТЗ убрали кнопку "+ Add day" */}
         </div>
 
         {!hours.length && (
           <p className="text-xs text-gray-400">
-            No schedule yet. Add days and set hours.
+            No schedule set. Existing days come from initial data.
           </p>
         )}
 
@@ -503,19 +549,31 @@ export default function ClinicDraftEditor({
           </h2>
           <button
             type="button"
-            className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
+            className={`rounded border px-2 py-1 text-xs ${
+              canAddMoreImages
+                ? "hover:bg-gray-50"
+                : "cursor-not-allowed opacity-40"
+            }`}
+            disabled={!canAddMoreImages}
             onClick={() =>
-              setGallery((prev) => [...prev, { url: "", title: "" }])
+              setGallery((prev) => [
+                ...prev,
+                { url: "", title: "" },
+              ])
             }
           >
             + Add image
           </button>
         </div>
 
+        <p className="text-[11px] text-gray-400">
+          Maximum 10 images. For each image you can either provide URL
+          or upload from device (upload has priority).
+        </p>
+
         {!gallery.length && (
           <p className="text-xs text-gray-400">
-            No images yet. Add image URLs or подключи сюда свой
-            загрузчик из “Add new clinic”.
+            No images yet. Add image URLs or upload from device.
           </p>
         )}
 
@@ -562,6 +620,23 @@ export default function ClinicDraftEditor({
                   }
                 />
               </label>
+
+              <label className="space-y-1">
+                <span className="text-xs text-gray-500">
+                  Upload image (optional)
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  name={`gallery_file_${i}`}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <span className="text-[10px] text-gray-400">
+                  If a file is selected, it will be uploaded and replace
+                  the URL on save.
+                </span>
+              </label>
+
               {g.url && (
                 <div className="overflow-hidden rounded border bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -583,7 +658,7 @@ export default function ClinicDraftEditor({
           Facilities &amp; payment methods
         </h2>
 
-        <div className="grid gap-6 md:grid-cols-2 text-sm">
+        <div className="grid gap-6 text-sm md:grid-cols-2">
           {/* Facilities */}
           <div className="space-y-4">
             <FacilitiesEditor
@@ -730,6 +805,21 @@ export default function ClinicDraftEditor({
                   }
                   placeholder="https://..."
                 />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-gray-500">
+                  Upload logo (optional)
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  name={`accreditation_logo_${i}`}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <span className="text-[10px] text-gray-400">
+                  If a file is selected, it will replace logo URL on
+                  save.
+                </span>
               </label>
               <label className="space-y-1">
                 <span className="text-xs text-gray-500">
