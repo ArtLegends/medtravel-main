@@ -806,30 +806,48 @@ export default async function ClinicEditorPage({
     ? ((clinic as any).gallery as any[])
     : []) as any[];
 
-  const rawFacilitiesDraft = (draft?.facilities ?? {}) as any;
-  const rawAmenitiesClinic = ((clinic as any).amenities ?? {}) as any;
-  const facilities = {
-    premises: Array.isArray(rawFacilitiesDraft.premises)
-      ? rawFacilitiesDraft.premises
-      : Array.isArray(rawAmenitiesClinic.premises)
-      ? rawAmenitiesClinic.premises
-      : [],
-    clinic_services: Array.isArray(rawFacilitiesDraft.clinic_services)
-      ? rawFacilitiesDraft.clinic_services
-      : Array.isArray(rawAmenitiesClinic.clinic_services)
-      ? rawAmenitiesClinic.clinic_services
-      : [],
-    travel_services: Array.isArray(rawFacilitiesDraft.travel_services)
-      ? rawFacilitiesDraft.travel_services
-      : Array.isArray(rawAmenitiesClinic.travel_services)
-      ? rawAmenitiesClinic.travel_services
-      : [],
-    languages_spoken: Array.isArray(rawFacilitiesDraft.languages_spoken)
-      ? rawFacilitiesDraft.languages_spoken
-      : Array.isArray(rawAmenitiesClinic.languages_spoken)
-      ? rawAmenitiesClinic.languages_spoken
-      : [],
-  };
+    const rawFacilitiesDraft = (draft?.facilities ?? {}) as any;
+    const rawAmenitiesClinic = ((clinic as any).amenities ?? {}) as any;
+  
+    function normalizeAmenityArray(value: any): string[] {
+      if (!Array.isArray(value)) return [];
+      return value
+        .map((item: any) => {
+          if (typeof item === "string") return item.trim();
+          if (item && typeof item === "object") {
+            if (typeof item.label === "string") return item.label.trim();
+            if (typeof item.name === "string") return item.name.trim();
+            if (typeof item.title === "string") return item.title.trim();
+          }
+          return null;
+        })
+        .filter(
+          (v: string | null): v is string => !!v && v.length > 0,
+        );
+    }
+  
+    const facilities = {
+      premises: normalizeAmenityArray(
+        Array.isArray(rawFacilitiesDraft.premises)
+          ? rawFacilitiesDraft.premises
+          : rawAmenitiesClinic.premises,
+      ),
+      clinic_services: normalizeAmenityArray(
+        Array.isArray(rawFacilitiesDraft.clinic_services)
+          ? rawFacilitiesDraft.clinic_services
+          : rawAmenitiesClinic.clinic_services,
+      ),
+      travel_services: normalizeAmenityArray(
+        Array.isArray(rawFacilitiesDraft.travel_services)
+          ? rawFacilitiesDraft.travel_services
+          : rawAmenitiesClinic.travel_services,
+      ),
+      languages_spoken: normalizeAmenityArray(
+        Array.isArray(rawFacilitiesDraft.languages_spoken)
+          ? rawFacilitiesDraft.languages_spoken
+          : rawAmenitiesClinic.languages_spoken,
+      ),
+    };
 
   const payments: string[] = (() => {
     if (Array.isArray(draft?.pricing)) {
