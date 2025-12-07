@@ -112,6 +112,42 @@ async function uploadImageToClinicsBucket(
 
 /* ---------- server action: сохранить клинику + драфт ---------- */
 
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+const WEEKDAY_MAP: Record<string, number> = {
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  sunday: 7,
+};
+
+function dayNameToWeekday(day: string | undefined | null): number | null {
+  if (!day) return null;
+  const key = day.trim().toLowerCase();
+  return WEEKDAY_MAP[key] ?? null;
+}
+
+function toTime(value: string | null | undefined): string | null {
+  const v = (value ?? "").trim();
+  if (!v) return null;
+  // ожидаем "HH:MM"
+  const m = v.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hh = String(Math.min(23, Math.max(0, Number(m[1])))).padStart(2, "0");
+  const mm = String(Math.min(59, Math.max(0, Number(m[2])))).padStart(2, "0");
+  return `${hh}:${mm}:00`;
+}
+
 async function saveClinic(formData: FormData) {
   "use server";
 
@@ -120,110 +156,49 @@ async function saveClinic(formData: FormData) {
 
   const sb = createServiceClient();
 
+  const str = (name: string) => String(formData.get(name) ?? "").trim();
+
+  const parseJson = (field: string) => {
+    const raw = formData.get(field);
+    if (!raw) return null;
+    try {
+      return JSON.parse(String(raw));
+    } catch {
+      return null;
+    }
+  };
+
   // --- basic info / location ---
   const basic_info = {
-    name: strFromForm(formData, "clinic_name") || null,
-    slug: strFromForm(formData, "clinic_slug") || null,
-    specialty: strFromForm(formData, "clinic_specialty") || null,
-    country: strFromForm(formData, "clinic_country") || null,
-    city: strFromForm(formData, "clinic_city") || null,
-    province: strFromForm(formData, "clinic_province") || null,
-    district: strFromForm(formData, "clinic_district") || null,
-    description: strFromForm(formData, "clinic_description") || null,
+    name: str("clinic_name") || null,
+    slug: str("clinic_slug") || null,
+    specialty: str("clinic_specialty") || null,
+    country: str("clinic_country") || null,
+    city: str("clinic_city") || null,
+    province: str("clinic_province") || null,
+    district: str("clinic_district") || null,
+    description: str("clinic_description") || null,
   };
 
   const location = {
-    mapUrl: strFromForm(formData, "clinic_mapUrl") || null,
-    directions: strFromForm(formData, "clinic_directions") || null,
+    mapUrl: str("clinic_mapUrl") || null,
+    directions: str("clinic_directions") || null, // храним только в драфте
   };
 
-  const address = strFromForm(formData, "clinic_address") || null;
-  const clinicStatus = strFromForm(formData, "clinic_status") || null;
-  const moderationStatus =
-    strFromForm(formData, "clinic_moderation_status") || null;
-  const draftStatus = strFromForm(formData, "draft_status") || null;
+  const address = str("clinic_address") || null;
+  const clinicStatus = str("clinic_status") || null;
+  const moderationStatus = str("clinic_moderation_status") || null;
+  const draftStatus = str("draft_status") || null;
 
-  // raw JSON из скрытых полей
-  let services = (parseJsonField(formData, "draft_services") ??
-    []) as any[];
-  let doctors = (parseJsonField(formData, "draft_doctors") ??
-    []) as any[];
-  let hours = (parseJsonField(formData, "draft_hours") ?? []) as any[];
-  let gallery = (parseJsonField(formData, "draft_gallery") ??
-    []) as any[];
-  const facilities = (parseJsonField(formData, "draft_facilities") ??
-    {}) as any;
-  const pricing = (parseJsonField(formData, "draft_pricing") ??
-    []) as any[];
-  let accreditations = (parseJsonField(
-    formData,
-    "clinic_accreditations",
-  ) ?? []) as any[];
+  const services = (parseJson("draft_services") ?? []) as any[];
+  const doctors = (parseJson("draft_doctors") ?? []) as any[];
+  const hours = (parseJson("draft_hours") ?? []) as any[];
+  const gallery = (parseJson("draft_gallery") ?? []) as any[];
+  const facilities = (parseJson("draft_facilities") ?? {}) as any;
+  const pricing = (parseJson("draft_pricing") ?? []) as any[];
+  const accreditations = (parseJson("clinic_accreditations") ?? []) as any[];
 
-  // --- обработка загрузок: gallery / doctors / accreditations ---
-
-  // 1) Gallery: максимум 10, каждая картинка либо URL, либо upload
-  if (!Array.isArray(gallery)) gallery = [];
-  if (gallery.length > 10) gallery = gallery.slice(0, 10);
-
-  for (let i = 0; i < gallery.length; i++) {
-    const file = formData.get(`gallery_file_${i}`) as File | null;
-    if (file && file.size > 0) {
-      const url = await uploadImageToClinicsBucket(
-        sb,
-        file,
-        `clinic-${id}/gallery`,
-      );
-      if (url) {
-        gallery[i] = {
-          ...(gallery[i] ?? {}),
-          url,
-        };
-      }
-    }
-  }
-
-  // 2) Doctors: image URL + upload + description
-  if (!Array.isArray(doctors)) doctors = [];
-  for (let i = 0; i < doctors.length; i++) {
-    const file = formData.get(`doctor_image_${i}`) as File | null;
-    if (file && file.size > 0) {
-      const url = await uploadImageToClinicsBucket(
-        sb,
-        file,
-        `clinic-${id}/doctors`,
-      );
-      if (url) {
-        doctors[i] = {
-          ...(doctors[i] ?? {}),
-          image_url: url,
-        };
-      }
-    }
-  }
-
-  // 3) Accreditations: logo URL + upload
-  if (!Array.isArray(accreditations)) accreditations = [];
-  for (let i = 0; i < accreditations.length; i++) {
-    const file = formData.get(
-      `accreditation_logo_${i}`,
-    ) as File | null;
-    if (file && file.size > 0) {
-      const url = await uploadImageToClinicsBucket(
-        sb,
-        file,
-        `clinic-${id}/accreditations`,
-      );
-      if (url) {
-        accreditations[i] = {
-          ...(accreditations[i] ?? {}),
-          logo_url: url,
-        };
-      }
-    }
-  }
-
-  // --- подготовка структур для clinics (jsonb) ---
+  // --- подготовка структур для JSON в draft / clinics ---
 
   const servicesForClinic = Array.isArray(services) ? services : [];
 
@@ -232,32 +207,25 @@ async function saveClinic(formData: FormData) {
         name: (d.fullName ?? d.name ?? "").trim(),
         title: (d.title ?? "").trim(),
         spec: (d.specialty ?? d.spec ?? "").trim(),
-        description:
-          typeof d.description === "string"
-            ? d.description.trim()
-            : null,
-        image_url:
-          typeof d.image_url === "string" && d.image_url.trim().length
-            ? d.image_url.trim()
-            : null,
+        // опционально: bio / photoUrl, если потом добавим в форму
+        bio: d.bio ?? null,
+        photo_url: d.photo_url ?? d.photo ?? null,
       }))
     : [];
 
   const hoursForClinic = Array.isArray(hours)
     ? hours.map((h) => ({
         day: h.day ?? h.weekday ?? "",
-        status: h.status ?? null,
-        open: h.start ?? h.open ?? null,
-        close: h.end ?? h.close ?? null,
+        status: h.status ?? null, // open / closed / by_appointment
+        open: h.start ?? h.open ?? null, // "09:00"
+        close: h.end ?? h.close ?? null, // "17:00"
       }))
     : [];
 
   const galleryForClinic = Array.isArray(gallery) ? gallery : [];
 
   const amenitiesForClinic = {
-    premises: Array.isArray(facilities.premises)
-      ? facilities.premises
-      : [],
+    premises: Array.isArray(facilities.premises) ? facilities.premises : [],
     clinic_services: Array.isArray(facilities.clinic_services)
       ? facilities.clinic_services
       : [],
@@ -272,40 +240,40 @@ async function saveClinic(formData: FormData) {
   const paymentsForClinic = (Array.isArray(pricing) ? pricing : [])
     .map((p) => {
       if (typeof p === "string") return { method: p.trim() };
-      if (p && typeof p === "object") return p;
+      if (p && typeof p === "object" && typeof p.method === "string") {
+        return { method: p.method.trim() };
+      }
+      if (p && typeof p === "object" && typeof p.name === "string") {
+        return { method: p.name.trim() };
+      }
       return null;
     })
-    .filter(Boolean);
+    .filter(
+      (v): v is { method: string } =>
+        !!v && typeof v.method === "string" && v.method.length > 0,
+    );
 
   const accreditationsForClinic = Array.isArray(accreditations)
     ? accreditations
     : [];
 
-  // --- обновляем основную запись clinics ---
+  // --- 1) обновляем clinics (только реально существующие колонки) ---
+
   const clinicUpdate: any = {
     name: basic_info.name,
     slug: basic_info.slug,
-    specialty: basic_info.specialty,
     about: basic_info.description,
     country: basic_info.country,
     city: basic_info.city,
     province: basic_info.province,
     district: basic_info.district,
     address,
-    status: clinicStatus,
-    moderation_status: moderationStatus,
+    status: clinicStatus || null, // 'draft' / 'published' / 'hidden'
+    moderation_status: moderationStatus || "draft",
     is_published: formData.get("clinic_is_published") === "on",
     map_embed_url: location.mapUrl,
-    directions: location.directions,
-    services: servicesForClinic,
-    doctors: doctorsForClinic,
-    hours: hoursForClinic,
-    images: galleryForClinic,
-    gallery: galleryForClinic,
     amenities: amenitiesForClinic,
     payments: paymentsForClinic,
-    accreditations: accreditationsForClinic,
-    updated_at: new Date().toISOString(),
   };
 
   const { error: clinicError } = await sb
@@ -318,22 +286,295 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic");
   }
 
-  // --- сохраняем/обновляем draft ---
+  // --- 2) категория по specialty → categories + clinic_categories ---
+
+  if (basic_info.specialty) {
+    try {
+      const catSlug = slugify(basic_info.specialty);
+      let categoryId: number | null = null;
+
+      const { data: existing, error: catSelErr } = await sb
+        .from("categories")
+        .select("id")
+        .eq("slug", catSlug)
+        .maybeSingle();
+
+      if (catSelErr) throw catSelErr;
+
+      if (existing?.id) {
+        categoryId = existing.id as number;
+      } else {
+        const { data: created, error: catInsErr } = await sb
+          .from("categories")
+          .insert({
+            name: basic_info.specialty,
+            slug: catSlug,
+          } as any)
+          .select("id")
+          .single();
+
+        if (catInsErr) throw catInsErr;
+        categoryId = created.id as number;
+      }
+
+      if (categoryId != null) {
+        const { error: delCcErr } = await sb
+          .from("clinic_categories")
+          .delete()
+          .eq("clinic_id", id);
+        if (delCcErr) throw delCcErr;
+
+        const { error: insCcErr } = await sb
+          .from("clinic_categories")
+          .insert({ clinic_id: id, category_id: categoryId } as any);
+        if (insCcErr) throw insCcErr;
+      }
+    } catch (err) {
+      console.error("clinic category sync error", err);
+      // категорию можно считать не критичной, поэтому не падаем
+    }
+  }
+
+  // --- 3) услуги: services + clinic_services ---
+
+  try {
+    const { error: delLinksErr } = await sb
+      .from("clinic_services")
+      .delete()
+      .eq("clinic_id", id);
+    if (delLinksErr) throw delLinksErr;
+
+    for (const s of servicesForClinic) {
+      const name = (s?.name ?? "").trim();
+      if (!name) continue;
+
+      const desc = s?.description ?? null;
+      const currency = (s?.currency ?? "USD").trim() || "USD";
+
+      let priceNum: number | null = null;
+      const p = s?.price;
+      if (typeof p === "number") {
+        priceNum = p;
+      } else if (typeof p === "string" && p.trim() !== "") {
+        const parsed = Number(p.replace(",", "."));
+        if (!Number.isNaN(parsed)) priceNum = parsed;
+      }
+
+      const { data: svc, error: svcErr } = await sb
+        .from("services")
+        .upsert(
+          {
+            name,
+            slug: slugify(name),
+            description: desc,
+          } as any,
+          { onConflict: "name" } as any,
+        )
+        .select("id")
+        .single();
+
+      if (svcErr || !svc) {
+        throw svcErr || new Error("Service upsert failed");
+      }
+
+      const { error: linkErr } = await sb
+        .from("clinic_services")
+        .upsert(
+          {
+            clinic_id: id,
+            service_id: svc.id as number,
+            price: priceNum,
+            currency,
+          } as any,
+          { onConflict: "clinic_id,service_id" } as any,
+        );
+
+      if (linkErr) throw linkErr;
+    }
+  } catch (err) {
+    console.error("services sync error", err);
+    throw new Error("Failed to update clinic services");
+  }
+
+  // --- 4) изображения: clinic_images ---
+
+  try {
+    const { error: delImgErr } = await sb
+      .from("clinic_images")
+      .delete()
+      .eq("clinic_id", id);
+    if (delImgErr) throw delImgErr;
+
+    const imageRows = (galleryForClinic as any[])
+      .filter(
+        (g) => g && typeof g.url === "string" && g.url.trim().length > 0,
+      )
+      .map((g, index) => ({
+        clinic_id: id,
+        url: g.url.trim(),
+        title: (g.title ?? null) as string | null,
+        sort: index,
+        created_at: new Date().toISOString(),
+      }));
+
+    if (imageRows.length) {
+      const { error: insImgErr } = await sb
+        .from("clinic_images")
+        .insert(imageRows as any);
+      if (insImgErr) throw insImgErr;
+    }
+  } catch (err) {
+    console.error("clinic_images sync error", err);
+    throw new Error("Failed to update clinic images");
+  }
+
+  // --- 5) доктора: clinic_staff ---
+
+  try {
+    const { error: delStaffErr } = await sb
+      .from("clinic_staff")
+      .delete()
+      .eq("clinic_id", id);
+    if (delStaffErr) throw delStaffErr;
+
+    const staffRows = doctorsForClinic
+      .filter((d) => (d.name ?? "").trim().length > 0)
+      .map((d) => ({
+        clinic_id: id,
+        name: d.name,
+        title: d.title || null,
+        position: d.spec || d.title || null,
+        bio: d.bio ?? null,
+        languages: "{}" as any, // text[]
+        photo_url: d.photo_url ?? null,
+        created_at: new Date().toISOString(),
+      }));
+
+    if (staffRows.length) {
+      const { error: insStaffErr } = await sb
+        .from("clinic_staff")
+        .insert(staffRows as any);
+      if (insStaffErr) throw insStaffErr;
+    }
+  } catch (err) {
+    console.error("clinic_staff sync error", err);
+    throw new Error("Failed to update clinic staff");
+  }
+
+  // --- 6) часы работы: clinic_hours ---
+
+  try {
+    const { error: delHoursErr } = await sb
+      .from("clinic_hours")
+      .delete()
+      .eq("clinic_id", id);
+    if (delHoursErr) throw delHoursErr;
+
+    const hourRows = hoursForClinic
+      .map((h) => {
+        const weekday = dayNameToWeekday(h.day);
+        if (!weekday) return null;
+
+        const status = h.status ?? "open";
+        const isClosed = status === "closed";
+        const open = isClosed ? null : toTime(h.open);
+        const close = isClosed ? null : toTime(h.close);
+
+        let hoursText: string | null = null;
+        if (isClosed) hoursText = "closed";
+        else if (status === "by_appointment") hoursText = "by appointment";
+        else if (h.open && h.close) hoursText = `${h.open} - ${h.close}`;
+
+        return {
+          clinic_id: id,
+          weekday,
+          open,
+          close,
+          is_closed: isClosed,
+          dow: weekday,
+          hours_text: hoursText,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    if (hourRows.length) {
+      const { error: insHoursErr } = await sb
+        .from("clinic_hours")
+        .insert(hourRows as any);
+      if (insHoursErr) throw insHoursErr;
+    }
+  } catch (err) {
+    console.error("clinic_hours sync error", err);
+    throw new Error("Failed to update clinic hours");
+  }
+
+  // --- 7) аккредитации: accreditations + clinic_accreditations ---
+
+  try {
+    const { error: delLinksErr } = await sb
+      .from("clinic_accreditations")
+      .delete()
+      .eq("clinic_id", id);
+    if (delLinksErr) throw delLinksErr;
+
+    for (const a of accreditationsForClinic) {
+      const name = (a?.name ?? "").trim();
+      if (!name) continue;
+
+      const { data: acc, error: accErr } = await sb
+        .from("accreditations")
+        .upsert(
+          {
+            name,
+            logo_url: a.logo_url ?? null,
+            description: a.description ?? null,
+          } as any,
+          { onConflict: "name" } as any,
+        )
+        .select("id")
+        .single();
+
+      if (accErr || !acc) {
+        throw accErr || new Error("Accreditation upsert failed");
+      }
+
+      const { error: linkErr } = await sb
+        .from("clinic_accreditations")
+        .upsert(
+          {
+            clinic_id: id,
+            accreditation_id: acc.id as number,
+          } as any,
+          { onConflict: "clinic_id,accreditation_id" } as any,
+        );
+
+      if (linkErr) throw linkErr;
+    }
+  } catch (err) {
+    console.error("clinic_accreditations sync error", err);
+    throw new Error("Failed to update clinic accreditations");
+  }
+
+  // --- 8) сохраняем/обновляем draft (jsonb) ---
+
   const { error: draftError } = await sb
     .from("clinic_profile_drafts")
-    .upsert({
-      clinic_id: id,
-      basic_info,
-      location,
-      services: servicesForClinic,
-      doctors: doctorsForClinic,
-      hours: hoursForClinic,
-      gallery: galleryForClinic,
-      facilities: amenitiesForClinic,
-      pricing: Array.isArray(pricing) ? pricing : [],
-      status: draftStatus,
-      updated_at: new Date().toISOString(),
-    } as any); // без onConflict — не ловим ошибку отсутствия unique по clinic_id
+    .upsert(
+      {
+        clinic_id: id,
+        basic_info,
+        location,
+        services: servicesForClinic,
+        doctors: doctorsForClinic,
+        hours: hoursForClinic,
+        gallery: galleryForClinic,
+        facilities: amenitiesForClinic,
+        pricing: Array.isArray(pricing) ? pricing : [],
+        status: draftStatus || "draft",
+        updated_at: new Date().toISOString(),
+      } as any,
+      { onConflict: "clinic_id" } as any,
+    );
 
   if (draftError) {
     console.error("clinic_profile_drafts upsert error", draftError);
