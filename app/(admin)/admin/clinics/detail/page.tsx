@@ -33,6 +33,8 @@ type ClinicRow = {
   gallery?: any;
   amenities?: any;
   payments?: any;
+  // в clinics такой колонки нет, но тип оставляем как optional,
+  // чтобы не падать, если позже появится
   accreditations?: any;
   map_embed_url?: string | null;
   directions?: string | null;
@@ -50,6 +52,8 @@ type DraftRow = {
   location: any | null;
   status: string | null;
   updated_at: string | null;
+  // на всякий случай – если есть колонка accreditations в drafts
+  accreditations?: any[] | null;
 };
 
 type SearchParams = {
@@ -57,20 +61,6 @@ type SearchParams = {
 };
 
 /* ---------- helpers ---------- */
-
-function strFromForm(formData: FormData, name: string) {
-  return String(formData.get(name) ?? "").trim();
-}
-
-function parseJsonField(formData: FormData, field: string) {
-  const raw = formData.get(field);
-  if (!raw) return null;
-  try {
-    return JSON.parse(String(raw));
-  } catch {
-    return null;
-  }
-}
 
 function randomKey() {
   return Math.random().toString(36).slice(2);
@@ -319,7 +309,6 @@ async function saveClinic(formData: FormData) {
           let hoursText: string | null = null;
 
           if (timeText && !openStr && !closeStr) {
-            // формат "09:00-18:00" / "9:00 AM - 6:00 PM" / "Closed"
             const parsed = parseTimeSpanDraft(timeText);
             open = parsed.open;
             close = parsed.close;
@@ -361,12 +350,9 @@ async function saveClinic(formData: FormData) {
         .toString()
         .trim();
       if (!url) return null;
-      const title = (
-        g?.title ??
-        g?.alt ??
-        g?.caption ??
-        null
-      ) as string | null;
+      const title = (g?.title ?? g?.alt ?? g?.caption ?? null) as
+        | string
+        | null;
       return { url, title, sort: index };
     })
     .filter(
@@ -425,11 +411,11 @@ async function saveClinic(formData: FormData) {
     map_embed_url: location.mapUrl,
     amenities: amenitiesForClinic,
     payments: paymentsForClinic,
-    // для удобства редактора и возможного фронта
+    // jsonb для фронта
     doctors: doctorsForDb,
     images: galleryForClinic,
     gallery: galleryForClinic,
-    accreditations: accreditationsForClinic,
+    // ВНИМАНИЕ: НЕ пишем поле accreditations — колонки в clinics нет
   };
 
   const { error: clinicError } = await sb
@@ -717,6 +703,8 @@ async function saveClinic(formData: FormData) {
         pricing: Array.isArray(rawPricing) ? rawPricing : [],
         status: draftStatus || "draft",
         updated_at: new Date().toISOString(),
+        // сюда НЕ пишем accreditations, чтобы не триггерить ошибку,
+        // если колонки нет
       } as any,
       { onConflict: "clinic_id" } as any,
     );
@@ -821,6 +809,29 @@ export default async function ClinicEditorPage({
         </Link>
       </div>
     );
+  }
+
+  // ---- подгружаем аккредитации через join таблицы ----
+  let accreditationsFromJoin: any[] = [];
+  try {
+    const { data: linkRows, error: linksErr } = await sb
+      .from("clinic_accreditations")
+      .select("accreditation_id")
+      .eq("clinic_id", id);
+
+    if (!linksErr && Array.isArray(linkRows) && linkRows.length) {
+      const ids = linkRows.map((r: any) => r.accreditation_id);
+      const { data: accRows, error: accErr } = await sb
+        .from("accreditations")
+        .select("id, name, logo_url, description")
+        .in("id", ids);
+
+      if (!accErr && Array.isArray(accRows)) {
+        accreditationsFromJoin = accRows;
+      }
+    }
+  } catch (e) {
+    console.error("load accreditations join error", e);
   }
 
   // ---- нормализация initial-данных из draft + clinics ----
@@ -943,7 +954,11 @@ export default async function ClinicEditorPage({
       );
   })();
 
-  const accreditations: any[] = Array.isArray((clinic as any).accreditations)
+  const accreditations: any[] = accreditationsFromJoin.length
+    ? accreditationsFromJoin
+    : Array.isArray((draft as any)?.accreditations)
+    ? ((draft as any).accreditations as any[])
+    : Array.isArray((clinic as any).accreditations)
     ? ((clinic as any).accreditations as any[])
     : [];
 

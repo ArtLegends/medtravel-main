@@ -134,11 +134,12 @@ function normalizeWeekdays(token: string): number[] {
   const clean = token.trim().toLowerCase().replace(/\s+/g, '');
   if (/^\d+$/.test(clean)) {
     const n = Number(clean);
-    return (n >= 1 && n <= 7) ? [n] : [];
+    return n >= 1 && n <= 7 ? [n] : [];
   }
   const range = clean.split(/-|–|—/);
   if (range.length === 2 && mapName[range[0]] && mapName[range[1]]) {
-    const a = mapName[range[0]], b = mapName[range[1]];
+    const a = mapName[range[0]];
+    const b = mapName[range[1]];
     if (a <= b) return Array.from({ length: b - a + 1 }, (_, i) => a + i);
   }
   if (mapName[clean]) return [mapName[clean]];
@@ -146,12 +147,18 @@ function normalizeWeekdays(token: string): number[] {
 }
 
 /** parse "9:00 AM - 6:00 PM" → {open:'09:00:00', close:'18:00:00'}; "Closed" → {is_closed:true} */
-function parseTimeSpan(s?: string): { open: string | null; close: string | null; is_closed: boolean } {
+function parseTimeSpan(s?: string): {
+  open: string | null;
+  close: string | null;
+  is_closed: boolean;
+} {
   const text = (s || '').trim();
   if (!text) return { open: null, close: null, is_closed: false };
   if (/^closed$/i.test(text)) return { open: null, close: null, is_closed: true };
 
-  const m = text.match(/^\s*([0-9: ]+(?:am|pm)?)\s*[-–—]\s*([0-9: ]+(?:am|pm)?)\s*$/i);
+  const m = text.match(
+    /^\s*([0-9: ]+(?:am|pm)?)\s*[-–—]\s*([0-9: ]+(?:am|pm)?)\s*$/i,
+  );
   if (!m) return { open: null, close: null, is_closed: false };
 
   const to24 = (v: string) => {
@@ -163,13 +170,19 @@ function parseTimeSpan(s?: string): { open: string | null; close: string | null;
       const ap = ampm[3].toLowerCase();
       if (ap === 'pm' && hh !== 12) hh += 12;
       if (ap === 'am' && hh === 12) hh = 0;
-      return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:00`;
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(
+        2,
+        '0',
+      )}:00`;
     }
     const hhmm = t.match(/^(\d{1,2})(?::(\d{2}))?$/);
     if (hhmm) {
       const hh = Number(hhmm[1]);
       const mm = Number(hhmm[2] ?? 0);
-      return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:00`;
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(
+        2,
+        '0',
+      )}:00`;
     }
     return null;
   };
@@ -211,14 +224,14 @@ export async function POST(req: Request) {
       directions: null as string | null, // в API пока нет directions
     };
 
-    const servicesJson = parsed.services.map(s => ({
+    const servicesJson = parsed.services.map((s) => ({
       name: s.name,
       description: s.desc ?? null,
       price: s.price ?? null,
       currency: s.currency,
     }));
 
-    const doctorsJson = parsed.doctors.map(d => ({
+    const doctorsJson = parsed.doctors.map((d) => ({
       name: d.name,
       title: d.title ?? null,
       specialty: d.spec ?? null,
@@ -229,7 +242,7 @@ export async function POST(req: Request) {
       languages: [] as string[],
     }));
 
-    const hoursJson = parsed.hours.map(h => ({
+    const hoursJson = parsed.hours.map((h) => ({
       day: h.day,
       time: h.time ?? '',
     }));
@@ -240,54 +253,50 @@ export async function POST(req: Request) {
       sort: index,
     }));
 
-    const accreditationsJson = parsed.accreditations.map(a => ({
-      name: a.name,
-      logo_url: a.logo_url ?? null,
-      description: a.description ?? null,
-    }));
-
     const isPublished = parsed.clinic.status === 'Published';
     const status = isPublished ? 'published' : 'draft';
 
     // ---- 1) create clinic ----
     const { data: clinicRow, error: clinicErr } = await sb
       .from('clinics')
-      .insert([{
-        name: parsed.clinic.name,
-        slug: basicInfo.slug,
-        about: parsed.clinic.about,
-        address: parsed.clinic.address,
-        country: parsed.clinic.country,
-        city: parsed.clinic.city,
-        province: parsed.clinic.region ?? null,
-        district: parsed.clinic.district ?? null,
+      .insert([
+        {
+          name: parsed.clinic.name,
+          slug: basicInfo.slug,
+          about: parsed.clinic.about,
+          address: parsed.clinic.address,
+          country: parsed.clinic.country,
+          city: parsed.clinic.city,
+          province: parsed.clinic.region ?? null,
+          district: parsed.clinic.district ?? null,
 
-        // lat/lng – если ты их не используешь, можно потом выпилить
-        lat: parsed.clinic.lat ? Number(parsed.clinic.lat) : null,
-        lng: parsed.clinic.lng ? Number(parsed.clinic.lng) : null,
+          // lat/lng – если ты их не используешь, можно потом выпилить
+          lat: parsed.clinic.lat ? Number(parsed.clinic.lat) : null,
+          lng: parsed.clinic.lng ? Number(parsed.clinic.lng) : null,
 
-        // НОВОЕ: google maps url → колонка clinics.map_embed_url
-        map_embed_url: parsed.clinic.map_embed_url ?? null,
+          // google maps url → колонка clinics.map_embed_url
+          map_embed_url: parsed.clinic.map_embed_url ?? null,
 
-        // НОВОЕ: jsonb поля
-        amenities: parsed.clinic.amenities,
-        payments: parsed.clinic.payments,
+          // jsonb поля
+          amenities: parsed.clinic.amenities,
+          payments: parsed.clinic.payments,
 
-        // ВАЖНО: jsonb поля для details
-        services: servicesJson,
-        doctors: doctorsJson,
-        hours: hoursJson,
-        images: galleryJson,
-        gallery: galleryJson,
-        accreditations: accreditationsJson,
+          // jsonb поля для details (services/doctors/hours/gallery)
+          services: servicesJson,
+          doctors: doctorsJson,
+          hours: hoursJson,
+          images: galleryJson,
+          gallery: galleryJson,
+          // ВАЖНО: БЕЗ поля accreditations — такой колонки в clinics нет
 
-        status,
-        is_published: isPublished,
-        verified_by_medtravel: true,
-        is_official_partner: true,
+          status,
+          is_published: isPublished,
+          verified_by_medtravel: true,
+          is_official_partner: true,
 
-        moderation_status: 'approved',
-      }])
+          moderation_status: 'approved',
+        },
+      ])
       .select('id')
       .single();
 
@@ -301,20 +310,22 @@ export async function POST(req: Request) {
           .maybeSingle();
 
         if (existingClinic?.id) {
-          return NextResponse.json({ ok: true, id: existingClinic.id }, { status: 201 });
+          return NextResponse.json(
+            { ok: true, id: existingClinic.id },
+            { status: 201 },
+          );
         }
       }
 
       return NextResponse.json(
         { error: clinicErr?.message ?? 'Insert clinic failed' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const clinicId = clinicRow.id as string;
 
     // ---- 2) category link ----
-    // Берём specialty как имя категории. Находим по slug, иначе создаём.
     const catSlug = slugify(parsed.clinic.specialty);
     let categoryId: number | null = null;
 
@@ -341,7 +352,7 @@ export async function POST(req: Request) {
         if (catInsErr && !isAcctsSlugConflict(catInsErr)) {
           return NextResponse.json(
             { error: catInsErr?.message ?? 'Create category failed' },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
@@ -357,9 +368,11 @@ export async function POST(req: Request) {
         .from('clinic_categories')
         .upsert(
           [{ clinic_id: clinicId, category_id: categoryId! }],
-          { onConflict: 'clinic_id,category_id' }
+          { onConflict: 'clinic_id,category_id' },
         );
-      if (ccErr) return NextResponse.json({ error: ccErr.message }, { status: 400 });
+      if (ccErr) {
+        return NextResponse.json({ error: ccErr.message }, { status: 400 });
+      }
     }
 
     // ---- 3) images (clinic_images) ----
@@ -372,12 +385,14 @@ export async function POST(req: Request) {
         created_at: new Date().toISOString(),
       }));
       const { error } = await sb.from('clinic_images').insert(imgRows);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
     }
 
     // ---- 4) staff (clinic_staff) ----
     if (parsed.doctors.length) {
-      const staffRows = parsed.doctors.map(d => ({
+      const staffRows = parsed.doctors.map((d) => ({
         clinic_id: clinicId,
         name: d.name,
         title: d.title ?? null,
@@ -388,7 +403,9 @@ export async function POST(req: Request) {
         created_at: new Date().toISOString(),
       }));
       const { error } = await sb.from('clinic_staff').insert(staffRows);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
     }
 
     // ---- 5) services: upsert service → link in clinic_services ----
@@ -397,13 +414,22 @@ export async function POST(req: Request) {
         const { data: svc, error: svcErr } = await sb
           .from('services')
           .upsert(
-            [{ name: s.name, slug: slugify(s.name), description: s.desc ?? null }],
+            [
+              {
+                name: s.name,
+                slug: slugify(s.name),
+                description: s.desc ?? null,
+              },
+            ],
             { onConflict: 'name' },
           )
           .select('id')
           .single();
         if (svcErr || !svc) {
-          return NextResponse.json({ error: svcErr?.message ?? 'Service upsert failed' }, { status: 400 });
+          return NextResponse.json(
+            { error: svcErr?.message ?? 'Service upsert failed' },
+            { status: 400 },
+          );
         }
         const priceNum =
           s.price && s.price.trim() !== ''
@@ -412,15 +438,19 @@ export async function POST(req: Request) {
         const { error: linkErr } = await sb
           .from('clinic_services')
           .upsert(
-            [{
-              clinic_id: clinicId,
-              service_id: svc.id,
-              price: priceNum,
-              currency: s.currency || 'USD',
-            }],
+            [
+              {
+                clinic_id: clinicId,
+                service_id: svc.id,
+                price: priceNum,
+                currency: s.currency || 'USD',
+              },
+            ],
             { onConflict: 'clinic_id,service_id' },
           );
-        if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 400 });
+        if (linkErr) {
+          return NextResponse.json({ error: linkErr.message }, { status: 400 });
+        }
       }
     }
 
@@ -450,7 +480,9 @@ export async function POST(req: Request) {
         const { error } = await sb
           .from('clinic_hours')
           .upsert(rows, { onConflict: 'clinic_id,weekday' });
-        if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
       }
     }
 
@@ -460,17 +492,22 @@ export async function POST(req: Request) {
         const { data: acc, error: accErr } = await sb
           .from('accreditations')
           .upsert(
-            [{
-              name: a.name,
-              logo_url: a.logo_url ?? null,
-              description: a.description ?? null,
-            }],
+            [
+              {
+                name: a.name,
+                logo_url: a.logo_url ?? null,
+                description: a.description ?? null,
+              },
+            ],
             { onConflict: 'name' },
           )
           .select('id')
           .single();
         if (accErr || !acc) {
-          return NextResponse.json({ error: accErr?.message ?? 'Accreditation upsert failed' }, { status: 400 });
+          return NextResponse.json(
+            { error: accErr?.message ?? 'Accreditation upsert failed' },
+            { status: 400 },
+          );
         }
         const { error: linkErr } = await sb
           .from('clinic_accreditations')
@@ -478,7 +515,9 @@ export async function POST(req: Request) {
             [{ clinic_id: clinicId, accreditation_id: acc.id }],
             { onConflict: 'clinic_id,accreditation_id' },
           );
-        if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 400 });
+        if (linkErr) {
+          return NextResponse.json({ error: linkErr.message }, { status: 400 });
+        }
       }
     }
 
@@ -499,6 +538,8 @@ export async function POST(req: Request) {
             pricing: parsed.clinic.payments,
             status,
             updated_at: new Date().toISOString(),
+            // СЮДА НЕ ПИШЕМ accreditations, чтобы не ловить ошибку,
+            // если в clinic_profile_drafts нет такой колонки.
           } as any,
           { onConflict: 'clinic_id' } as any,
         );
@@ -513,7 +554,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, id: clinicId }, { status: 201 });
   } catch (e: any) {
-    if (e?.code === '23505' && String(e?.constraint).includes('accts_slug_uq')) {
+    if (
+      e?.code === '23505' &&
+      String(e?.constraint).includes('accts_slug_uq')
+    ) {
       return NextResponse.json(
         { error: 'Slug already exists. Please choose another one.' },
         { status: 400 },
