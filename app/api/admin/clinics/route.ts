@@ -103,6 +103,7 @@ const Body = z.object({
     .array(
       z.object({
         day: z.string().min(1),
+        // строка типа "9:00 AM - 6:00 PM", "09:00-18:00", "Closed", "By appointment"
         time: z.string().optional(),
       }),
     )
@@ -192,33 +193,94 @@ export async function POST(req: Request) {
     const parsed = Body.parse(await req.json());
     const sb = createServiceClient();
 
-    // ---- 1) create clinic ----
+    /* ---- подготовим структуры, которые нужны и для clinics.jsonb, и для draft ---- */
+
+    const basicInfo = {
+      name: parsed.clinic.name,
+      slug: parsed.clinic.slug || slugify(parsed.clinic.name),
+      specialty: parsed.clinic.specialty,
+      country: parsed.clinic.country,
+      city: parsed.clinic.city,
+      province: parsed.clinic.region ?? null,
+      district: parsed.clinic.district ?? null,
+      description: parsed.clinic.about,
+    };
+
+    const location = {
+      mapUrl: parsed.clinic.map_embed_url ?? null,
+      directions: null as string | null, // в API пока нет directions
+    };
+
+    const servicesJson = parsed.services.map(s => ({
+      name: s.name,
+      description: s.desc ?? null,
+      price: s.price ?? null,
+      currency: s.currency,
+    }));
+
+    const doctorsJson = parsed.doctors.map(d => ({
+      name: d.name,
+      title: d.title ?? null,
+      specialty: d.spec ?? null,
+      spec: d.spec ?? null,
+      photo_url: d.photo ?? null,
+      photoUrl: d.photo ?? null,
+      bio: d.bio ?? null,
+      languages: [] as string[],
+    }));
+
+    const hoursJson = parsed.hours.map(h => ({
+      day: h.day,
+      time: h.time ?? '',
+    }));
+
+    const galleryJson = parsed.images.map((im, index) => ({
+      url: im.url,
+      title: im.title ?? null,
+      sort: index,
+    }));
+
+    const accreditationsJson = parsed.accreditations.map(a => ({
+      name: a.name,
+      logo_url: a.logo_url ?? null,
+      description: a.description ?? null,
+    }));
+
     const isPublished = parsed.clinic.status === 'Published';
     const status = isPublished ? 'published' : 'draft';
 
+    // ---- 1) create clinic ----
     const { data: clinicRow, error: clinicErr } = await sb
       .from('clinics')
       .insert([{
         name: parsed.clinic.name,
-        slug: parsed.clinic.slug || slugify(parsed.clinic.name),
+        slug: basicInfo.slug,
         about: parsed.clinic.about,
         address: parsed.clinic.address,
         country: parsed.clinic.country,
         city: parsed.clinic.city,
         province: parsed.clinic.region ?? null,
         district: parsed.clinic.district ?? null,
-  
+
         // lat/lng – если ты их не используешь, можно потом выпилить
         lat: parsed.clinic.lat ? Number(parsed.clinic.lat) : null,
         lng: parsed.clinic.lng ? Number(parsed.clinic.lng) : null,
-  
+
         // НОВОЕ: google maps url → колонка clinics.map_embed_url
         map_embed_url: parsed.clinic.map_embed_url ?? null,
-  
+
         // НОВОЕ: jsonb поля
         amenities: parsed.clinic.amenities,
         payments: parsed.clinic.payments,
-  
+
+        // ВАЖНО: jsonb поля для details
+        services: servicesJson,
+        doctors: doctorsJson,
+        hours: hoursJson,
+        images: galleryJson,
+        gallery: galleryJson,
+        accreditations: accreditationsJson,
+
         status,
         is_published: isPublished,
         verified_by_medtravel: true,
@@ -229,29 +291,29 @@ export async function POST(req: Request) {
       .select('id')
       .single();
 
-      if (clinicErr || !clinicRow) {
-        // если именно дубликат accts_slug_uq — пробуем найти клинику по slug и считаем это мягким успехом
-        if (isAcctsSlugConflict(clinicErr)) {
-          const { data: existingClinic } = await sb
-            .from('clinics')
-            .select('id')
-            .eq('slug', parsed.clinic.slug || slugify(parsed.clinic.name))
-            .maybeSingle();
-      
-          if (existingClinic?.id) {
-            return NextResponse.json({ ok: true, id: existingClinic.id }, { status: 201 });
-          }
-        }
-      
-        return NextResponse.json(
-          { error: clinicErr?.message ?? 'Insert clinic failed' },
-          { status: 400 }
-        );
-      }
-      
-      const clinicId = clinicRow.id as string;
+    if (clinicErr || !clinicRow) {
+      // если именно дубликат accts_slug_uq — пробуем найти клинику по slug и считаем это мягким успехом
+      if (isAcctsSlugConflict(clinicErr)) {
+        const { data: existingClinic } = await sb
+          .from('clinics')
+          .select('id')
+          .eq('slug', basicInfo.slug)
+          .maybeSingle();
 
-    // ---- 2) category link (НОВОЕ) ----
+        if (existingClinic?.id) {
+          return NextResponse.json({ ok: true, id: existingClinic.id }, { status: 201 });
+        }
+      }
+
+      return NextResponse.json(
+        { error: clinicErr?.message ?? 'Insert clinic failed' },
+        { status: 400 }
+      );
+    }
+
+    const clinicId = clinicRow.id as string;
+
+    // ---- 2) category link ----
     // Берём specialty как имя категории. Находим по slug, иначе создаём.
     const catSlug = slugify(parsed.clinic.specialty);
     let categoryId: number | null = null;
@@ -263,47 +325,50 @@ export async function POST(req: Request) {
         .eq('slug', catSlug)
         .maybeSingle();
 
-        if (catSelErr && !isAcctsSlugConflict(catSelErr)) {
-          return NextResponse.json({ error: catSelErr.message }, { status: 400 });
+      if (catSelErr && !isAcctsSlugConflict(catSelErr)) {
+        return NextResponse.json({ error: catSelErr.message }, { status: 400 });
+      }
+
+      if (existing?.id) {
+        categoryId = existing.id as number;
+      } else {
+        const { data: created, error: catInsErr } = await sb
+          .from('categories')
+          .insert([{ name: parsed.clinic.specialty, slug: catSlug }])
+          .select('id')
+          .single();
+
+        if (catInsErr && !isAcctsSlugConflict(catInsErr)) {
+          return NextResponse.json(
+            { error: catInsErr?.message ?? 'Create category failed' },
+            { status: 400 }
+          );
         }
-        
-        if (existing?.id) {
-          categoryId = existing.id as number;
-        } else {
-          const { data: created, error: catInsErr } = await sb
-            .from('categories')
-            .insert([{ name: parsed.clinic.specialty, slug: catSlug }])
-            .select('id')
-            .single();
-        
-          if (catInsErr && !isAcctsSlugConflict(catInsErr)) {
-            return NextResponse.json(
-              { error: catInsErr?.message ?? 'Create category failed' },
-              { status: 400 }
-            );
-          }
-        
-          if (created?.id) {
-            categoryId = created.id as number;
-          }
+
+        if (created?.id) {
+          categoryId = created.id as number;
         }
+      }
     }
 
     // upsert связь в clinic_categories
     {
       const { error: ccErr } = await sb
         .from('clinic_categories')
-        .upsert([{ clinic_id: clinicId, category_id: categoryId! }], { onConflict: 'clinic_id,category_id' });
+        .upsert(
+          [{ clinic_id: clinicId, category_id: categoryId! }],
+          { onConflict: 'clinic_id,category_id' }
+        );
       if (ccErr) return NextResponse.json({ error: ccErr.message }, { status: 400 });
     }
 
-    // ---- 3) images ----
+    // ---- 3) images (clinic_images) ----
     if (parsed.images.length) {
-      const imgRows = parsed.images.map(im => ({
+      const imgRows = parsed.images.map((im, index) => ({
         clinic_id: clinicId,
         url: im.url,
         title: im.title ?? null,
-        sort: 0,
+        sort: index,
         created_at: new Date().toISOString(),
       }));
       const { error } = await sb.from('clinic_images').insert(imgRows);
@@ -316,7 +381,7 @@ export async function POST(req: Request) {
         clinic_id: clinicId,
         name: d.name,
         title: d.title ?? null,
-        position: d.title ?? null,
+        position: d.spec ?? d.title ?? null,
         bio: d.bio ?? null,
         languages: '{}', // пустой text[]
         photo_url: d.photo ?? null,
@@ -331,37 +396,59 @@ export async function POST(req: Request) {
       for (const s of parsed.services) {
         const { data: svc, error: svcErr } = await sb
           .from('services')
-          .upsert([{ name: s.name, slug: slugify(s.name), description: s.desc ?? null }], { onConflict: 'name' })
+          .upsert(
+            [{ name: s.name, slug: slugify(s.name), description: s.desc ?? null }],
+            { onConflict: 'name' },
+          )
           .select('id')
           .single();
         if (svcErr || !svc) {
           return NextResponse.json({ error: svcErr?.message ?? 'Service upsert failed' }, { status: 400 });
         }
-        const priceNum = s.price && s.price.trim() !== '' ? Number(s.price.replace(',', '.')) : null;
+        const priceNum =
+          s.price && s.price.trim() !== ''
+            ? Number(s.price.replace(',', '.'))
+            : null;
         const { error: linkErr } = await sb
           .from('clinic_services')
-          .upsert([{
-            clinic_id: clinicId,
-            service_id: svc.id,
-            price: priceNum,
-            currency: s.currency || 'USD',
-          }], { onConflict: 'clinic_id,service_id' });
+          .upsert(
+            [{
+              clinic_id: clinicId,
+              service_id: svc.id,
+              price: priceNum,
+              currency: s.currency || 'USD',
+            }],
+            { onConflict: 'clinic_id,service_id' },
+          );
         if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 400 });
       }
     }
 
     // ---- 6) hours: parse → upsert (clinic_id, weekday) ----
     if (parsed.hours.length) {
-      const rows: { clinic_id: string; weekday: number; open: string | null; close: string | null; is_closed: boolean }[] = [];
+      const rows: {
+        clinic_id: string;
+        weekday: number;
+        open: string | null;
+        close: string | null;
+        is_closed: boolean;
+      }[] = [];
       for (const h of parsed.hours) {
         const wds = normalizeWeekdays(h.day);
         const times = parseTimeSpan(h.time);
         for (const wd of wds) {
-          rows.push({ clinic_id: clinicId, weekday: wd, open: times.open, close: times.close, is_closed: times.is_closed });
+          rows.push({
+            clinic_id: clinicId,
+            weekday: wd,
+            open: times.open,
+            close: times.close,
+            is_closed: times.is_closed,
+          });
         }
       }
       if (rows.length) {
-        const { error } = await sb.from('clinic_hours')
+        const { error } = await sb
+          .from('clinic_hours')
           .upsert(rows, { onConflict: 'clinic_id,weekday' });
         if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       }
@@ -372,7 +459,14 @@ export async function POST(req: Request) {
       for (const a of parsed.accreditations) {
         const { data: acc, error: accErr } = await sb
           .from('accreditations')
-          .upsert([{ name: a.name, logo_url: a.logo_url ?? null, description: a.description ?? null }], { onConflict: 'name' })
+          .upsert(
+            [{
+              name: a.name,
+              logo_url: a.logo_url ?? null,
+              description: a.description ?? null,
+            }],
+            { onConflict: 'name' },
+          )
           .select('id')
           .single();
         if (accErr || !acc) {
@@ -380,8 +474,40 @@ export async function POST(req: Request) {
         }
         const { error: linkErr } = await sb
           .from('clinic_accreditations')
-          .upsert([{ clinic_id: clinicId, accreditation_id: acc.id }], { onConflict: 'clinic_id,accreditation_id' });
+          .upsert(
+            [{ clinic_id: clinicId, accreditation_id: acc.id }],
+            { onConflict: 'clinic_id,accreditation_id' },
+          );
         if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 400 });
+      }
+    }
+
+    // ---- 8) clinic_profile_drafts: сырые данные для details/редактора ----
+    {
+      const { error: draftErr } = await sb
+        .from('clinic_profile_drafts')
+        .upsert(
+          {
+            clinic_id: clinicId,
+            basic_info: basicInfo,
+            location,
+            services: servicesJson,
+            doctors: doctorsJson,
+            hours: hoursJson,
+            gallery: galleryJson,
+            facilities: parsed.clinic.amenities,
+            pricing: parsed.clinic.payments,
+            status,
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'clinic_id' } as any,
+        );
+
+      if (draftErr) {
+        return NextResponse.json(
+          { error: draftErr.message ?? 'Clinic draft upsert failed' },
+          { status: 400 },
+        );
       }
     }
 
@@ -391,10 +517,10 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Slug already exists. Please choose another one.' },
         { status: 400 },
-      )
+      );
     }
 
-    console.error(e)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    console.error(e);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

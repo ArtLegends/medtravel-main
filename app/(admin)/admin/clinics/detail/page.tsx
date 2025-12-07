@@ -165,6 +165,50 @@ function toTime(value: string | null | undefined): string | null {
   return `${hh}:${mm}:00`;
 }
 
+/** локальная версия parseTimeSpan для часов из draft: "9:00-18:00", "Closed" и т.п. */
+function parseTimeSpanDraft(
+  s?: string,
+): { open: string | null; close: string | null; is_closed: boolean } {
+  const text = (s || "").trim();
+  if (!text) return { open: null, close: null, is_closed: false };
+  if (/^closed$/i.test(text)) return { open: null, close: null, is_closed: true };
+
+  const m = text.match(
+    /^\s*([0-9: ]+(?:am|pm)?)\s*[-–—]\s*([0-9: ]+(?:am|pm)?)\s*$/i,
+  );
+  if (!m) return { open: null, close: null, is_closed: false };
+
+  const to24 = (v: string) => {
+    const t = v.trim().toLowerCase();
+    const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+    if (ampm) {
+      let hh = Number(ampm[1]);
+      const mm = Number(ampm[2] ?? 0);
+      const ap = ampm[3].toLowerCase();
+      if (ap === "pm" && hh !== 12) hh += 12;
+      if (ap === "am" && hh === 12) hh = 0;
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(
+        2,
+        "0",
+      )}:00`;
+    }
+    const hhmm = t.match(/^(\d{1,2})(?::(\d{2}))?$/);
+    if (hhmm) {
+      const hh = Number(hhmm[1]);
+      const mm = Number(hhmm[2] ?? 0);
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(
+        2,
+        "0",
+      )}:00`;
+    }
+    return null;
+  };
+
+  const open = to24(m[1]) as string | null;
+  const close = to24(m[2]) as string | null;
+  return { open, close, is_closed: false };
+}
+
 async function saveClinic(formData: FormData) {
   "use server";
 
@@ -263,19 +307,32 @@ async function saveClinic(formData: FormData) {
           const weekday = dayNameToWeekday(day);
           if (!weekday) return null;
 
-          const status = h.status ?? "open";
-          const isClosed = status === "closed";
+          let status: string = h.status ?? "open";
+          let isClosed = status === "closed";
 
-          const openStr: string | null = h.start ?? h.open ?? null;
-          const closeStr: string | null = h.end ?? h.close ?? null;
+          let openStr: string | null = h.start ?? h.open ?? null;
+          let closeStr: string | null = h.end ?? h.close ?? null;
+          const timeText: string | null = h.time ?? null;
 
-          const open = isClosed ? null : toTime(openStr);
-          const close = isClosed ? null : toTime(closeStr);
-
+          let open: string | null = null;
+          let close: string | null = null;
           let hoursText: string | null = null;
-          if (isClosed) hoursText = "closed";
-          else if (status === "by_appointment") hoursText = "by appointment";
-          else if (openStr && closeStr) hoursText = `${openStr} - ${closeStr}`;
+
+          if (timeText && !openStr && !closeStr) {
+            // формат "09:00-18:00" / "9:00 AM - 6:00 PM" / "Closed"
+            const parsed = parseTimeSpanDraft(timeText);
+            open = parsed.open;
+            close = parsed.close;
+            isClosed = parsed.is_closed;
+            hoursText = timeText;
+            if (parsed.is_closed) status = "closed";
+          } else {
+            open = isClosed ? null : toTime(openStr);
+            close = isClosed ? null : toTime(closeStr);
+            if (isClosed) hoursText = "closed";
+            else if (status === "by_appointment") hoursText = "by appointment";
+            else if (openStr && closeStr) hoursText = `${openStr} - ${closeStr}`;
+          }
 
           return {
             clinic_id: id,
@@ -312,7 +369,9 @@ async function saveClinic(formData: FormData) {
       ) as string | null;
       return { url, title, sort: index };
     })
-    .filter((x): x is { url: string; title: string | null; sort: number } => !!x);
+    .filter(
+      (x): x is { url: string; title: string | null; sort: number } => !!x,
+    );
 
   const amenitiesForClinic = {
     premises: normalizeStringList(rawFacilities.premises),
@@ -340,8 +399,13 @@ async function saveClinic(formData: FormData) {
       return { name, logo_url, description: desc };
     })
     .filter(
-      (x): x is { name: string; logo_url: string | null; description: string | null } =>
-        !!x,
+      (
+        x,
+      ): x is {
+        name: string;
+        logo_url: string | null;
+        description: string | null;
+      } => !!x,
     );
 
   // --- 1) clinics ---
@@ -436,7 +500,7 @@ async function saveClinic(formData: FormData) {
       const name = (s?.name ?? "").trim();
       if (!name) continue;
 
-      const desc = s?.description ?? null;
+      const desc = s?.description ?? s?.desc ?? null;
       const currency = (s?.currency ?? "USD").trim() || "USD";
 
       let priceNum: number | null = null;
@@ -806,48 +870,46 @@ export default async function ClinicEditorPage({
     ? ((clinic as any).gallery as any[])
     : []) as any[];
 
-    const rawFacilitiesDraft = (draft?.facilities ?? {}) as any;
-    const rawAmenitiesClinic = ((clinic as any).amenities ?? {}) as any;
-  
-    function normalizeAmenityArray(value: any): string[] {
-      if (!Array.isArray(value)) return [];
-      return value
-        .map((item: any) => {
-          if (typeof item === "string") return item.trim();
-          if (item && typeof item === "object") {
-            if (typeof item.label === "string") return item.label.trim();
-            if (typeof item.name === "string") return item.name.trim();
-            if (typeof item.title === "string") return item.title.trim();
-          }
-          return null;
-        })
-        .filter(
-          (v: string | null): v is string => !!v && v.length > 0,
-        );
-    }
-  
-    const facilities = {
-      premises: normalizeAmenityArray(
-        Array.isArray(rawFacilitiesDraft.premises)
-          ? rawFacilitiesDraft.premises
-          : rawAmenitiesClinic.premises,
-      ),
-      clinic_services: normalizeAmenityArray(
-        Array.isArray(rawFacilitiesDraft.clinic_services)
-          ? rawFacilitiesDraft.clinic_services
-          : rawAmenitiesClinic.clinic_services,
-      ),
-      travel_services: normalizeAmenityArray(
-        Array.isArray(rawFacilitiesDraft.travel_services)
-          ? rawFacilitiesDraft.travel_services
-          : rawAmenitiesClinic.travel_services,
-      ),
-      languages_spoken: normalizeAmenityArray(
-        Array.isArray(rawFacilitiesDraft.languages_spoken)
-          ? rawFacilitiesDraft.languages_spoken
-          : rawAmenitiesClinic.languages_spoken,
-      ),
-    };
+  const rawFacilitiesDraft = (draft?.facilities ?? {}) as any;
+  const rawAmenitiesClinic = ((clinic as any).amenities ?? {}) as any;
+
+  function normalizeAmenityArray(value: any): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item: any) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          if (typeof item.label === "string") return item.label.trim();
+          if (typeof item.name === "string") return item.name.trim();
+          if (typeof item.title === "string") return item.title.trim();
+        }
+        return null;
+      })
+      .filter((v: string | null): v is string => !!v && v.length > 0);
+  }
+
+  const facilities = {
+    premises: normalizeAmenityArray(
+      Array.isArray(rawFacilitiesDraft.premises)
+        ? rawFacilitiesDraft.premises
+        : rawAmenitiesClinic.premises,
+    ),
+    clinic_services: normalizeAmenityArray(
+      Array.isArray(rawFacilitiesDraft.clinic_services)
+        ? rawFacilitiesDraft.clinic_services
+        : rawAmenitiesClinic.clinic_services,
+    ),
+    travel_services: normalizeAmenityArray(
+      Array.isArray(rawFacilitiesDraft.travel_services)
+        ? rawFacilitiesDraft.travel_services
+        : rawAmenitiesClinic.travel_services,
+    ),
+    languages_spoken: normalizeAmenityArray(
+      Array.isArray(rawFacilitiesDraft.languages_spoken)
+        ? rawFacilitiesDraft.languages_spoken
+        : rawAmenitiesClinic.languages_spoken,
+    ),
+  };
 
   const payments: string[] = (() => {
     if (Array.isArray(draft?.pricing)) {
@@ -899,10 +961,7 @@ export default async function ClinicEditorPage({
     }) || `/clinic/${clinic.slug}`);
 
   return (
-    <form
-      className="mx-auto max-w-6xl space-y-6 p-6"
-      action={saveClinic}
-    >
+    <form className="mx-auto max-w-6xl space-y-6 p-6" action={saveClinic}>
       <input type="hidden" name="clinic_id" value={clinic.id} />
 
       {/* HEADER */}
@@ -945,8 +1004,6 @@ export default async function ClinicEditorPage({
             <div className="text-lg font-semibold">{clinic.name}</div>
             <div className="text-xs text-gray-500">{clinic.slug}</div>
           </div>
-
-       
 
           <div className="space-y-1 text-sm">
             <div>
