@@ -9,7 +9,7 @@ import ClinicDraftEditor from "@/components/admin/ClinicDraftEditor";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const CLINIC_BUCKET = "clinics";
+const CLINIC_BUCKET = "clinic-images";
 
 type ClinicRow = {
   id: string;
@@ -157,7 +157,6 @@ async function saveClinic(formData: FormData) {
   const sb = createServiceClient();
 
   const str = (name: string) => String(formData.get(name) ?? "").trim();
-
   const parseJson = (field: string) => {
     const raw = formData.get(field);
     if (!raw) return null;
@@ -182,7 +181,7 @@ async function saveClinic(formData: FormData) {
 
   const location = {
     mapUrl: str("clinic_mapUrl") || null,
-    directions: str("clinic_directions") || null, // храним только в драфте
+    directions: str("clinic_directions") || null, // только в драфте
   };
 
   const address = str("clinic_address") || null;
@@ -190,54 +189,114 @@ async function saveClinic(formData: FormData) {
   const moderationStatus = str("clinic_moderation_status") || null;
   const draftStatus = str("draft_status") || null;
 
-  const services = (parseJson("draft_services") ?? []) as any[];
-  const doctors = (parseJson("draft_doctors") ?? []) as any[];
-  const hours = (parseJson("draft_hours") ?? []) as any[];
-  const gallery = (parseJson("draft_gallery") ?? []) as any[];
-  const facilities = (parseJson("draft_facilities") ?? {}) as any;
-  const pricing = (parseJson("draft_pricing") ?? []) as any[];
-  const accreditations = (parseJson("clinic_accreditations") ?? []) as any[];
+  // --- СЫРЫЕ JSON из формы (то, что уйдёт в clinic_profile_drafts) ---
+  const rawServices = (parseJson("draft_services") ?? []) as any[];
+  const rawDoctors = (parseJson("draft_doctors") ?? []) as any[];
+  const rawHours = (parseJson("draft_hours") ?? []) as any[];
+  const rawGallery = (parseJson("draft_gallery") ?? []) as any[];
+  const rawFacilities = (parseJson("draft_facilities") ?? {}) as any;
+  const rawPricing = (parseJson("draft_pricing") ?? []) as any[];
+  const rawAccreditations = (parseJson("clinic_accreditations") ?? []) as any[];
 
-  // --- подготовка структур для JSON в draft / clinics ---
+  // --- НОРМАЛИЗОВАННЫЕ структуры ДЛЯ ТАБЛИЦ ---
 
-  const servicesForClinic = Array.isArray(services) ? services : [];
+  // services → как есть, мы нормализуем только по месту
+  const servicesForDb = Array.isArray(rawServices) ? rawServices : [];
 
-  const doctorsForClinic = Array.isArray(doctors)
-    ? doctors.map((d) => ({
-        name: (d.fullName ?? d.name ?? "").trim(),
-        title: (d.title ?? "").trim(),
-        spec: (d.specialty ?? d.spec ?? "").trim(),
-        // опционально: bio / photoUrl, если потом добавим в форму
-        bio: d.bio ?? null,
-        photo_url: d.photo_url ?? d.photo ?? null,
-      }))
+  // doctors → для clinic_staff
+  const doctorsForDb = Array.isArray(rawDoctors)
+    ? rawDoctors.map((d) => {
+        const name = (d.fullName ?? d.name ?? "").trim();
+        const title = (d.title ?? "").trim();
+        const spec = (d.specialty ?? d.spec ?? "").trim();
+
+        // языки: либо массив строк, либо строка "en, tr"
+        let langs: string[] = [];
+        if (Array.isArray(d.languages)) {
+          langs = d.languages
+            .filter(
+              (x: unknown): x is string =>
+                typeof x === "string" && x.trim().length > 0,
+            )
+            .map((x: string) => x.trim());
+        } else if (typeof d.languages === "string") {
+          langs = d.languages
+            .split(",")
+            .map((x: string) => x.trim())
+            .filter(Boolean);
+        }
+
+        return {
+          name,
+          title: title || null,
+          position: spec || title || null,
+          bio:
+            typeof d.bio === "string" && d.bio.trim().length
+              ? d.bio.trim()
+              : null,
+          photo_url:
+            (d.photoUrl ?? d.photo_url ?? d.photo ?? "").trim() || null,
+          languages: langs,
+        };
+      })
     : [];
 
-  const hoursForClinic = Array.isArray(hours)
-    ? hours.map((h) => ({
-        day: h.day ?? h.weekday ?? "",
-        status: h.status ?? null, // open / closed / by_appointment
-        open: h.start ?? h.open ?? null, // "09:00"
-        close: h.end ?? h.close ?? null, // "17:00"
-      }))
+  // hours → для clinic_hours
+  const hoursForDb = Array.isArray(rawHours)
+    ? rawHours
+        .map((h) => {
+          const day = h.day ?? h.weekday ?? "";
+          const weekday = dayNameToWeekday(day);
+          if (!weekday) return null;
+
+          const status = h.status ?? "open";
+          const isClosed = status === "closed";
+
+          const openStr: string | null =
+            h.start ?? h.open ?? null; // "09:00"
+          const closeStr: string | null =
+            h.end ?? h.close ?? null; // "17:00"
+
+          const open = isClosed ? null : toTime(openStr);
+          const close = isClosed ? null : toTime(closeStr);
+
+          let hoursText: string | null = null;
+          if (isClosed) hoursText = "closed";
+          else if (status === "by_appointment") hoursText = "by appointment";
+          else if (openStr && closeStr) hoursText = `${openStr} - ${closeStr}`;
+
+          return {
+            clinic_id: id,
+            weekday,
+            open,
+            close,
+            is_closed: isClosed,
+            dow: weekday,
+            hours_text: hoursText,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
     : [];
 
-  const galleryForClinic = Array.isArray(gallery) ? gallery : [];
-
+  // gallery → для clinic_images
+  const galleryForDb = Array.isArray(rawGallery) ? rawGallery : [];
   const amenitiesForClinic = {
-    premises: Array.isArray(facilities.premises) ? facilities.premises : [],
-    clinic_services: Array.isArray(facilities.clinic_services)
-      ? facilities.clinic_services
+    premises: Array.isArray(rawFacilities.premises)
+      ? rawFacilities.premises
       : [],
-    travel_services: Array.isArray(facilities.travel_services)
-      ? facilities.travel_services
+    clinic_services: Array.isArray(rawFacilities.clinic_services)
+      ? rawFacilities.clinic_services
       : [],
-    languages_spoken: Array.isArray(facilities.languages_spoken)
-      ? facilities.languages_spoken
+    travel_services: Array.isArray(rawFacilities.travel_services)
+      ? rawFacilities.travel_services
+      : [],
+    languages_spoken: Array.isArray(rawFacilities.languages_spoken)
+      ? rawFacilities.languages_spoken
       : [],
   };
 
-  const paymentsForClinic = (Array.isArray(pricing) ? pricing : [])
+  // payments → clinics.payments
+  const paymentsForClinic = (Array.isArray(rawPricing) ? rawPricing : [])
     .map((p) => {
       if (typeof p === "string") return { method: p.trim() };
       if (p && typeof p === "object" && typeof p.method === "string") {
@@ -253,11 +312,11 @@ async function saveClinic(formData: FormData) {
         !!v && typeof v.method === "string" && v.method.length > 0,
     );
 
-  const accreditationsForClinic = Array.isArray(accreditations)
-    ? accreditations
+  const accreditationsForDb = Array.isArray(rawAccreditations)
+    ? rawAccreditations
     : [];
 
-  // --- 1) обновляем clinics (только реально существующие колонки) ---
+  // --- 1) clinics ---
 
   const clinicUpdate: any = {
     name: basic_info.name,
@@ -268,7 +327,7 @@ async function saveClinic(formData: FormData) {
     province: basic_info.province,
     district: basic_info.district,
     address,
-    status: clinicStatus || null, // 'draft' / 'published' / 'hidden'
+    status: clinicStatus || null,
     moderation_status: moderationStatus || "draft",
     is_published: formData.get("clinic_is_published") === "on",
     map_embed_url: location.mapUrl,
@@ -286,7 +345,7 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic");
   }
 
-  // --- 2) категория по specialty → categories + clinic_categories ---
+  // --- 2) categories + clinic_categories (по specialty) ---
 
   if (basic_info.specialty) {
     try {
@@ -306,10 +365,7 @@ async function saveClinic(formData: FormData) {
       } else {
         const { data: created, error: catInsErr } = await sb
           .from("categories")
-          .insert({
-            name: basic_info.specialty,
-            slug: catSlug,
-          } as any)
+          .insert({ name: basic_info.specialty, slug: catSlug } as any)
           .select("id")
           .single();
 
@@ -331,11 +387,11 @@ async function saveClinic(formData: FormData) {
       }
     } catch (err) {
       console.error("clinic category sync error", err);
-      // категорию можно считать не критичной, поэтому не падаем
+      // не критично – категорию можно не считать фатальной ошибкой
     }
   }
 
-  // --- 3) услуги: services + clinic_services ---
+  // --- 3) services + clinic_services ---
 
   try {
     const { error: delLinksErr } = await sb
@@ -344,7 +400,7 @@ async function saveClinic(formData: FormData) {
       .eq("clinic_id", id);
     if (delLinksErr) throw delLinksErr;
 
-    for (const s of servicesForClinic) {
+    for (const s of servicesForDb) {
       const name = (s?.name ?? "").trim();
       if (!name) continue;
 
@@ -363,19 +419,13 @@ async function saveClinic(formData: FormData) {
       const { data: svc, error: svcErr } = await sb
         .from("services")
         .upsert(
-          {
-            name,
-            slug: slugify(name),
-            description: desc,
-          } as any,
+          { name, slug: slugify(name), description: desc } as any,
           { onConflict: "name" } as any,
         )
         .select("id")
         .single();
 
-      if (svcErr || !svc) {
-        throw svcErr || new Error("Service upsert failed");
-      }
+      if (svcErr || !svc) throw svcErr || new Error("Service upsert failed");
 
       const { error: linkErr } = await sb
         .from("clinic_services")
@@ -396,7 +446,7 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic services");
   }
 
-  // --- 4) изображения: clinic_images ---
+  // --- 4) clinic_images ---
 
   try {
     const { error: delImgErr } = await sb
@@ -405,17 +455,23 @@ async function saveClinic(formData: FormData) {
       .eq("clinic_id", id);
     if (delImgErr) throw delImgErr;
 
-    const imageRows = (galleryForClinic as any[])
-      .filter(
-        (g) => g && typeof g.url === "string" && g.url.trim().length > 0,
-      )
-      .map((g, index) => ({
-        clinic_id: id,
-        url: g.url.trim(),
-        title: (g.title ?? null) as string | null,
-        sort: index,
-        created_at: new Date().toISOString(),
-      }));
+    const imageRows = galleryForDb
+      .map((g, index) => {
+        const url =
+          (g?.url ?? g?.src ?? g?.imageUrl ?? "").trim();
+        if (!url) return null;
+        return {
+          clinic_id: id,
+          url,
+          title:
+            (g?.title ??
+              g?.alt ??
+              null) as string | null,
+          sort: index,
+          created_at: new Date().toISOString(),
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
 
     if (imageRows.length) {
       const { error: insImgErr } = await sb
@@ -428,7 +484,7 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic images");
   }
 
-  // --- 5) доктора: clinic_staff ---
+  // --- 5) clinic_staff ---
 
   try {
     const { error: delStaffErr } = await sb
@@ -437,15 +493,15 @@ async function saveClinic(formData: FormData) {
       .eq("clinic_id", id);
     if (delStaffErr) throw delStaffErr;
 
-    const staffRows = doctorsForClinic
+    const staffRows = doctorsForDb
       .filter((d) => (d.name ?? "").trim().length > 0)
       .map((d) => ({
         clinic_id: id,
         name: d.name,
-        title: d.title || null,
-        position: d.spec || d.title || null,
-        bio: d.bio ?? null,
-        languages: "{}" as any, // text[]
+        title: d.title,
+        position: d.position,
+        bio: d.bio,
+        languages: d.languages ?? [],
         photo_url: d.photo_url ?? null,
         created_at: new Date().toISOString(),
       }));
@@ -461,7 +517,7 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic staff");
   }
 
-  // --- 6) часы работы: clinic_hours ---
+  // --- 6) clinic_hours ---
 
   try {
     const { error: delHoursErr } = await sb
@@ -470,37 +526,10 @@ async function saveClinic(formData: FormData) {
       .eq("clinic_id", id);
     if (delHoursErr) throw delHoursErr;
 
-    const hourRows = hoursForClinic
-      .map((h) => {
-        const weekday = dayNameToWeekday(h.day);
-        if (!weekday) return null;
-
-        const status = h.status ?? "open";
-        const isClosed = status === "closed";
-        const open = isClosed ? null : toTime(h.open);
-        const close = isClosed ? null : toTime(h.close);
-
-        let hoursText: string | null = null;
-        if (isClosed) hoursText = "closed";
-        else if (status === "by_appointment") hoursText = "by appointment";
-        else if (h.open && h.close) hoursText = `${h.open} - ${h.close}`;
-
-        return {
-          clinic_id: id,
-          weekday,
-          open,
-          close,
-          is_closed: isClosed,
-          dow: weekday,
-          hours_text: hoursText,
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
-
-    if (hourRows.length) {
+    if (hoursForDb.length) {
       const { error: insHoursErr } = await sb
         .from("clinic_hours")
-        .insert(hourRows as any);
+        .insert(hoursForDb as any);
       if (insHoursErr) throw insHoursErr;
     }
   } catch (err) {
@@ -508,7 +537,7 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic hours");
   }
 
-  // --- 7) аккредитации: accreditations + clinic_accreditations ---
+  // --- 7) accreditations + clinic_accreditations ---
 
   try {
     const { error: delLinksErr } = await sb
@@ -517,26 +546,28 @@ async function saveClinic(formData: FormData) {
       .eq("clinic_id", id);
     if (delLinksErr) throw delLinksErr;
 
-    for (const a of accreditationsForClinic) {
+    for (const a of accreditationsForDb) {
       const name = (a?.name ?? "").trim();
       if (!name) continue;
+
+      const logoUrl =
+        (a?.logo_url ?? a?.logoUrl ?? a?.url ?? "").trim() || null;
+      const desc =
+        typeof a?.description === "string" && a.description.trim().length
+          ? a.description.trim()
+          : null;
 
       const { data: acc, error: accErr } = await sb
         .from("accreditations")
         .upsert(
-          {
-            name,
-            logo_url: a.logo_url ?? null,
-            description: a.description ?? null,
-          } as any,
+          { name, logo_url: logoUrl, description: desc } as any,
           { onConflict: "name" } as any,
         )
         .select("id")
         .single();
 
-      if (accErr || !acc) {
+      if (accErr || !acc)
         throw accErr || new Error("Accreditation upsert failed");
-      }
 
       const { error: linkErr } = await sb
         .from("clinic_accreditations")
@@ -555,7 +586,7 @@ async function saveClinic(formData: FormData) {
     throw new Error("Failed to update clinic accreditations");
   }
 
-  // --- 8) сохраняем/обновляем draft (jsonb) ---
+  // --- 8) clinic_profile_drafts (сюда кладём СЫРОЙ JSON формы) ---
 
   const { error: draftError } = await sb
     .from("clinic_profile_drafts")
@@ -564,12 +595,12 @@ async function saveClinic(formData: FormData) {
         clinic_id: id,
         basic_info,
         location,
-        services: servicesForClinic,
-        doctors: doctorsForClinic,
-        hours: hoursForClinic,
-        gallery: galleryForClinic,
-        facilities: amenitiesForClinic,
-        pricing: Array.isArray(pricing) ? pricing : [],
+        services: Array.isArray(rawServices) ? rawServices : [],
+        doctors: Array.isArray(rawDoctors) ? rawDoctors : [],
+        hours: Array.isArray(rawHours) ? rawHours : [],
+        gallery: Array.isArray(rawGallery) ? rawGallery : [],
+        facilities: rawFacilities ?? {},
+        pricing: Array.isArray(rawPricing) ? rawPricing : [],
         status: draftStatus || "draft",
         updated_at: new Date().toISOString(),
       } as any,
