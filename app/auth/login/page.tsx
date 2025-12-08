@@ -37,24 +37,31 @@ export default async function LoginPage({ searchParams }: Props) {
   const as = (params.as || "CUSTOMER").toUpperCase();
   const isAdmin = as === "ADMIN";
   const isPartner = as === "PARTNER";
+  const isPatient = as === "PATIENT";
 
   const portalLabel = isAdmin
     ? "Admin portal"
     : isPartner
-      ? "Partner portal"
-      : "Clinic portal";
+    ? "Partner portal"
+    : isPatient
+    ? "Patient portal"
+    : "Clinic portal";
 
   const title = isAdmin
     ? "Sign in to admin panel"
     : isPartner
-      ? "Sign in as partner"
-      : "Sign in";
+    ? "Sign in as partner"
+    : isPatient
+    ? "Sign in as patient"
+    : "Sign in";
 
   const description = isAdmin
     ? "Access the MedTravel admin dashboard."
     : isPartner
-      ? "Access your MedTravel partner dashboard using Google or email."
-      : "Access your MedTravel clinic dashboard using Google or email.";
+    ? "Access your MedTravel partner dashboard using Google or email."
+    : isPatient
+    ? "Access your MedTravel patient portal using Google or email."
+    : "Access your MedTravel clinic dashboard using Google or email.";
 
   return (
     <main className="min-h-screen w-full bg-gradient-to-b flex items-center justify-center px-4">

@@ -16,7 +16,7 @@ export async function middleware(req: NextRequest) {
             name: c.name,
             value: c.value,
           })),
-          setAll: (all: Array<{ name: string; value: string; options?: any }>) =>
+        setAll: (all: Array<{ name: string; value: string; options?: any }>) =>
           all.forEach((cookie) =>
             res.cookies.set(cookie.name, cookie.value, cookie.options),
           ),
@@ -34,14 +34,15 @@ export async function middleware(req: NextRequest) {
   const isAdminRoute = pathname.startsWith("/admin");
   const isCustomerRoute = pathname.startsWith("/customer");
   const isPartnerRoute = pathname.startsWith("/partner");
+  const isPatientRoute = pathname.startsWith("/patient");
 
   // --- определяем isAdmin ---
   let isAdmin = false;
 
   if (user) {
     const metaRoles =
-      ((user.app_metadata?.roles as string[] | undefined) ?? []).map(
-        (r) => String(r).toUpperCase(),
+      ((user.app_metadata?.roles as string[] | undefined) ?? []).map((r) =>
+        String(r).toUpperCase(),
       );
     if (metaRoles.includes("ADMIN")) {
       isAdmin = true;
@@ -67,14 +68,15 @@ export async function middleware(req: NextRequest) {
       searchParams.get("next") ||
       (isAdmin
         ? "/admin"
-        : isCustomerRoute
-        ? "/customer"
         : "/");
     return NextResponse.redirect(new URL(next, req.url));
   }
 
-  // Гость пытается в /admin, /customer или /partner → на логин
-  if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute)) {
+  // Гость пытается в /admin, /customer, /partner или /patient → на логин
+  if (
+    !user &&
+    (isAdminRoute || isCustomerRoute || isPartnerRoute || isPatientRoute)
+  ) {
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set(
       "next",
@@ -82,7 +84,13 @@ export async function middleware(req: NextRequest) {
     );
     loginUrl.searchParams.set(
       "as",
-      isAdminRoute ? "ADMIN" : isPartnerRoute ? "PARTNER" : "CUSTOMER",
+      isAdminRoute
+        ? "ADMIN"
+        : isPartnerRoute
+        ? "PARTNER"
+        : isCustomerRoute
+        ? "CUSTOMER"
+        : "PATIENT",
     );
     return NextResponse.redirect(loginUrl);
   }
@@ -96,5 +104,11 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/auth/:path*", "/admin/:path*", "/customer/:path*", "/partner/:path*"],
+  matcher: [
+    "/auth/:path*",
+    "/admin/:path*",
+    "/customer/:path*",
+    "/partner/:path*",
+    "/patient/:path*",
+  ],
 };

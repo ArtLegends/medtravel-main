@@ -34,6 +34,7 @@ import {
 } from "@/config/nav";
 import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
 import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
+import PatientAuthModal from "@/components/auth/PatientAuthModal";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 
 // безопасный текст без жёсткой завязки на i18n
@@ -94,13 +95,15 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя — выбор: клиника или партнёр */
+/** Дропдаун гостя — выбор: клиника / партнёр / пациент */
 function ProfileDropdownGuest({
   onOpenCustomerAuth,
   onOpenPartnerAuth,
+  onOpenPatientAuth,
 }: {
   onOpenCustomerAuth: () => void;
   onOpenPartnerAuth: () => void;
+  onOpenPatientAuth: () => void;
 }) {
   return (
     <Dropdown placement="bottom-end">
@@ -119,6 +122,9 @@ function ProfileDropdownGuest({
         </DropdownItem>
         <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
           Sign in / Sign up as partner
+        </DropdownItem>
+        <DropdownItem key="signin-patient" onPress={onOpenPatientAuth}>
+          Sign in / Sign up as patient
         </DropdownItem>
       </DropdownMenu>
     </Dropdown>
@@ -152,6 +158,7 @@ function ProfileDropdownAuth({
     upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
   const canAccessCustomer = upperRole === "CUSTOMER" || canAccessAdmin;
   const canAccessPartner = upperRole === "PARTNER" || canAccessAdmin;
+  const canAccessPatient = upperRole === "PATIENT" || canAccessAdmin;
 
   return (
     <Dropdown placement="bottom-end">
@@ -203,7 +210,7 @@ function ProfileDropdownAuth({
           </DropdownItem>
         ) : null}
 
-        {/* Партнёрская панель — доступна партнёру и админу */}
+        {/* Партнёрская панель */}
         {canAccessPartner ? (
           <DropdownItem
             key="partner-dashboard"
@@ -215,7 +222,20 @@ function ProfileDropdownAuth({
               />
             }
           >
-            My dashboard
+            My partner dashboard
+          </DropdownItem>
+        ) : null}
+
+        {/* Пациентская панель */}
+        {canAccessPatient ? (
+          <DropdownItem
+            key="patient-dashboard"
+            onPress={() => router.push("/patient/dashboard")}
+            startContent={
+              <Icon icon="solar:heart-pulse-2-linear" width={16} />
+            }
+          >
+            My patient portal
           </DropdownItem>
         ) : null}
 
@@ -252,6 +272,7 @@ export const Navbar = React.memo(() => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
   const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
+  const [patientAuthOpen, setPatientAuthOpen] = React.useState(false);
 
   const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
   useMemo(() => getAccessibleProfileMenuItems(role), [role]);
@@ -350,9 +371,8 @@ export const Navbar = React.memo(() => {
             ) : (
               <ProfileDropdownGuest
                 onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
-                onOpenPartnerAuth={() =>
-                  setPartnerAuthOpen(true)
-                }
+                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
+                onOpenPatientAuth={() => setPatientAuthOpen(true)}
               />
             )}
           </NavbarItem>
@@ -365,7 +385,8 @@ export const Navbar = React.memo(() => {
                 key={item.key}
                 active={
                   pathname === item.href ||
-                  (item.href !== "/" && pathname.startsWith(item.href))
+                  (item.href !== "/" &&
+                    pathname.startsWith(item.href))
                 }
                 item={item}
                 t={t}
@@ -384,6 +405,10 @@ export const Navbar = React.memo(() => {
       <PartnerAuthModal
         open={partnerAuthOpen}
         onClose={() => setPartnerAuthOpen(false)}
+      />
+      <PatientAuthModal
+        open={patientAuthOpen}
+        onClose={() => setPatientAuthOpen(false)}
       />
     </>
   );
