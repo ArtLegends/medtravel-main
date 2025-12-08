@@ -46,10 +46,10 @@ const Body = z.object({
     lat: z.string().nullable().optional(),
     lng: z.string().nullable().optional(),
 
-    // НОВОЕ: google maps URL
+    // google maps URL
     map_embed_url: z.string().url().nullable().optional(),
 
-    // НОВОЕ: payments как [{ method: "..." }]
+    // payments как [{ method: "..." }]
     payments: z
       .array(
         z.object({
@@ -58,7 +58,7 @@ const Body = z.object({
       )
       .default([]),
 
-    // НОВОЕ: amenities jsonb
+    // amenities jsonb
     amenities: Amenities.default({
       premises: [],
       clinic_services: [],
@@ -219,8 +219,14 @@ export async function POST(req: Request) {
     const sb = createServiceClient();
 
     // ---- 1) create clinic ----
-    const isPublished = parsed.clinic.status === 'Published';
-    const status = isPublished ? 'published' : 'draft';
+    // Для клиник, созданных из админки: по умолчанию публикуем.
+    // Единственный вариант сделать её непубличной при создании — выбрать Hidden.
+    let isPublished = true;
+    let status: 'published' | 'hidden' = 'published';
+    if (parsed.clinic.status === 'Hidden') {
+      isPublished = false;
+      status = 'hidden';
+    }
 
     const { data: clinicRow, error: clinicErr } = await sb
       .from('clinics')
@@ -251,6 +257,7 @@ export async function POST(req: Request) {
           verified_by_medtravel: true,
           is_official_partner: true,
 
+          // модерация для админских клиник сразу "approved"
           moderation_status: 'approved',
         },
       ])
@@ -450,27 +457,87 @@ export async function POST(req: Request) {
       }
     }
 
-    // ---- 7) accreditations: upsert master → link table ----
+    // ---- 7) accreditations: find-or-create → link table ----
     if (parsed.accreditations.length) {
       for (const a of parsed.accreditations) {
-        const { data: acc, error: accErr } = await sb
+        // 1) пробуем найти по name
+        let accreditationId: number | null = null;
+
+        const { data: existingAcc, error: accSelErr } = await sb
           .from('accreditations')
-          .upsert(
-            [
+          .select('id')
+          .eq('name', a.name)
+          .maybeSingle();
+
+        if (accSelErr) {
+          return NextResponse.json(
+            { error: accSelErr.message ?? 'Accreditation select failed' },
+            { status: 400 },
+          );
+        }
+
+        if (existingAcc?.id) {
+          accreditationId = existingAcc.id as number;
+
+          // можем мягко обновить logo/description (ошибки игнорим)
+          await sb
+            .from('accreditations')
+            .update({
+              logo_url: a.logo_url ?? null,
+              description: a.description ?? null,
+            } as any)
+            .eq('id', accreditationId);
+        } else {
+          // 2) создаём новую
+          const { data: createdAcc, error: accInsErr } = await sb
+            .from('accreditations')
+            .insert([
               {
                 name: a.name,
                 logo_url: a.logo_url ?? null,
                 description: a.description ?? null,
               },
-            ],
-            { onConflict: 'name' },
-          )
-          .select('id')
-          .single();
+            ])
+            .select('id')
+            .single();
 
-        if (accErr || !acc) {
+          if (accInsErr || !createdAcc) {
+            // если вдруг поймали unique по slug — считаем, что запись уже есть и ищем ещё раз
+            if (
+              accInsErr?.code === '23505' &&
+              String(accInsErr?.message ?? '').includes('accts_slug_uq')
+            ) {
+              const { data: fallbackAcc } = await sb
+                .from('accreditations')
+                .select('id')
+                .eq('name', a.name)
+                .maybeSingle();
+              if (fallbackAcc?.id) {
+                accreditationId = fallbackAcc.id as number;
+              } else {
+                return NextResponse.json(
+                  {
+                    error:
+                      accInsErr.message ??
+                      'Accreditation slug conflict (accts_slug_uq)',
+                  },
+                  { status: 400 },
+                );
+              }
+            } else {
+              return NextResponse.json(
+                { error: accInsErr?.message ?? 'Accreditation insert failed' },
+                { status: 400 },
+              );
+            }
+          } else {
+            accreditationId = createdAcc.id as number;
+          }
+        }
+
+        if (accreditationId == null) {
           return NextResponse.json(
-            { error: accErr?.message ?? 'Accreditation upsert failed' },
+            { error: 'Accreditation id not resolved' },
             { status: 400 },
           );
         }
@@ -478,7 +545,7 @@ export async function POST(req: Request) {
         const { error: linkErr } = await sb
           .from('clinic_accreditations')
           .upsert(
-            [{ clinic_id: clinicId, accreditation_id: acc.id }],
+            [{ clinic_id: clinicId, accreditation_id: accreditationId }],
             { onConflict: 'clinic_id,accreditation_id' },
           );
 
