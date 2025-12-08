@@ -17,7 +17,10 @@ function normalizeRole(asParam?: string | null): RoleName {
   return "GUEST";
 }
 
-async function ensureProfileAndRole(supabase: any, asParam: string | null) {
+async function ensureProfileAndRole(
+  supabase: any,
+  asParam: string | null,
+) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -43,7 +46,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
   // приоритет: ?as=... > metadata
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
-  // --- upsert в public.profiles (primary role = последняя роль логина)
+  // --- upsert в public.profiles (primary role = последний тип логина)
   await supabase
     .from("profiles")
     .upsert(
@@ -55,7 +58,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
       { onConflict: "id" },
     );
 
-  // --- upsert в public.user_roles для всех "настоящих" ролей
+  // --- upsert в public.user_roles, добавляем роль к уже существующим
   if (
     finalRole === "ADMIN" ||
     finalRole === "CUSTOMER" ||
@@ -93,9 +96,7 @@ export async function GET(req: NextRequest) {
             name: c.name,
             value: c.value,
           })),
-        setAll: (
-          all: Array<{ name: string; value: string; options?: any }>,
-        ) => {
+        setAll: (all: Array<{ name: string; value: string; options?: any }>) => {
           all.forEach((cookie) => {
             res.cookies.set(cookie.name, cookie.value, cookie.options);
           });
@@ -110,15 +111,19 @@ export async function GET(req: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    res.cookies.set("mt_auth_error", encodeURIComponent(error.message), {
-      path: "/",
-      httpOnly: false,
-      maxAge: 60,
-    });
+    res.cookies.set(
+      "mt_auth_error",
+      encodeURIComponent(error.message),
+      {
+        path: "/",
+        httpOnly: false,
+        maxAge: 60,
+      },
+    );
     return NextResponse.redirect(new URL("/login?error=oauth", req.url));
   }
 
-  // здесь гарантируем profile + user_roles (с PATIENT)
+  // гарантируем profile + user_roles (включая PATIENT)
   await ensureProfileAndRole(supabase, asParam);
 
   return res;

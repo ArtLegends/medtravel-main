@@ -41,8 +41,8 @@ export async function middleware(req: NextRequest) {
 
   if (user) {
     const metaRoles =
-      ((user.app_metadata?.roles as string[] | undefined) ?? []).map((r) =>
-        String(r).toUpperCase(),
+      ((user.app_metadata?.roles as string[] | undefined) ?? []).map(
+        (r) => String(r).toUpperCase(),
       );
     if (metaRoles.includes("ADMIN")) {
       isAdmin = true;
@@ -62,7 +62,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Уже залогинен и идёт на /auth/... → отправляем на next или дефолт
+  // Уже залогинен и идёт на /auth/... → редиректим по next или дефолту
   if (isAuthRoute && user) {
     const next =
       searchParams.get("next") ||
@@ -78,10 +78,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(next, req.url));
   }
 
-  // Гость пытается в /admin, /customer, /partner, /patient → на логин
+  // Гость пытается в закрытые панели → на логин
   if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute || isPatientRoute)) {
     const loginUrl = new URL("/auth/login", req.url);
-    loginUrl.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
+    loginUrl.searchParams.set(
+      "next",
+      req.nextUrl.pathname + req.nextUrl.search,
+    );
 
     const asParam = isAdminRoute
       ? "ADMIN"

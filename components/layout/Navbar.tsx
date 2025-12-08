@@ -152,7 +152,7 @@ function ProfileDropdownAuth({
     router.refresh();
   }, [supabase, router]);
 
-  // грузим все роли пользователя из user_roles + primary role из profiles
+  // грузим все роли пользователя из user_roles + primary role из profile
   useEffect(() => {
     let cancelled = false;
 
@@ -176,7 +176,7 @@ function ProfileDropdownAuth({
             .filter(Boolean);
         }
       } catch {
-        // ничего, просто фоллбекнёмся на profile.role
+        // в крайнем случае просто используем profile.role
       }
 
       const primary = String(role || "").toUpperCase();
@@ -249,7 +249,7 @@ function ProfileDropdownAuth({
           {tSafe(t, "navbar.mySettings", "My settings")}
         </DropdownItem>
 
-        {/* Клиентская панель (кастомер) */}
+        {/* Клиентская панель */}
         {canAccessCustomer ? (
           <DropdownItem
             key="my-clinic"

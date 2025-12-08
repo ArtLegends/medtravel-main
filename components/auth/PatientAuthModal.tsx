@@ -11,7 +11,6 @@ export default function PatientAuthModal({ open, onClose }: Props) {
   const { supabase } = useSupabase();
   const sp = useSearchParams();
 
-  // по умолчанию ведём в /patient
   const next = sp?.get("next") || "/patient";
 
   const [email, setEmail] = useState("");
@@ -19,10 +18,10 @@ export default function PatientAuthModal({ open, onClose }: Props) {
   const [info, setInfo] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // закрытие по ESC
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) =>
+      e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -95,7 +94,9 @@ export default function PatientAuthModal({ open, onClose }: Props) {
         <div className="mb-1 text-sm font-medium text-emerald-700">
           Patient portal
         </div>
-        <div className="mb-4 text-lg font-semibold">Sign in / Sign up as patient</div>
+        <div className="mb-4 text-lg font-semibold">
+          Sign in / Sign up as patient
+        </div>
         <p className="mb-4 text-sm text-gray-500">
           Use your email to access the MedTravel patient portal. We’ll email you a secure magic link.
         </p>

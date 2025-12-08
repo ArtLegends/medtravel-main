@@ -29,7 +29,6 @@ export default function PatientSidebar() {
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white">
-      {/* Nav */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const active = isActive(pathname, item.href);
@@ -51,7 +50,6 @@ export default function PatientSidebar() {
         })}
       </nav>
 
-      {/* Back to home */}
       <div className="border-t px-3 py-4">
         <Link
           href="/"

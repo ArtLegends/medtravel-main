@@ -12,7 +12,6 @@ export default async function PatientDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
@@ -22,7 +21,6 @@ export default async function PatientDashboardPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Upcoming Appointments"
@@ -46,9 +44,7 @@ export default async function PatientDashboardPage() {
         />
       </div>
 
-      {/* Main grid */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent activity */}
         <section className="lg:col-span-2 rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">
             Recent Activity
@@ -69,7 +65,6 @@ export default async function PatientDashboardPage() {
           </div>
         </section>
 
-        {/* Quick actions */}
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">
             Quick Actions
@@ -84,9 +79,6 @@ export default async function PatientDashboardPage() {
             </QuickAction>
             <QuickAction href="/patient/visits" label="View Visit History">
               ⏱️
-            </QuickAction>
-            <QuickAction href="/settings" label="Update Profile">
-              👤
             </QuickAction>
           </div>
         </section>
@@ -103,10 +95,8 @@ function StatCard(props: { label: string; value: number; helper?: string }) {
         {label}
       </div>
       <div className="mt-3 text-2xl font-semibold text-gray-900">{value}</div>
-      {helper && (
-        <div className="mt-1 text-xs text-gray-500">
-          {value === 0 ? helper : null}
-        </div>
+      {helper && value === 0 && (
+        <div className="mt-1 text-xs text-gray-500">{helper}</div>
       )}
     </div>
   );
