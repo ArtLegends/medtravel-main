@@ -68,30 +68,32 @@ export async function middleware(req: NextRequest) {
       searchParams.get("next") ||
       (isAdmin
         ? "/admin"
+        : isCustomerRoute
+        ? "/customer"
+        : isPartnerRoute
+        ? "/partner"
+        : isPatientRoute
+        ? "/patient"
         : "/");
     return NextResponse.redirect(new URL(next, req.url));
   }
 
-  // Гость пытается в /admin, /customer, /partner или /patient → на логин
-  if (
-    !user &&
-    (isAdminRoute || isCustomerRoute || isPartnerRoute || isPatientRoute)
-  ) {
+  // Гость пытается в /admin, /customer, /partner, /patient → на логин
+  if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute || isPatientRoute)) {
     const loginUrl = new URL("/auth/login", req.url);
-    loginUrl.searchParams.set(
-      "next",
-      req.nextUrl.pathname + req.nextUrl.search,
-    );
-    loginUrl.searchParams.set(
-      "as",
-      isAdminRoute
-        ? "ADMIN"
-        : isPartnerRoute
-        ? "PARTNER"
-        : isCustomerRoute
-        ? "CUSTOMER"
-        : "PATIENT",
-    );
+    loginUrl.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
+
+    const asParam = isAdminRoute
+      ? "ADMIN"
+      : isPartnerRoute
+      ? "PARTNER"
+      : isCustomerRoute
+      ? "CUSTOMER"
+      : isPatientRoute
+      ? "PATIENT"
+      : "GUEST";
+
+    loginUrl.searchParams.set("as", asParam);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -104,11 +106,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/auth/:path*",
-    "/admin/:path*",
-    "/customer/:path*",
-    "/partner/:path*",
-    "/patient/:path*",
-  ],
+  matcher: ["/auth/:path*", "/admin/:path*", "/customer/:path*", "/partner/:path*", "/patient/:path*"],
 };

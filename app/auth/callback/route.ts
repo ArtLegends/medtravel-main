@@ -43,7 +43,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
   // приоритет: ?as=... > metadata
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
-  // --- upsert в public.profiles ---
+  // --- upsert в public.profiles (primary role = последняя роль логина)
   await supabase
     .from("profiles")
     .upsert(
@@ -55,8 +55,13 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
       { onConflict: "id" },
     );
 
-  // --- upsert в public.user_roles для «настоящих» ролей ---
-  if (["ADMIN", "CUSTOMER", "PARTNER", "PATIENT"].includes(finalRole)) {
+  // --- upsert в public.user_roles для всех "настоящих" ролей
+  if (
+    finalRole === "ADMIN" ||
+    finalRole === "CUSTOMER" ||
+    finalRole === "PARTNER" ||
+    finalRole === "PATIENT"
+  ) {
     await supabase
       .from("user_roles")
       .upsert(
@@ -88,7 +93,9 @@ export async function GET(req: NextRequest) {
             name: c.name,
             value: c.value,
           })),
-        setAll: (all: Array<{ name: string; value: string; options?: any }>) => {
+        setAll: (
+          all: Array<{ name: string; value: string; options?: any }>,
+        ) => {
           all.forEach((cookie) => {
             res.cookies.set(cookie.name, cookie.value, cookie.options);
           });
@@ -111,7 +118,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=oauth", req.url));
   }
 
-  // гарантируем profile + user_roles
+  // здесь гарантируем profile + user_roles (с PATIENT)
   await ensureProfileAndRole(supabase, asParam);
 
   return res;

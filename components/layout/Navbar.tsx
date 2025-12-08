@@ -1,7 +1,7 @@
 // components/layout/Navbar.tsx
 "use client";
 
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useEffect, useState } from "react";
 import NextLink from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -144,6 +144,7 @@ function ProfileDropdownAuth({
   t: any;
 }) {
   const router = useRouter();
+  const [roles, setRoles] = useState<string[] | null>(null);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -151,14 +152,63 @@ function ProfileDropdownAuth({
     router.refresh();
   }, [supabase, router]);
 
-  const upperRole = String(role || "").toUpperCase();
+  // грузим все роли пользователя из user_roles + primary role из profiles
+  useEffect(() => {
+    let cancelled = false;
 
-  // единая система ролей
-  const canAccessAdmin =
-    upperRole === "ADMIN" || upperRole === "SUPER_ADMIN";
-  const canAccessCustomer = upperRole === "CUSTOMER" || canAccessAdmin;
-  const canAccessPartner = upperRole === "PARTNER" || canAccessAdmin;
-  const canAccessPatient = upperRole === "PATIENT" || canAccessAdmin;
+    async function loadRoles() {
+      if (!session) {
+        if (!cancelled) setRoles(null);
+        return;
+      }
+
+      let collected: string[] = [];
+
+      try {
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id);
+
+        if (!error && Array.isArray(data)) {
+          collected = data
+            .map((r: any) => String(r.role || "").toUpperCase())
+            .filter(Boolean);
+        }
+      } catch {
+        // ничего, просто фоллбекнёмся на profile.role
+      }
+
+      const primary = String(role || "").toUpperCase();
+      if (primary && !collected.includes(primary)) {
+        collected.push(primary);
+      }
+
+      if (!collected.length) {
+        collected.push("GUEST");
+      }
+
+      if (!cancelled) setRoles(collected);
+    }
+
+    loadRoles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, supabase, role]);
+
+  const effectiveRoles =
+    roles && roles.length
+      ? roles
+      : [String(role || "").toUpperCase() || "GUEST"];
+
+  const hasAdmin =
+    effectiveRoles.includes("ADMIN") || effectiveRoles.includes("SUPER_ADMIN");
+
+  const canAccessCustomer = hasAdmin || effectiveRoles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || effectiveRoles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || effectiveRoles.includes("PATIENT");
 
   return (
     <Dropdown placement="bottom-end">
@@ -230,17 +280,15 @@ function ProfileDropdownAuth({
         {canAccessPatient ? (
           <DropdownItem
             key="patient-dashboard"
-            onPress={() => router.push("/patient/dashboard")}
-            startContent={
-              <Icon icon="solar:heart-pulse-2-linear" width={16} />
-            }
+            onPress={() => router.push("/patient")}
+            startContent={<Icon icon="solar:heart-pulse-2-linear" width={16} />}
           >
             My patient portal
           </DropdownItem>
         ) : null}
 
         {/* Admin panel */}
-        {canAccessAdmin ? (
+        {hasAdmin ? (
           <DropdownItem
             key="admin"
             onPress={() => router.push("/admin")}
@@ -353,7 +401,6 @@ export const Navbar = React.memo(() => {
             <ThemeSwitch />
           </NavbarItem>
 
-          {/* колокольчик только для авторизованных */}
           {session && (
             <NavbarItem>
               <NotificationsBell />

@@ -11,8 +11,8 @@ export default function PatientAuthModal({ open, onClose }: Props) {
   const { supabase } = useSupabase();
   const sp = useSearchParams();
 
-  // по умолчанию ведём в панель пациента
-  const next = sp?.get("next") || "/patient/dashboard";
+  // по умолчанию ведём в /patient
+  const next = sp?.get("next") || "/patient";
 
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,7 +50,6 @@ export default function PatientAuthModal({ open, onClose }: Props) {
         },
       });
       if (error) setErrorMsg(error.message);
-      // дальше управление уйдёт в Google → /auth/callback
     } finally {
       setBusy(false);
     }
@@ -80,7 +79,6 @@ export default function PatientAuthModal({ open, onClose }: Props) {
     }
   }
 
-  // клик по фону — закрыть
   function onBackdrop(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }
@@ -94,18 +92,14 @@ export default function PatientAuthModal({ open, onClose }: Props) {
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="mb-1 text-sm font-medium text-sky-700">
+        <div className="mb-1 text-sm font-medium text-emerald-700">
           Patient portal
         </div>
-        <div className="mb-4 text-lg font-semibold">
-          Sign in / Sign up as patient
-        </div>
+        <div className="mb-4 text-lg font-semibold">Sign in / Sign up as patient</div>
         <p className="mb-4 text-sm text-gray-500">
-          Use your email to access the MedTravel patient portal. We’ll email you
-          a secure magic link.
+          Use your email to access the MedTravel patient portal. We’ll email you a secure magic link.
         </p>
 
-        {/* EMAIL + MAGIC LINK */}
         <form onSubmit={sendMagicLink} className="space-y-3">
           <div>
             <label className="block text-sm mb-1">Email</label>
@@ -128,11 +122,8 @@ export default function PatientAuthModal({ open, onClose }: Props) {
           </button>
         </form>
 
-        {/* info / error */}
         {info && <p className="mt-2 text-sm text-gray-600">{info}</p>}
-        {errorMsg && (
-          <p className="mt-2 text-sm text-red-600">{errorMsg}</p>
-        )}
+        {errorMsg && <p className="mt-2 text-sm text-red-600">{errorMsg}</p>}
 
         <div className="my-4 flex items-center gap-3 text-xs text-gray-400">
           <div className="h-px flex-1 bg-gray-200" />

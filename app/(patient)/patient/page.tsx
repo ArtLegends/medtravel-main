@@ -1,9 +1,8 @@
-// app/(patient)/patient/dashboard/page.tsx
+// app/(patient)/patient/page.tsx
 
 export const dynamic = "force-dynamic";
 
 export default async function PatientDashboardPage() {
-  // позже сюда подтащим реальные данные из Supabase
   const stats = {
     upcomingAppointments: 0,
     totalVisits: 0,
@@ -81,13 +80,12 @@ export default async function PatientDashboardPage() {
 
           <div className="mt-4 space-y-2">
             <QuickAction href="/patient/appointment" label="Book New Appointment">
-              {/* icon slot можно будет заменить на нормальную иконку */}
               📅
             </QuickAction>
             <QuickAction href="/patient/visits" label="View Visit History">
               ⏱️
             </QuickAction>
-            <QuickAction href="/patient/settings" label="Update Profile">
+            <QuickAction href="/settings" label="Update Profile">
               👤
             </QuickAction>
           </div>

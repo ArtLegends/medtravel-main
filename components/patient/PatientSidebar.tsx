@@ -11,16 +11,15 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/patient/dashboard" },
+  { label: "Dashboard", href: "/patient" },
   { label: "My Bookings", href: "/patient/bookings" },
   { label: "Visit History", href: "/patient/visits" },
   { label: "Make an Appointment", href: "/patient/appointment" },
-  { label: "Settings", href: "/patient/settings" },
 ];
 
 function isActive(pathname: string, href: string) {
-  if (href === "/patient/dashboard") {
-    return pathname === "/patient" || pathname === href;
+  if (href === "/patient") {
+    return pathname === "/patient";
   }
   return pathname.startsWith(href);
 }
@@ -30,19 +29,6 @@ export default function PatientSidebar() {
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white">
-      {/* Brand */}
-      <div className="flex items-center gap-2 border-b px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-sm font-semibold text-white">
-          MT
-        </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-gray-900">
-            Patient Portal
-          </span>
-          <span className="text-xs text-gray-500">MedTravel.me</span>
-        </div>
-      </div>
-
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
