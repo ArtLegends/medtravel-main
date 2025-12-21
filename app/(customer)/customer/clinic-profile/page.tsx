@@ -68,7 +68,7 @@ type ServiceRow = {
 
 // диапазон и шаг для слайдера цены
 const PRICE_MIN = 0;
-const PRICE_MAX = 5000;
+const PRICE_MAX = 20000;
 const PRICE_STEP = 10;
 
 type DoctorRow = {
