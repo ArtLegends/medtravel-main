@@ -1,3 +1,4 @@
+// app/api/patient/appointment/clinics/route.ts
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createRouteClient();
-  const { data, error } = await supabase.rpc("patient_clinics_by_service", {
+  const { data, error } = await supabase.rpc("patient_clinics_by_service_location", {
     p_service_id: serviceId,
     p_country: country,
     p_city: city,
