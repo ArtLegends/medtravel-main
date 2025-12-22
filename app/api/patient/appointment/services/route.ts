@@ -13,14 +13,14 @@ export async function GET(req: Request) {
   }
 
   const categoryId = Number(categoryIdRaw);
-  if (!Number.isFinite(categoryId)) {
-    return NextResponse.json({ error: "categoryId must be a number" }, { status: 400 });
-  }
+if (!Number.isInteger(categoryId)) {
+  return NextResponse.json({ error: "categoryId must be an integer" }, { status: 400 });
+}
 
   const supabase = await createRouteClient();
 
   const { data, error } = await supabase.rpc("patient_services_by_category", {
-    p_category_id: categoryId, // ✅ integer
+    p_category_id: categoryId,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

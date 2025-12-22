@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const serviceId = url.searchParams.get("serviceId");
+  const serviceIdRaw = url.searchParams.get("serviceId");
+const serviceId = Number(serviceIdRaw);
   const country = url.searchParams.get("country");
   const city = url.searchParams.get("city");
 
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createRouteClient();
-  const { data, error } = await supabase.rpc("patient_clinics_by_service_location", {
+  const { data, error } = await supabase.rpc("patient_clinics_by_service", {
     p_service_id: serviceId,
     p_country: country,
     p_city: city,
