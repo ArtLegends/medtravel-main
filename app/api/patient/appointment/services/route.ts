@@ -1,4 +1,3 @@
-// app/api/patient/appointment/services/route.ts
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 
@@ -6,16 +5,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const categoryIdRaw = url.searchParams.get("categoryId");
-
-  if (!categoryIdRaw) {
-    return NextResponse.json({ error: "categoryId is required" }, { status: 400 });
-  }
-
-  const categoryId = Number(categoryIdRaw);
-if (!Number.isInteger(categoryId)) {
-  return NextResponse.json({ error: "categoryId must be an integer" }, { status: 400 });
-}
+  const categoryId = url.searchParams.get("categoryId");
+  if (!categoryId) return NextResponse.json({ error: "categoryId is required" }, { status: 400 });
 
   const supabase = await createRouteClient();
 
@@ -25,5 +16,15 @@ if (!Number.isInteger(categoryId)) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ services: data ?? [] });
+  const list = (data ?? []).map((s: any) => ({
+    ...s,
+    id: String(s.id),                    // <- железобетонно строкой (UI часто ждёт string)
+    label: s.name,
+    value: String(s.id),
+  }));
+
+  return NextResponse.json(
+    { services: list, data: list, items: list },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

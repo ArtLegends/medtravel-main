@@ -21,5 +21,13 @@ const serviceId = Number(serviceIdRaw);
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ cities: data ?? [] });
+  const list = (data ?? []).map((c: any) => ({
+    ...c,
+    label: c.city,
+    value: c.city,
+  }));
+  return NextResponse.json(
+    { cities: list, data: list, items: list },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

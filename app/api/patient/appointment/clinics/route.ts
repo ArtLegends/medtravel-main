@@ -23,5 +23,14 @@ const serviceId = Number(serviceIdRaw);
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ clinics: data ?? [] });
+  const list = (data ?? []).map((c: any) => ({
+    ...c,
+    id: String(c.id),
+    label: c.name,
+    value: String(c.id),
+  }));
+  return NextResponse.json(
+    { clinics: list, data: list, items: list },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

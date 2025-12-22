@@ -19,6 +19,14 @@ if (!Number.isInteger(serviceId)) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ countries: data ?? [] });
+  const list = (data ?? []).map((c: any) => ({
+    ...c,
+    label: c.country,
+    value: c.country,
+  }));
+  return NextResponse.json(
+    { countries: list, data: list, items: list },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
