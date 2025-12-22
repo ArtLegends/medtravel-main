@@ -2005,6 +2005,121 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_bookings: {
+        Row: {
+          booking_method: string
+          category_id: number | null
+          clinic_id: string
+          created_at: string
+          full_name: string
+          id: string
+          notes: string | null
+          patient_id: string
+          phone: string
+          preferred_date: string
+          preferred_time: string | null
+          service_id: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          booking_method?: string
+          category_id?: number | null
+          clinic_id: string
+          created_at?: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          patient_id: string
+          phone: string
+          preferred_date: string
+          preferred_time?: string | null
+          service_id: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          booking_method?: string
+          category_id?: number | null
+          clinic_id?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          patient_id?: string
+          phone?: string
+          preferred_date?: string
+          preferred_time?: string | null
+          service_id?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_bookings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_queue"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_catalog_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "mv_clinic_inquiries"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_clinic_dashboard"
+            referencedColumns: ["clinic_id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "v_public_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_bookings_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           clinic_id: string
@@ -3609,6 +3724,39 @@ export type Database = {
       is_clinic_member: { Args: { c_id: string }; Returns: boolean }
       is_customer: { Args: never; Returns: boolean }
       parse_amenities: { Args: { src: string }; Returns: Json }
+      patient_cities_by_service_country: {
+        Args: { p_country: string; p_service_id: string }
+        Returns: {
+          city: string
+          clinicsCount: number
+        }[]
+      }
+      patient_clinics_by_service_location: {
+        Args: { p_city: string; p_country: string; p_service_id: string }
+        Returns: {
+          city: string
+          country: string
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
+      patient_countries_by_service: {
+        Args: { p_service_id: string }
+        Returns: {
+          clinicsCount: number
+          country: string
+        }[]
+      }
+      patient_services_by_category: {
+        Args: { p_category_id: number }
+        Returns: {
+          clinicsCount: number
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
       publish_clinic_from_draft: {
         Args: { p_clinic_id: string }
         Returns: undefined
@@ -3623,10 +3771,10 @@ export type Database = {
         Args: { limit_count?: number; q: string }
         Returns: {
           category: string
-          clinic_id: string
-          clinic_name: string
-          clinic_slug: string
+          id: string
           image_url: string
+          name: string
+          slug: string
         }[]
       }
       seo_treatment_price_range: {
