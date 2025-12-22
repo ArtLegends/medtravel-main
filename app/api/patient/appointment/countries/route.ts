@@ -6,12 +6,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const serviceIdRaw = url.searchParams.get("serviceId");
-const serviceId = Number(serviceIdRaw);
-if (!Number.isInteger(serviceId)) {
-  return NextResponse.json({ error: "serviceId must be an integer" }, { status: 400 });
-}
+  const serviceId = Number(serviceIdRaw);
 
-  if (!serviceId) return NextResponse.json({ error: "serviceId is required" }, { status: 400 });
+  if (!Number.isInteger(serviceId)) {
+    return NextResponse.json({ error: "serviceId must be an integer" }, { status: 400 });
+  }
 
   const supabase = await createRouteClient();
   const { data, error } = await supabase.rpc("patient_countries_by_service", {
@@ -19,14 +18,14 @@ if (!Number.isInteger(serviceId)) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
   const list = (data ?? []).map((c: any) => ({
-    ...c,
-    label: c.country,
-    value: c.country,
+    country: c.country ?? "",
+    clinics_count: Number(c.clinicsCount ?? c.clinics_count ?? 0),
   }));
+
   return NextResponse.json(
     { countries: list, data: list, items: list },
     { headers: { "Cache-Control": "no-store" } }
   );
 }
-

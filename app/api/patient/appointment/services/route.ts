@@ -17,10 +17,10 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const list = (data ?? []).map((s: any) => ({
-    ...s,
-    id: String(s.id),                    // <- железобетонно строкой (UI часто ждёт string)
-    label: s.name,
-    value: String(s.id),
+    service_id: String(s.id ?? s.service_id),
+    service_name: s.name ?? s.service_name ?? "",
+    clinics_count: Number(s.clinicsCount ?? s.clinics_count ?? 0),
+    slug: s.slug ?? null,
   }));
 
   return NextResponse.json(
