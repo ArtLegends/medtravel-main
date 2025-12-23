@@ -3,33 +3,39 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 
 export const dynamic = "force-dynamic";
 
-type Ctx = { params: Promise<{ id: string }> };
+type Params = { id: string };
 
-export async function PATCH(req: Request, ctx: Ctx) {
-  const { id } = await ctx.params;
+const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
 
-  const supabase = await createRouteClient();
+export async function PATCH(req: Request, { params }: { params: Promise<Params> }) {
+  const { id } = await params;
+
   const body = await req.json().catch(() => ({}));
+  const status = String(body?.status ?? "").toLowerCase();
 
-  const status = body?.status as string | undefined;
-  const actualCost = body?.actualCost as number | null | undefined;
-
-  if (!status || !["pending", "processed", "rejected"].includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  if (!ALLOWED_STATUSES.has(status)) {
+    return NextResponse.json(
+      { error: `Invalid status. Allowed: ${Array.from(ALLOWED_STATUSES).join(", ")}` },
+      { status: 400 }
+    );
   }
 
-  const patch: any = { status };
-  if (actualCost !== undefined) patch.actual_cost = actualCost;
+  const supabase = await createRouteClient();
 
-  const { error } = await supabase.from("patient_bookings").update(patch).eq("id", id);
+  const { data, error } = await supabase
+    .from("patient_bookings")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id, status, updated_at")
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ booking: data }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
-  const { id } = await ctx.params;
+export async function DELETE(_req: Request, { params }: { params: Promise<Params> }) {
+  const { id } = await params;
 
   const supabase = await createRouteClient();
 

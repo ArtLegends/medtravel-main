@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/browserClient";
 type Row = {
   booking_id: string;
   patient_id: string;
+  patient_public_id: number | null;
   patient_name: string | null;
   phone: string | null;
   service_name: string | null;
@@ -235,7 +236,9 @@ export default function PatientsListClient() {
               ) : (
                 items.map((r) => (
                   <tr key={r.booking_id} className="border-t">
-                    <td className="px-4 py-3 font-mono text-xs">{r.patient_id?.slice(0, 8)}…</td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                            {r.patient_public_id ?? "—"}
+                        </td>
                     <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
                     <td className="px-4 py-3">{r.phone ?? "—"}</td>
                     <td className="px-4 py-3">{r.service_name ?? "—"}</td>
