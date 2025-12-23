@@ -3,7 +3,11 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: Request, ctx: { params: { id: string } }) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PATCH(req: Request, ctx: Ctx) {
+  const { id } = await ctx.params;
+
   const supabase = await createRouteClient();
   const body = await req.json().catch(() => ({}));
 
@@ -17,23 +21,19 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const patch: any = { status };
   if (actualCost !== undefined) patch.actual_cost = actualCost;
 
-  const { error } = await supabase
-    .from("patient_bookings")
-    .update(patch)
-    .eq("id", ctx.params.id);
+  const { error } = await supabase.from("patient_bookings").update(patch).eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
+export async function DELETE(_req: Request, ctx: Ctx) {
+  const { id } = await ctx.params;
+
   const supabase = await createRouteClient();
 
-  const { error } = await supabase
-    .from("patient_bookings")
-    .delete()
-    .eq("id", ctx.params.id);
+  const { error } = await supabase.from("patient_bookings").delete().eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
