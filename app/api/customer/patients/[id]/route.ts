@@ -1,15 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 
 export const dynamic = "force-dynamic";
 
-type Params = { id: string };
-type Ctx = { params: Promise<Params> };
+type RouteContext = {
+  params: { [key: string]: string | string[] };
+};
 
 const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
 
-export async function PATCH(req: Request, { params }: Ctx) {
-  const { id } = await params;
+function getParam(ctx: RouteContext, key: string) {
+  const v = ctx.params?.[key];
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const id = getParam(ctx, "id");
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
   const status = String(body?.status ?? "").toLowerCase();
@@ -30,17 +37,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // rpc returns TABLE => array
   const row = Array.isArray(data) ? data[0] : null;
-
-  return NextResponse.json(
-    { booking: row },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function DELETE(_req: Request, { params }: Ctx) {
-  const { id } = await params;
+export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+  const id = getParam(ctx, "id");
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const supabase = await createRouteClient();
 
@@ -50,8 +53,5 @@ export async function DELETE(_req: Request, { params }: Ctx) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json(
-    { ok: data === true },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ ok: data === true }, { headers: { "Cache-Control": "no-store" } });
 }
