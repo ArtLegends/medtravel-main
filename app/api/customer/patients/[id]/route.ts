@@ -4,10 +4,12 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 export const dynamic = "force-dynamic";
 
 type Params = { id: string };
+type Ctx = { params: Promise<Params> };
+
 const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PATCH(req: Request, { params }: Ctx) {
+  const { id } = await params;
 
   const body = await req.json().catch(() => ({}));
   const status = String(body?.status ?? "").toLowerCase();
@@ -28,12 +30,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // rpc возвращает table => массив
+  // rpc returns TABLE => array
   const row = Array.isArray(data) ? data[0] : null;
-  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
+
+  return NextResponse.json(
+    { booking: row },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<Params> }) {
+export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
 
   const supabase = await createRouteClient();
@@ -44,5 +50,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<Params
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: data === true }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { ok: data === true },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
