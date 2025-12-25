@@ -41,6 +41,17 @@ export default function PatientsListClient() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const abortRef = useRef<AbortController | null>(null);
 
+  async function readError(res: Response) {
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct.includes("application/json")) {
+      const j = await res.json().catch(() => null);
+      return j?.error ? String(j.error) : JSON.stringify(j);
+    }
+    const t = await res.text();
+    // коротко + без гигантской html-каши
+    return t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  }
+
   async function load(p = page) {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -61,7 +72,7 @@ export default function PatientsListClient() {
         signal: abortRef.current.signal,
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await readError(res));
       const json = await res.json();
 
       setItems(json.items ?? []);
@@ -103,12 +114,12 @@ export default function PatientsListClient() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/customer/patients/${bookingId}`, {
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(bookingId)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status: next }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await readError(res));
       setItems((prev) => prev.map((r) => (r.booking_id === bookingId ? { ...r, status: next } : r)));
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -123,8 +134,8 @@ export default function PatientsListClient() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/customer/patients/${bookingId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(bookingId)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res));
       await load(page);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -146,7 +157,7 @@ export default function PatientsListClient() {
       if (endDate) q.set("endDate", endDate);
 
       const res = await fetch(`/api/customer/patients?${q.toString()}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await readError(res));
       await load(1);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -159,7 +170,7 @@ export default function PatientsListClient() {
     <div className="space-y-6">
       {err && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {err}
+          <div className="max-h-40 overflow-auto whitespace-pre-wrap break-words">{err}</div>
         </div>
       )}
 
@@ -236,9 +247,9 @@ export default function PatientsListClient() {
               ) : (
                 items.map((r) => (
                   <tr key={r.booking_id} className="border-t">
-                        <td className="px-4 py-3 font-mono text-xs">
-                            {r.patient_public_id ?? "—"}
-                        </td>
+                    <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
+                      {r.patient_public_id ? `#${r.patient_public_id}` : "—"}
+                    </td>
                     <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
                     <td className="px-4 py-3">{r.phone ?? "—"}</td>
                     <td className="px-4 py-3">{r.service_name ?? "—"}</td>
