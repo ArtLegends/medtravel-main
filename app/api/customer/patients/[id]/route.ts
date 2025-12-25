@@ -3,23 +3,17 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 
 export const dynamic = "force-dynamic";
 
-type RouteContext = {
-  params: { [key: string]: string | string[] };
+type Ctx = {
+  params: Promise<{ id: string }>;
 };
 
 const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
 
-function getParam(ctx: RouteContext, key: string) {
-  const v = ctx.params?.[key];
-  return Array.isArray(v) ? v[0] : v;
-}
-
-export async function PATCH(req: NextRequest, ctx: RouteContext) {
-  const id = getParam(ctx, "id");
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
 
   const body = await req.json().catch(() => ({}));
-  const status = String(body?.status ?? "").toLowerCase();
+  const status = String((body as any)?.status ?? "").toLowerCase();
 
   if (!ALLOWED_STATUSES.has(status)) {
     return NextResponse.json(
@@ -37,13 +31,16 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const row = Array.isArray(data) ? data[0] : null;
-  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
+  const row = Array.isArray(data) ? data[0] : data ?? null;
+
+  return NextResponse.json(
+    { booking: row },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
-  const id = getParam(ctx, "id");
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
 
   const supabase = await createRouteClient();
 
@@ -53,5 +50,8 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: data === true }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { ok: data === true },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
