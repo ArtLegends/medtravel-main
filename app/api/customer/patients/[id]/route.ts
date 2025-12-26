@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +9,9 @@ const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
 
   const body = await req.json().catch(() => ({}));
   const status = String((body as any)?.status ?? "").toLowerCase();
@@ -38,9 +39,9 @@ export async function PATCH(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
 
   const supabase = await createRouteClient();
 
