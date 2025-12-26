@@ -34,7 +34,10 @@ export async function PATCH(
 
   const row = Array.isArray(data) ? data[0] : data ?? null;
 
-  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { booking: row },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 export async function DELETE(
@@ -51,5 +54,8 @@ export async function DELETE(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: data === true }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { ok: data === true },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
