@@ -47,9 +47,8 @@ export default function PatientsListClient() {
       const j = await res.json().catch(() => null);
       return j?.error ? String(j.error) : JSON.stringify(j);
     }
-    const t = await res.text();
-    // коротко + без гигантской html-каши
-    return t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+    // если это HTML (404/500 от Next), вернём коротко
+    return `${res.status} ${res.statusText}`;
   }
 
   async function load(p = page) {
