@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 
 export const dynamic = "force-dynamic";
-// На всякий случай (чтобы не пыталось в edge):
 export const runtime = "nodejs";
 
 const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
 
-type Ctx = { params: { id: string } };
-
-export async function PATCH(req: NextRequest, { params }: Ctx) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const id = params.id;
 
   const body = await req.json().catch(() => ({}));
@@ -33,13 +33,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
   const row = Array.isArray(data) ? data[0] : data ?? null;
 
-  return NextResponse.json(
-    { booking: row },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const id = params.id;
 
   const supabase = await createRouteClient();
@@ -50,8 +50,5 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json(
-    { ok: data === true },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ ok: data === true }, { headers: { "Cache-Control": "no-store" } });
 }
