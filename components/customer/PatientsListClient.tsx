@@ -10,7 +10,7 @@ type Row = {
   patient_name: string | null;
   phone: string | null;
   service_name: string | null;
-  status: "pending" | "processed" | "rejected";
+  status: "pending" | "confirmed" | "cancelled" | "completed";
   pre_cost: number | null;
   currency: string | null;
   actual_cost: number | null;
@@ -30,7 +30,10 @@ export default function PatientsListClient() {
   const [items, setItems] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
 
-  const [status, setStatus] = useState<"all" | "pending" | "processed" | "rejected">("all");
+  const [status, setStatus] = useState<
+    "all" | "pending" | "confirmed" | "cancelled" | "completed"
+  >("all");
+
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
@@ -196,8 +199,9 @@ export default function PatientsListClient() {
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending</option>
-            <option value="processed">Processed</option>
-            <option value="rejected">Rejected</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="completed">Completed</option>
           </select>
 
           <input
@@ -261,8 +265,9 @@ export default function PatientsListClient() {
                         className="border rounded-md px-2 py-1"
                       >
                         <option value="pending">pending</option>
-                        <option value="processed">processed</option>
-                        <option value="rejected">rejected</option>
+                        <option value="confirmed">confirmed</option>
+                        <option value="cancelled">cancelled</option>
+                        <option value="completed">completed</option>
                       </select>
                     </td>
 

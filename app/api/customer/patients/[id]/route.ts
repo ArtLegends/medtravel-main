@@ -5,7 +5,7 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const ALLOWED_STATUSES = new Set(["pending", "processed", "rejected"]);
+const ALLOWED_STATUSES = new Set(["pending", "confirmed", "cancelled", "completed"]);
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
