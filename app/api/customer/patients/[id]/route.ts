@@ -7,17 +7,7 @@ export const runtime = "nodejs";
 
 const ALLOWED_STATUSES = new Set(["pending", "confirmed", "cancelled", "completed"]);
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return NextResponse.json({ ok: true, id });
-}
-
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-
+async function handleUpdate(req: NextRequest, id: string) {
   const body = await req.json().catch(() => ({}));
   const status = String((body as any)?.status ?? "").toLowerCase();
 
@@ -39,22 +29,28 @@ export async function PATCH(
 
   const row = Array.isArray(data) ? data[0] : data ?? null;
 
-  return NextResponse.json(
-    { booking: row },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  return NextResponse.json({ ok: true, id: params.id });
+}
 
+// основной вариант
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  return handleUpdate(req, params.id);
+}
+
+// алиас на случай если PATCH режется где-то по пути
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  return handleUpdate(req, params.id);
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = await createRouteClient();
 
   const { data, error } = await supabase.rpc("customer_patient_delete_one", {
-    p_booking_id: id,
+    p_booking_id: params.id,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

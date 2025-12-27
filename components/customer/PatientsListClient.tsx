@@ -117,7 +117,7 @@ export default function PatientsListClient() {
     setErr(null);
     try {
       const res = await fetch(`/api/customer/patients/${encodeURIComponent(bookingId)}`, {
-        method: "PATCH",
+        method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status: next }),
       });
