@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CustomerStat from "@/components/customer/CustomerStat";
 import MiniLineChart from "@/components/customer/MiniLineChart";
 import StatusLegend from "@/components/customer/StatusLegend";
@@ -18,11 +18,20 @@ type BookingRow = {
 };
 
 type PatientRow = {
-  id: string;
+  booking_id: string | null;
+  patient_id: string | null;
+  patient_public_id: number | null;
+
   patient_name: string | null;
   phone: string | null;
-  service: string | null;
+
+  service_name: string | null;
   status: string | null;
+
+  booking_method: string | null;
+  preferred_date: string | null; // date приходит как YYYY-MM-DD
+  preferred_time: string | null;
+
   created_at: string | null;
 };
 
@@ -42,6 +51,10 @@ export default function CustomerDashboard() {
   const [doctors, setDoctors] = useState<DoctorRow[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [patients, setPatients] = useState<PatientRow[]>([]);
+
+  const [patientsTotal, setPatientsTotal] = useState<number>(0);
+
+  const [appointments, setAppointments] = useState<PatientRow[]>([]);
 
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({
     confirmed: 0,
@@ -72,7 +85,7 @@ export default function CustomerDashboard() {
 
         const userId = user.id;
 
-        // 2) Клиника, которой владеет пользователь (published)
+        // 2) Клиника пользователя (published)
         const { data: clinicRow, error: clinicError } = await supabase
           .from("clinics")
           .select("id")
@@ -93,8 +106,14 @@ export default function CustomerDashboard() {
           return;
         }
 
-        // 3) Доктора, заявки, пациенты
-        const [doctorsRes, bookingsRes, patientsRes] = await Promise.all([
+        // 3) Доктора, заявки, пациенты (последние 10), кол-во пациентов (count), pending-аппоинтменты (последние 10)
+        const [
+          doctorsRes,
+          bookingsRes,
+          patientsRes,
+          patientsCountRes,
+          appointmentsRes,
+        ] = await Promise.all([
           supabase
             .from("clinic_staff")
             .select("id, clinic_id, name, title, position")
@@ -105,24 +124,45 @@ export default function CustomerDashboard() {
             .select("id, clinic_id, status")
             .eq("clinic_id", clinicId),
 
-          // ✅ Пациенты (вью)
           supabase
             .from("v_customer_patients")
-            .select("id, patient_name, phone, service, status, created_at, clinic_id")
+            .select(
+              "booking_id, patient_id, patient_public_id, patient_name, phone, service_name, status, booking_method, preferred_date, preferred_time, created_at, clinic_id"
+            )
             .eq("clinic_id", clinicId)
             .order("created_at", { ascending: false })
-            .limit(10), // можно убрать/увеличить
+            .limit(10),
+
+          // ВАЖНО: тут нет id. Берем count по booking_id (head:true)
+          supabase
+            .from("v_customer_patients")
+            .select("booking_id", { count: "exact", head: true })
+            .eq("clinic_id", clinicId),
+
+          // Appointment List = только pending в этой клинике
+          supabase
+            .from("v_customer_patients")
+            .select(
+              "booking_id, patient_id, patient_public_id, patient_name, phone, service_name, status, booking_method, preferred_date, preferred_time, created_at, clinic_id"
+            )
+            .eq("clinic_id", clinicId)
+            .ilike("status", "pending")
+            .order("created_at", { ascending: false })
+            .limit(10),
         ]);
 
         if (doctorsRes.error) throw doctorsRes.error;
         if (bookingsRes.error) throw bookingsRes.error;
         if (patientsRes.error) throw patientsRes.error;
+        if (patientsCountRes.error) throw patientsCountRes.error;
+        if (appointmentsRes.error) throw appointmentsRes.error;
 
         if (cancelled) return;
 
         const doctorsData = (doctorsRes.data || []) as any[];
         const bookingsData = (bookingsRes.data || []) as any[];
         const patientsData = (patientsRes.data || []) as any[];
+        const appointmentsData = (appointmentsRes.data || []) as any[];
 
         // Доктора
         setDoctors(
@@ -133,26 +173,49 @@ export default function CustomerDashboard() {
           }))
         );
 
-        // Заявки
+        // Заявки (requests)
         const bookingRows: BookingRow[] = bookingsData.map((b) => ({
           id: b.id,
           status: b.status,
         }));
         setBookings(bookingRows);
 
-        // Пациенты
-        setPatients(
-          patientsData.map((p) => ({
-            id: p.id,
-            patient_name: p.patient_name ?? null,
-            phone: p.phone ?? null,
-            service: p.service ?? null,
-            status: p.status ?? null,
-            created_at: p.created_at ?? null,
-          }))
-        );
+        // Patients List (последние 10)
+        const mappedPatients: PatientRow[] = patientsData.map((p) => ({
+          booking_id: p.booking_id ?? null,
+          patient_id: p.patient_id ?? null,
+          patient_public_id: p.patient_public_id ?? null,
+          patient_name: p.patient_name ?? null,
+          phone: p.phone ?? null,
+          service_name: p.service_name ?? null,
+          status: p.status ?? null,
+          booking_method: p.booking_method ?? null,
+          preferred_date: p.preferred_date ?? null,
+          preferred_time: p.preferred_time ?? null,
+          created_at: p.created_at ?? null,
+        }));
+        setPatients(mappedPatients);
 
-        // 4) Статусы заявок
+        // Patients count (не зависит от limit)
+        setPatientsTotal(patientsCountRes.count ?? 0);
+
+        // Appointment List = pending
+        const mappedAppointments: PatientRow[] = appointmentsData.map((p) => ({
+          booking_id: p.booking_id ?? null,
+          patient_id: p.patient_id ?? null,
+          patient_public_id: p.patient_public_id ?? null,
+          patient_name: p.patient_name ?? null,
+          phone: p.phone ?? null,
+          service_name: p.service_name ?? null,
+          status: p.status ?? null,
+          booking_method: p.booking_method ?? null,
+          preferred_date: p.preferred_date ?? null,
+          preferred_time: p.preferred_time ?? null,
+          created_at: p.created_at ?? null,
+        }));
+        setAppointments(mappedAppointments);
+
+        // 4) Статусы заявок (requests) — как было
         const counts: StatusCounts = {
           confirmed: 0,
           pending: 0,
@@ -186,7 +249,18 @@ export default function CustomerDashboard() {
 
   const doctorsCount = doctors.length;
   const bookingsCount = bookings.length;
-  const patientsCount = patients.length;
+
+  const patientsCount = patientsTotal; // важно: используем count из head:true
+
+  const appointmentsCount = appointments.length;
+
+  const formatApptDateTime = (row: PatientRow) => {
+    const d = row.preferred_date ? row.preferred_date : null;
+    const t = row.preferred_time ? row.preferred_time : null;
+    if (!d && !t) return "—";
+    if (d && t) return `${d}, ${t}`;
+    return d ?? t ?? "—";
+  };
 
   return (
     <div className="space-y-6">
@@ -221,7 +295,8 @@ export default function CustomerDashboard() {
             <div className="h-24 animate-pulse rounded-md bg-gray-50" />
           ) : bookingsCount === 0 ? (
             <div className="text-sm text-gray-500">
-              No bookings yet. Once you start receiving requests, you&apos;ll see their status here.
+              No bookings yet. Once you start receiving requests, you&apos;ll see
+              their status here.
             </div>
           ) : (
             <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -281,7 +356,9 @@ export default function CustomerDashboard() {
           {loading ? (
             <div className="h-32 animate-pulse rounded-md bg-gray-50" />
           ) : doctorsCount === 0 ? (
-            <div className="text-center py-6 text-gray-500">No doctors added yet</div>
+            <div className="text-center py-6 text-gray-500">
+              No doctors added yet
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
@@ -315,41 +392,96 @@ export default function CustomerDashboard() {
 
           {loading ? (
             <div className="h-32 animate-pulse rounded-md bg-gray-50" />
-          ) : patientsCount === 0 ? (
-            <div className="text-center py-6 text-gray-500">No patients added yet</div>
+          ) : patients.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              No patients added yet
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase">
-                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2">Patient ID</th>
+                    <th className="px-3 py-2">Patient Name</th>
                     <th className="px-3 py-2">Phone</th>
                     <th className="px-3 py-2">Treatment</th>
                     <th className="px-3 py-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {patients.map((p, idx) => (
-                    <tr key={p.id || `p-${idx}`} className="border-b last:border-0">
-                      <td className="px-3 py-2">{p.patient_name || "—"}</td>
-                      <td className="px-3 py-2">{p.phone || "—"}</td>
-                      <td className="px-3 py-2">{p.service || "—"}</td>
-                      <td className="px-3 py-2">{p.status || "—"}</td>
-                    </tr>
-                  ))}
+                  {patients.map((p, idx) => {
+                    const key = p.booking_id ?? p.patient_id ?? `p-${idx}`;
+                    return (
+                      <tr key={key} className="border-b last:border-0">
+                        <td className="px-3 py-2">
+                          {p.patient_public_id ? `#${p.patient_public_id}` : "—"}
+                        </td>
+                        <td className="px-3 py-2">{p.patient_name || "—"}</td>
+                        <td className="px-3 py-2">{p.phone || "—"}</td>
+                        <td className="px-3 py-2">{p.service_name || "—"}</td>
+                        <td className="px-3 py-2">{p.status || "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+
               <div className="mt-2 text-xs text-gray-400">
-                Showing last {Math.min(patientsCount, 10)} patients
+                Showing last {patients.length} patients
               </div>
             </div>
           )}
         </div>
       </div>
 
+      {/* APPOINTMENT LIST = только pending */}
       <div className="rounded-xl border bg-white p-4">
-        <div className="mb-4 text-lg font-semibold">Appointment List</div>
-        <div className="text-center py-6 text-gray-500">No appointments scheduled yet</div>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-lg font-semibold">Appointment List</div>
+          {!loading && appointmentsCount > 0 && (
+            <div className="text-xs text-gray-500">Total: {appointmentsCount}</div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="h-32 animate-pulse rounded-md bg-gray-50" />
+        ) : appointmentsCount === 0 ? (
+          <div className="text-center py-6 text-gray-500">
+            No appointments scheduled yet
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase">
+                  <th className="px-3 py-2">Patient</th>
+                  <th className="px-3 py-2">Service</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Method</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appointments.map((a, idx) => {
+                  const key = a.booking_id ?? a.patient_id ?? `a-${idx}`;
+                  return (
+                    <tr key={key} className="border-b last:border-0">
+                      <td className="px-3 py-2">{a.patient_name || "—"}</td>
+                      <td className="px-3 py-2">{a.service_name || "—"}</td>
+                      <td className="px-3 py-2">{formatApptDateTime(a)}</td>
+                      <td className="px-3 py-2">{a.booking_method || "—"}</td>
+                      <td className="px-3 py-2">{a.status || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="mt-2 text-xs text-gray-400">
+              Showing last {appointments.length} pending appointments
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
