@@ -7,6 +7,8 @@ export const runtime = "nodejs";
 
 const ALLOWED_STATUSES = new Set(["pending", "confirmed", "cancelled", "completed"]);
 
+type Ctx = { params: Promise<{ id: string }> };
+
 async function handleUpdate(req: NextRequest, id: string) {
   const body = await req.json().catch(() => ({}));
   const status = String((body as any)?.status ?? "").toLowerCase();
@@ -35,25 +37,24 @@ async function handleUpdate(req: NextRequest, id: string) {
   );
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function GET(_req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
   return NextResponse.json({ ok: true, id });
 }
 
-// основной вариант
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function PATCH(req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
   return handleUpdate(req, id);
 }
 
-// алиас на случай если PATCH режется
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+// алиас (можешь оставить на всякий случай)
+export async function POST(req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
   return handleUpdate(req, id);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function DELETE(_req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
 
   const supabase = await createRouteClient();
 
