@@ -176,13 +176,20 @@ const nextConfig = {
 
     async rewrites() {
         const clinicRewrites = [
-          { source: '/:country/:province?/:city?/:district?/:slug/review',  destination: '/clinic/:slug/review'  },
-          { source: '/:country/:province?/:city?/:district?/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+          // -------- REVIEW (без ? сегментов) --------
+          { source: '/:country/:slug/review', destination: '/clinic/:slug/review' },
+          { source: '/:country/:city/:slug/review', destination: '/clinic/:slug/review' },
+          { source: '/:country/:province/:city/:slug/review', destination: '/clinic/:slug/review' },
+          { source: '/:country/:province/:city/:district/:slug/review', destination: '/clinic/:slug/review' },
       
+          // -------- INQUIRY (без ? сегментов) --------
+          { source: '/:country/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
           { source: '/:country/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
           { source: '/:country/:province/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
           { source: '/:country/:province/:city/:district/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
       
+          // -------- CLINIC DETAIL --------
+          { source: '/:country/:slug', destination: '/clinic/:slug' },
           { source: '/:country/:city/:slug', destination: '/clinic/:slug' },
           { source: '/:country/:province/:city/:slug', destination: '/clinic/:slug' },
           { source: '/:country/:province/:city/:district/:slug', destination: '/clinic/:slug' },
