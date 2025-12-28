@@ -158,21 +158,39 @@ const nextConfig = {
         ];
     },
 
+    // async rewrites() {
+    //     return [
+    //         { source: '/:country/:province?/:city?/:district?/:slug/review',  destination: '/clinic/:slug/review'  },
+    //         { source: '/:country/:province?/:city?/:district?/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+
+    //         { source: '/:country/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+    //         { source: '/:country/:province/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+    //         { source: '/:country/:province/:city/:district/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+
+    //         { source: '/:country/:city/:slug', destination: '/clinic/:slug' },
+    //         { source: '/:country/:province/:city/:slug', destination: '/clinic/:slug' },
+    //         { source: '/:country/:province/:city/:district/:slug', destination: '/clinic/:slug' },
+
+    //     ];
+    // },
+
     async rewrites() {
-        return [
-            { source: '/:country/:province?/:city?/:district?/:slug/review',  destination: '/clinic/:slug/review'  },
-            { source: '/:country/:province?/:city?/:district?/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
-
-            { source: '/:country/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
-            { source: '/:country/:province/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
-            { source: '/:country/:province/:city/:district/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
-
-            // детальная страница
-            { source: '/:country/:city/:slug', destination: '/clinic/:slug' },
-            { source: '/:country/:province/:city/:slug', destination: '/clinic/:slug' },
-            { source: '/:country/:province/:city/:district/:slug', destination: '/clinic/:slug' },
-
+        const clinicRewrites = [
+          { source: '/:country/:province?/:city?/:district?/:slug/review',  destination: '/clinic/:slug/review'  },
+          { source: '/:country/:province?/:city?/:district?/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+      
+          { source: '/:country/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+          { source: '/:country/:province/:city/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+          { source: '/:country/:province/:city/:district/:slug/inquiry', destination: '/clinic/:slug/inquiry' },
+      
+          { source: '/:country/:city/:slug', destination: '/clinic/:slug' },
+          { source: '/:country/:province/:city/:slug', destination: '/clinic/:slug' },
+          { source: '/:country/:province/:city/:district/:slug', destination: '/clinic/:slug' },
         ];
+      
+        return {
+          fallback: clinicRewrites,
+        };
     },
 
     async redirects() {

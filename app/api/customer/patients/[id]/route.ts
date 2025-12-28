@@ -5,9 +5,8 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const ALLOWED_STATUSES = new Set(["pending", "confirmed", "cancelled", "completed"]);
-
-type Ctx = { params: Promise<{ id: string }> };
+// лучше под твой enum/логику:
+const ALLOWED_STATUSES = new Set(["new", "pending", "confirmed", "cancelled", "completed"]);
 
 async function handleUpdate(req: NextRequest, id: string) {
   const body = await req.json().catch(() => ({}));
@@ -31,31 +30,27 @@ async function handleUpdate(req: NextRequest, id: string) {
 
   const row = Array.isArray(data) ? data[0] : data ?? null;
 
-  return NextResponse.json(
-    { booking: row },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function GET(_req: NextRequest, ctx: Ctx) {
-  const { id } = await ctx.params;
-  return NextResponse.json({ ok: true, id });
+export async function GET(_req: NextRequest, ctx: any) {
+  const id = String(ctx?.params?.id ?? "");
+  return NextResponse.json({ ok: true, id }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const { id } = await ctx.params;
+export async function PATCH(req: NextRequest, ctx: any) {
+  const id = String(ctx?.params?.id ?? "");
   return handleUpdate(req, id);
 }
 
-// алиас (можешь оставить на всякий случай)
-export async function POST(req: NextRequest, ctx: Ctx) {
-  const { id } = await ctx.params;
+// можно оставить алиас, не мешает
+export async function POST(req: NextRequest, ctx: any) {
+  const id = String(ctx?.params?.id ?? "");
   return handleUpdate(req, id);
 }
 
-export async function DELETE(_req: NextRequest, ctx: Ctx) {
-  const { id } = await ctx.params;
-
+export async function DELETE(_req: NextRequest, ctx: any) {
+  const id = String(ctx?.params?.id ?? "");
   const supabase = await createRouteClient();
 
   const { data, error } = await supabase.rpc("customer_patient_delete_one", {
