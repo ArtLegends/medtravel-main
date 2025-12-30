@@ -8,6 +8,9 @@ import { createClient } from "@/lib/supabase/browserClient";
 import { clinicHref } from "@/lib/clinic-url";
 import Breadcrumbs from "@/components/Breadcrumbs";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type ServiceMap = Record<string, string>;
 
 type CatalogItem = {

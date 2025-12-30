@@ -9,7 +9,8 @@ import { createServerClient } from "@/lib/supabase/serverClient";
 import { buildCategoryMetadata, buildTreatmentMetadata } from "@/lib/seo/meta";
 import { resolveCategoryRouteOnServer } from "@/lib/category-route/resolve";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Params = { category: string; filters?: string[] };
 
