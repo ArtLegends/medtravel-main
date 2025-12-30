@@ -200,3 +200,547 @@ yarn dev
 3. Закоммитьте изменения (`git commit -m 'Add amazing feature'`).
 4. Запушьте ветку (`git push origin feature/amazing-feature`).
 5. Откройте Pull Request.
+
+
+
+
+
+я протестировал все и в других категориях с фильтром по услугам и по локации.
+в общем нам нужно полностью переработать систему фильтрации и юрлов, сейчас все распишу тебе.
+
+все верно, фильтрация должно навигацией переходить на другой URL.
+перерабатывать будем только систему фильтрации на странице категории, все остальное оставляем как есть.
+для начала заменим содержимое фильтров, сейчас там находятся самые популярные услуги и локации из базы данных, нужно это заменить готовыми списками.
+у меня есть списки подкатегорий для наших 6 главных категорий и списка локаций, видимо придется создать новые таблицы.
+логика фильтрация будет заключатся во вложенности. вот путь(для описания пути я буду использовать реальные услуги, локации и категории, исключительно для примера и объяснения):
+при переходе на страницу любой категории скажем Dentistry мы попадаем на страницу категории с юрл /dentistry, изначально в списке клиник находятся все клиники этой категории.
+в фильтрах имеются списки подкатегорий и локаций, но технически только первая часть фильтров и список фильтров меняется в зависимости от вложенности и выбора фильтров пользователем.
+изначально при переходе на страницу какой-либо категории она имеет свой список локаций и список подкатегорий это все должно быть связано в базе с категориями и локациями.
+при выборе первого параметра в фильтре по подкатегориям скажем этого параметра All on 4 юрл должен быть следующего вида /dentistry/all-on-4, список подкатегорий уже должен измениться из-за вложенности, потому что этот параметр /subcategory/ подразумевает в себе еще список параметров, в котором мы еще выбираем параметр скажем Dental Crowns и далее редиректит все на ту же страницу категории на которой мы и были изначально, но с юрл /dentistry/all-on-4/dental-crowns, отфильтрованным списком клиник по выбранным параметрам и обновленным списком фильтров по подкатегориям, поскольку параметр /subcategory-2/ также подразумевает собой еще вложенные параметры, ну и последний параметр в этой вложенности это скажем Gold Crowns, получаем юрл /dentistry/all-on-4/dental-crowns/gold-crowns, отфильтрованный список клиник по выбранным параметрам и последний параметр во вложенности фильтра по подкатегориям /subcategory-3/, а список в фильтре должен быть не пустым на последнем параметре, а включать в себе первые параметры /subcategory/, чтобы можно было вернуться к началу.
+
+точно такой же принцип с точно такой же вложенностью должен иметь фильтр по локации.
+вот какими должны быть точные юрл в отдельности для каждого фильтра:
+url фильтрации по локации - /category/country/province/city/district.
+url фильтрации по подкатегориям - /category/subcategory/subcategory-2/subcategory-3.
+
+но если для фильтрации использовать оба фильтра одновременно, то точный и полный юрл включая оба фильтра должен выглядеть так:
+url фильтрации по локации и подкатегориям - /category/country/province/city/district/subcategory/subcategory-2/subcategory-3.
+
+причем юрл может быть таким /category/country/city/district/subcategory/subcategory-2 или таким /category/country/city/subcategory, все зависит от выбранных параметров в фильтрах.
+
+весь ui фильтров нужно сохранить, инпуты для поисков тоже оставить рабочими, Reset filters оставить, убрать лимит на количество параметров, вернее оставить видимый лимит по умолчанию но добавить ниже спан который разворачивает список показывая все существующие параметры в зависимости от вложенности.
+
+фильтрация по подкатегориям в зависимости от выбранных параметров должна искать по точным услугам(services) клиник, похожим услугам и искать ближайщие совпадения, чтобы не было строгой фильтрации по точному выбору, нужно максимально приближенно по фильтрам находить результаты услуг клиник, локации клиник не зависимо от вложенности фильтров, от регистра той же услуги или локации клиники в каталоге.
+
+придется поработать и в базе данных и в директории проекта.
+услуги у нас находятся в таблицах services и clinic_services(эти таблицы связаны), категории в таблицах categories и clinic_categories(эти таблицы тоже связаны между собой).
+локации клиник находятся в таблице clinics с колонками country, province, city, district. схемы этих таблиц прислал ниже. также загрузил на всякий случай lib/supabase/types.ts. текущие версии файлов app/[category]/[[...filters]]/page.tsx, components/category/CategoryGrid.tsx и components/category/CategoryGridClient.tsx ты знаешь, сам же мне их писал. смотри скриншоты, если еще что-нибудь для реализации потребуется смело говори я предоставлю. пример фильтров работающих по такому принципу, с такой же логикой есть на сервисе whatclinic.com. давай все реализуем качественно, безупречно, исходя из лучших практик.
+
+реальные списки для примера:
+Dentistry(category):
+- Hollywood Smile(subcategory)
+- All on 4(subcategory)
+- All on 6(subcategory)
+- Dental implants(subcategory)
+- Crowns(subcategory)
+- Zirconia crowns(subcategory)
+- Veneers(subcategory)
+- Tooth Whitening(subcategory)
+
+пример для наглядность полной фильтрации по подкатегориям:
+Plastic Surgery(category):
+- Body plastics(subcategory):
+- Liposuction(subcategory-2):
+- Tumescent Liposuction(subcategory-3)
+
+Turkey(country):
+- Istanbul Province(province):
+- Istanbul(city):
+- Sisli(district)
+- Fatih(district)
+- Kadikoy(district)
+- Esenyurt(district)
+- Beyoglu(district)
+
+public.categories: """
+[
+  {
+    "ordinal_position": 1,
+    "column_name": "id",
+    "data_type": "integer",
+    "udt_or_enum": "int4",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0,
+    "is_nullable": "NO",
+    "column_default": "nextval('categories_id_seq'::regclass)"
+  },
+  {
+    "ordinal_position": 2,
+    "column_name": "name",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 3,
+    "column_name": "slug",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  }
+]
+"""
+public.clinic_categories: """
+[
+  {
+    "ordinal_position": 1,
+    "column_name": "clinic_id",
+    "data_type": "uuid",
+    "udt_or_enum": "uuid",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 2,
+    "column_name": "category_id",
+    "data_type": "integer",
+    "udt_or_enum": "int4",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0,
+    "is_nullable": "NO",
+    "column_default": null
+  }
+]
+"""
+public.services: """
+[
+  {
+    "ordinal_position": 1,
+    "column_name": "id",
+    "data_type": "integer",
+    "udt_or_enum": "int4",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0,
+    "is_nullable": "NO",
+    "column_default": "nextval('services_id_seq'::regclass)"
+  },
+  {
+    "ordinal_position": 2,
+    "column_name": "name",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 3,
+    "column_name": "slug",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 4,
+    "column_name": "description",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  }
+]
+"""
+public.clinic_services: """
+[
+  {
+    "ordinal_position": 1,
+    "column_name": "clinic_id",
+    "data_type": "uuid",
+    "udt_or_enum": "uuid",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 2,
+    "column_name": "service_id",
+    "data_type": "integer",
+    "udt_or_enum": "int4",
+    "character_maximum_length": null,
+    "numeric_precision": 32,
+    "numeric_scale": 0,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 3,
+    "column_name": "price",
+    "data_type": "numeric",
+    "udt_or_enum": "numeric",
+    "character_maximum_length": null,
+    "numeric_precision": 10,
+    "numeric_scale": 2,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 4,
+    "column_name": "currency",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": "'USD'::text"
+  }
+]
+"""
+public.clinics: """
+[
+  {
+    "ordinal_position": 1,
+    "column_name": "id",
+    "data_type": "uuid",
+    "udt_or_enum": "uuid",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "ordinal_position": 2,
+    "column_name": "owner_id",
+    "data_type": "uuid",
+    "udt_or_enum": "uuid",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": "auth.uid()"
+  },
+  {
+    "ordinal_position": 3,
+    "column_name": "name",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 4,
+    "column_name": "slug",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 5,
+    "column_name": "about",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 6,
+    "column_name": "address",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 7,
+    "column_name": "country",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 8,
+    "column_name": "city",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 9,
+    "column_name": "latitude",
+    "data_type": "numeric",
+    "udt_or_enum": "numeric",
+    "character_maximum_length": null,
+    "numeric_precision": 9,
+    "numeric_scale": 6,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 10,
+    "column_name": "longitude",
+    "data_type": "numeric",
+    "udt_or_enum": "numeric",
+    "character_maximum_length": null,
+    "numeric_precision": 9,
+    "numeric_scale": 6,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 11,
+    "column_name": "moderation_status",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": "'draft'::text"
+  },
+  {
+    "ordinal_position": 12,
+    "column_name": "is_published",
+    "data_type": "boolean",
+    "udt_or_enum": "bool",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": "true"
+  },
+  {
+    "ordinal_position": 13,
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "udt_or_enum": "timestamptz",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "ordinal_position": 14,
+    "column_name": "document",
+    "data_type": "tsvector",
+    "udt_or_enum": "tsvector",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 15,
+    "column_name": "province",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 16,
+    "column_name": "district",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 17,
+    "column_name": "verified_by_medtravel",
+    "data_type": "boolean",
+    "udt_or_enum": "bool",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": "false"
+  },
+  {
+    "ordinal_position": 18,
+    "column_name": "is_official_partner",
+    "data_type": "boolean",
+    "udt_or_enum": "bool",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "NO",
+    "column_default": "false"
+  },
+  {
+    "ordinal_position": 19,
+    "column_name": "map_embed_url",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 20,
+    "column_name": "lat",
+    "data_type": "double precision",
+    "udt_or_enum": "float8",
+    "character_maximum_length": null,
+    "numeric_precision": 53,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 21,
+    "column_name": "lng",
+    "data_type": "double precision",
+    "udt_or_enum": "float8",
+    "character_maximum_length": null,
+    "numeric_precision": 53,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 22,
+    "column_name": "search",
+    "data_type": "tsvector",
+    "udt_or_enum": "tsvector",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 23,
+    "column_name": "amenities",
+    "data_type": "jsonb",
+    "udt_or_enum": "jsonb",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "ordinal_position": 24,
+    "column_name": "status",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": "'published'::text"
+  },
+  {
+    "ordinal_position": 25,
+    "column_name": "moderation_comment",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 26,
+    "column_name": "main_email",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 27,
+    "column_name": "extra_email",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 28,
+    "column_name": "time_zone",
+    "data_type": "text",
+    "udt_or_enum": "text",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "ordinal_position": 29,
+    "column_name": "payments",
+    "data_type": "jsonb",
+    "udt_or_enum": "jsonb",
+    "character_maximum_length": null,
+    "numeric_precision": null,
+    "numeric_scale": null,
+    "is_nullable": "YES",
+    "column_default": "'[]'::jsonb"
+  }
+]
+"""

@@ -6,14 +6,14 @@ export type Locale = 'en' | 'ru' | 'pl'
 
 export type LocationParts = {
   country?: string | null
+  province?: string | null
   city?: string | null
   district?: string | null
 }
 
-// Country, City, District
 function locToString(loc?: LocationParts) {
   if (!loc) return ''
-  return [loc.country, loc.city, loc.district].filter(Boolean).join(', ')
+  return [loc.country, loc.province, loc.city, loc.district].filter(Boolean).join(', ')
 }
 
 // Быстрый детект локали из префикса пути (‘/ru/...’, ‘/pl/...’) — EN по умолчанию
