@@ -612,7 +612,7 @@ export default function CategoryGridClient({
                         <img
                           src={
                             c.image_url ??
-                            "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+                            ""
                           }
                           alt={c.name}
                           className="h-full w-full object-cover"
