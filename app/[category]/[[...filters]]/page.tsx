@@ -36,11 +36,18 @@ export async function generateMetadata({
   if (!cat) return buildCategoryMetadata(`/${slug}`, { categoryLabelEn: cap(slug) });
 
   // resolve: location + chosen subcategory label + matched service slugs
-  const resolved = await resolveCategoryRouteOnServer(sb, {
-    categoryId: cat.id,
-    categorySlug: slug,
-    segments,
-  });
+  let resolved: any = { location: null, treatmentLabel: null, matchedServiceSlugs: [] };
+
+  try {
+    resolved = await resolveCategoryRouteOnServer(sb, {
+      categoryId: cat.id,
+      categorySlug: slug,
+      segments,
+    });
+  } catch (e) {
+    // НЕ даём метадате валить страницу в notFound
+    resolved = { location: null, treatmentLabel: null, matchedServiceSlugs: [] };
+  }
 
   // если выбрана подкатегория (любая глубина) — считаем это Treatment meta
   if (resolved.treatmentLabel) {
@@ -60,13 +67,11 @@ export async function generateMetadata({
   });
 }
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<Params>;
-}) {
-  const { category } = await params;
+export default async function Page({ params }: { params: Promise<Params> }) {
+  const { category, filters } = await params;
   const slug = decodeURIComponent(category).toLowerCase();
+
+  const initialPath = Array.isArray(filters) ? filters : [];
 
   const sb = await createServerClient();
   const { data: cat } = await sb
@@ -86,7 +91,8 @@ export default async function Page({
         categoryName={titleName}
       />
       <CategoryWhy />
-      <CategoryGrid categorySlug={slug} categoryName={titleName} />
+      <CategoryGrid categorySlug={slug} categoryName={titleName} initialPath={initialPath} />
     </>
   );
 }
+

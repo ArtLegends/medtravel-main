@@ -110,9 +110,11 @@ function joinCategoryPath(categorySlug: string, parts: string[]) {
 export default function CategoryGridClient({
   categorySlug,
   categoryName,
+  initialPath,
 }: {
   categorySlug: string;
   categoryName?: string;
+  initialPath?: string[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
