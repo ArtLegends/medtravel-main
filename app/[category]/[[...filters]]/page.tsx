@@ -1,4 +1,3 @@
-// app/[category]/[[...filters]]/page.tsx
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -12,16 +11,21 @@ import { resolveCategoryRouteOnServer } from "@/lib/category-route/resolve";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type Params = { category: string; filters?: string[] };
+type Params = {
+  category: string;
+  filters?: string[];
+};
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/* ---------------- METADATA ---------------- */
 
 export async function generateMetadata({
   params,
 }: {
-  params: { category: string; filters?: string[] };
+  params: Promise<Params>;
 }): Promise<Metadata> {
-  const { category, filters } = params;
+  const { category, filters } = await params;
 
   const slug = decodeURIComponent(category).toLowerCase();
   const segments = Array.isArray(filters) ? filters : [];
@@ -34,10 +38,17 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!cat) return buildCategoryMetadata(`/${slug}`, { categoryLabelEn: cap(slug) });
+  if (!cat) {
+    return buildCategoryMetadata(`/${slug}`, {
+      categoryLabelEn: cap(slug),
+    });
+  }
 
-  // resolve: location + chosen subcategory label + matched service slugs
-  let resolved: any = { location: null, treatmentLabel: null, matchedServiceSlugs: [] };
+  let resolved: any = {
+    location: null,
+    treatmentLabel: null,
+    matchedServiceSlugs: [],
+  };
 
   try {
     resolved = await resolveCategoryRouteOnServer(sb, {
@@ -45,18 +56,18 @@ export async function generateMetadata({
       categorySlug: slug,
       segments,
     });
-  } catch (e) {
-    // НЕ даём метадате валить страницу в notFound
-    resolved = { location: null, treatmentLabel: null, matchedServiceSlugs: [] };
+  } catch {
+    resolved = {
+      location: null,
+      treatmentLabel: null,
+      matchedServiceSlugs: [],
+    };
   }
 
-  // если выбрана подкатегория (любая глубина) — считаем это Treatment meta
   if (resolved.treatmentLabel) {
-    // при желании можно посчитать min/max price range по matchedServiceSlugs + loc
     return buildTreatmentMetadata(`/${slug}`, {
       treatmentLabel: resolved.treatmentLabel,
       location: resolved.location,
-      // minPrice/maxPrice/currency можно подтянуть как раньше (по rpc), но уже с province/district
     });
   }
 
@@ -68,15 +79,16 @@ export async function generateMetadata({
   });
 }
 
+/* ---------------- PAGE ---------------- */
+
 export default async function Page({
   params,
 }: {
-  params: { category: string; filters?: string[] };
+  params: Promise<Params>;
 }) {
-  const { category, filters } = params;
+  const { category, filters } = await params;
 
   const slug = decodeURIComponent(category).toLowerCase();
-
   const initialPath = Array.isArray(filters) ? filters : [];
 
   const sb = await createServerClient();
@@ -97,8 +109,11 @@ export default async function Page({
         categoryName={titleName}
       />
       <CategoryWhy />
-      <CategoryGrid categorySlug={slug} categoryName={titleName} initialPath={initialPath} />
+      <CategoryGrid
+        categorySlug={slug}
+        categoryName={titleName}
+        initialPath={initialPath}
+      />
     </>
   );
 }
-
