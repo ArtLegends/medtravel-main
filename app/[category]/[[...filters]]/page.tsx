@@ -19,9 +19,10 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<Params>;
+  params: Params;
 }): Promise<Metadata> {
-  const { category, filters } = await params;
+  const { category, filters } = params;
+
   const slug = decodeURIComponent(category).toLowerCase();
   const segments = Array.isArray(filters) ? filters : [];
 
@@ -67,8 +68,13 @@ export async function generateMetadata({
   });
 }
 
-export default async function Page({ params }: { params: Promise<Params> }) {
-  const { category, filters } = await params;
+export default async function Page({
+  params,
+}: {
+  params: Params;
+}) {
+  const { category, filters } = params;
+
   const slug = decodeURIComponent(category).toLowerCase();
 
   const initialPath = Array.isArray(filters) ? filters : [];
