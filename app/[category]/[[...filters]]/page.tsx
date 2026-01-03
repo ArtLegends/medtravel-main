@@ -19,7 +19,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export async function generateMetadata({
   params,
 }: {
-  params: Params;
+  params: { category: string; filters?: string[] };
 }): Promise<Metadata> {
   const { category, filters } = params;
 
@@ -71,7 +71,7 @@ export async function generateMetadata({
 export default async function Page({
   params,
 }: {
-  params: Params;
+  params: { category: string; filters?: string[] };
 }) {
   const { category, filters } = params;
 
