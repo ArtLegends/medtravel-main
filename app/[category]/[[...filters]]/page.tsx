@@ -93,11 +93,11 @@ export default async function Page({
   const initialPath = Array.isArray(filters) ? filters : [];
 
   const sb = await createServerClient();
-  const { data: cat } = await sb
-    .from("categories")
-    .select("id,name")
-    .eq("slug", slug)
-    .maybeSingle();
+  const { data: cat, error } = await sb
+  .from("categories")
+  .select("id,name")
+  .eq("slug", slug)
+  .maybeSingle();
 
   if (error) {
   return (
