@@ -92,25 +92,19 @@ const nextConfig = {
    */
   async rewrites() {
     const RESERVED =
-      'api|_next|static|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|customer|patient|admin|login|auth|settings|labs'
+      'api|_next|static|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|customer|patient|admin|login|auth|settings|labs' +
+      // важно: исключаем роуты категорий, иначе они будут переписываться в /clinic/:slug
+      '|dentistry|plastic-surgery|hair-transplant|crowns|veneers|dental-implants';
 
-    const country = `:country((?!${RESERVED})(?:[^/]+))`
+    const country = `:country((?!${RESERVED})(?:[^/]+))`;
 
     const clinicRewrites = [
-      // REVIEW
       { source: `/${country}/:path*/:slug/review`, destination: '/clinic/:slug/review' },
-
-      // INQUIRY
       { source: `/${country}/:path*/:slug/inquiry`, destination: '/clinic/:slug/inquiry' },
-
-      // CLINIC DETAIL (всегда последним!)
       { source: `/${country}/:path*/:slug`, destination: '/clinic/:slug' },
-    ]
+    ];
 
-    return {
-      afterFiles: clinicRewrites,
-      fallback: [],
-    }
+    return { afterFiles: clinicRewrites, fallback: [] };
   },
 
   async redirects() {

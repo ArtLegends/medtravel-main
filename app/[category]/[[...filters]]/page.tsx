@@ -7,7 +7,6 @@ import CategoryGrid from "@/components/category/CategoryGrid";
 import { createServerClient } from "@/lib/supabase/serverClient";
 import { buildCategoryMetadata, buildTreatmentMetadata } from "@/lib/seo/meta";
 import { resolveCategoryRouteOnServer } from "@/lib/category-route/resolve";
-import error from "next/error";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
