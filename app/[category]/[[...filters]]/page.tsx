@@ -7,6 +7,7 @@ import CategoryGrid from "@/components/category/CategoryGrid";
 import { createServerClient } from "@/lib/supabase/serverClient";
 import { buildCategoryMetadata, buildTreatmentMetadata } from "@/lib/seo/meta";
 import { resolveCategoryRouteOnServer } from "@/lib/category-route/resolve";
+import error from "next/error";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -98,7 +99,21 @@ export default async function Page({
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!cat) notFound();
+  if (error) {
+  return (
+    <pre style={{ padding: 16, whiteSpace: "pre-wrap" }}>
+      categories query error: {JSON.stringify(error, null, 2)}
+    </pre>
+  );
+}
+
+if (!cat) {
+  return (
+    <pre style={{ padding: 16, whiteSpace: "pre-wrap" }}>
+      category not found by slug="{slug}"
+    </pre>
+  );
+}
 
   const titleName = cat.name || cap(slug);
 
