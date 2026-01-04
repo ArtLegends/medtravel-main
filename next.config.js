@@ -107,16 +107,16 @@ const nextConfig = {
     return { afterFiles: clinicRewrites, fallback: [] };
   },
 
-  async redirects() {
-    return [
-      {
-        source:
-          '/:category(dentistry|plastic-surgery|hair-transplant|crowns|veneers|dental-implants)/:country/:province?/:city?/:district?/:clinic',
-        destination: '/clinic/:clinic',
-        permanent: false,
-      },
-    ]
-  },
+  // async redirects() {
+  //   return [
+  //     {
+  //       source:
+  //         '/:category(dentistry|plastic-surgery|hair-transplant|crowns|veneers|dental-implants)/:country/:province?/:city?/:district?/:clinic',
+  //       destination: '/clinic/:clinic',
+  //       permanent: false,
+  //     },
+  //   ]
+  // },
 
   images: {
     formats: ['image/avif', 'image/webp'],
