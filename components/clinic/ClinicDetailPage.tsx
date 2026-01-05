@@ -214,6 +214,8 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
   const [primaryCategory, setPrimaryCategory] = useState<CategoryLite | null>(null);
 
+  const [categoryLocChain, setCategoryLocChain] = useState<{ name: string; slug: string }[]>([]);
+
   // из данных клиники получаем список названий услуг:
   const servicesFromClinic = useMemo(
     () => Array.from(new Set((clinic?.services ?? []).map((s: any) => s?.name).filter(Boolean))),
@@ -373,6 +375,65 @@ export default function ClinicDetailPage({ clinic }: Props) {
     };
   }, [supabase, clinic.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!primaryCategory?.id) return;
+
+      const { data: nodes } = await supabase
+        .from("category_location_nodes")
+        .select("id,parent_id,kind,name,slug,aliases")
+        .eq("category_id", primaryCategory.id);
+
+      if (cancelled) return;
+
+      const list = (nodes ?? []) as any[];
+      const byId = new Map<number, any>();
+      list.forEach(n => byId.set(n.id, n));
+
+      const norm = (s: string) => s.trim().toLowerCase();
+      const clinicCity = norm(clinic.city ?? "");
+      const clinicCountry = norm(clinic.country ?? "");
+
+      // 1) пытаемся найти city-node (лучший вариант)
+      let hit =
+        list.find(n => n.kind === "city" && norm(n.name) === clinicCity) ||
+        list.find(n => n.kind === "city" && norm(n.slug) === clinicCity) ||
+        list.find(n => n.kind === "city" && (n.aliases ?? []).some((a: string) => norm(a) === clinicCity));
+
+      // 2) если city не нашли — ищем country-node
+      if (!hit && clinicCountry) {
+        hit =
+          list.find(n => n.kind === "country" && norm(n.name) === clinicCountry) ||
+          list.find(n => n.kind === "country" && norm(n.slug) === clinicCountry) ||
+          list.find(n => n.kind === "country" && (n.aliases ?? []).some((a: string) => norm(a) === clinicCountry));
+      }
+
+      if (!hit) {
+        setCategoryLocChain([]);
+        return;
+      }
+
+      // восстанавливаем цепочку по parent_id
+      const chain: any[] = [];
+      let cur: any | undefined = hit;
+
+      while (cur) {
+        chain.push(cur);
+        cur = cur.parent_id ? byId.get(cur.parent_id) : undefined;
+      }
+
+      chain.reverse(); // root -> leaf
+
+      setCategoryLocChain(chain.map(n => ({ name: n.name, slug: n.slug })));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, primaryCategory?.id, clinic.city, clinic.country]);
+
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllDoctors, setShowAllDoctors] = useState(false);
 
@@ -410,25 +471,26 @@ export default function ClinicDetailPage({ clinic }: Props) {
     return () => { cancelled = true; };
   }, [supabase, clinic.id]);
 
-  const breadcrumbsItems = useMemo(
-    () => {
-      const items: { label: string; href?: string }[] = [
-        { label: 'Home page', href: '/' },
-      ];
+  const breadcrumbsItems = useMemo(() => {
+    const items: { label: string; href?: string }[] = [{ label: "Home page", href: "/" }];
 
-      if (primaryCategory) {
+    if (primaryCategory) {
+      items.push({ label: primaryCategory.name, href: `/${primaryCategory.slug}` });
+
+      // location chain links
+      const slugs: string[] = [];
+      for (const n of categoryLocChain) {
+        slugs.push(n.slug);
         items.push({
-          label: primaryCategory.name,
-          href: `/${primaryCategory.slug}`,
+          label: n.name,
+          href: "/" + [primaryCategory.slug, ...slugs].join("/"),
         });
       }
+    }
 
-      items.push({ label: clinic.name });
-
-      return items;
-    },
-    [primaryCategory, clinic.name],
-  );
+    items.push({ label: clinic.name });
+    return items;
+  }, [primaryCategory, categoryLocChain, clinic.name]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10">

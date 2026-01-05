@@ -148,6 +148,60 @@ export default function CategoryGridClient({
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [total, setTotal] = useState(0);
 
+  const [categoryId, setCategoryId] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: cat } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", categorySlug)
+        .maybeSingle();
+
+      if (!cancelled) setCategoryId(Number((cat as any)?.id || 0));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, categorySlug]);
+
+  const [provinceCityTerms, setProvinceCityTerms] = useState<string[] | null>(null);
+
+  const breadcrumbItems = useMemo(() => {
+  const items: { label: string; href?: string }[] = [
+    { label: "Home page", href: "/" },
+    { label: categoryName ?? categorySlug, href: `/${categorySlug}` },
+  ];
+
+  const seq: { label: string; slug: string }[] = [];
+
+  for (const k of LOC_KIND_ORDER) {
+    const n = (activeLoc as any)[k] as LocationNode | undefined;
+    if (n?.slug) seq.push({ label: n.name, slug: n.slug });
+  }
+  for (const n of activeSub) {
+    seq.push({ label: n.name, slug: n.slug });
+  }
+
+  // строим prefix-href по фактическому пути
+  const slugs: string[] = [];
+  for (let i = 0; i < seq.length; i++) {
+    slugs.push(seq[i].slug);
+    items.push({
+      label: seq[i].label,
+      href: joinCategoryPath(categorySlug, slugs),
+    });
+  }
+
+  // последний пункт без href
+  if (items.length > 0) items[items.length - 1].href = undefined;
+
+  return items;
+}, [categorySlug, categoryName, activeLoc, activeSub]);
+
+
   // keep initial facets? мы теперь не используем RPC facets, но оставим как было для cover
   const initialLoadedRef = useRef(false);
 
@@ -270,8 +324,6 @@ export default function CategoryGridClient({
     let cancelled = false;
 
     async function run() {
-      const { data: cat } = await supabase.from("categories").select("id").eq("slug", categorySlug).maybeSingle();
-      const categoryId = Number((cat as any)?.id || 0);
       if (!categoryId) return;
 
       // определяем текущую глубину локации
@@ -286,10 +338,12 @@ export default function CategoryGridClient({
         }
       }
 
-      const nextKind = LOC_KIND_ORDER[Math.min(lastKindIndex + 1, LOC_KIND_ORDER.length - 1)];
+      const nextKind =
+        LOC_KIND_ORDER[Math.min(lastKindIndex + 1, LOC_KIND_ORDER.length - 1)];
       const parentId = lastNode?.id ?? null;
 
-      const q = supabase
+      // 1) пробуем загрузить детей (следующий уровень)
+      const qChildren = supabase
         .from("category_location_nodes")
         .select("id,category_id,parent_id,kind,name,slug,aliases,sort")
         .eq("category_id", categoryId)
@@ -297,50 +351,151 @@ export default function CategoryGridClient({
         .order("sort", { ascending: true })
         .order("name", { ascending: true });
 
-      parentId === null ? q.is("parent_id", null) : q.eq("parent_id", parentId);
+      parentId === null ? qChildren.is("parent_id", null) : qChildren.eq("parent_id", parentId);
 
-      const { data } = await q;
+      const { data: children } = await qChildren;
       if (cancelled) return;
-      setLocOptions((data as any) ?? []);
+
+      if ((children ?? []).length > 0) {
+        setLocOptions((children as any) ?? []);
+        return;
+      }
+
+      // 2) если детей нет — показываем siblings текущего уровня (чтобы не было тупика)
+      if (lastNode) {
+        const qSiblings = supabase
+          .from("category_location_nodes")
+          .select("id,category_id,parent_id,kind,name,slug,aliases,sort")
+          .eq("category_id", categoryId)
+          .eq("kind", lastNode.kind)
+          .order("sort", { ascending: true })
+          .order("name", { ascending: true });
+
+        lastNode.parent_id === null
+          ? qSiblings.is("parent_id", null)
+          : qSiblings.eq("parent_id", lastNode.parent_id);
+
+        const { data: siblings } = await qSiblings;
+        if (cancelled) return;
+
+        setLocOptions((siblings as any) ?? []);
+        return;
+      }
+
+      // 3) fallback: топ-уровень
+      const { data: top } = await supabase
+        .from("category_location_nodes")
+        .select("id,category_id,parent_id,kind,name,slug,aliases,sort")
+        .eq("category_id", categoryId)
+        .is("parent_id", null)
+        .eq("kind", "country")
+        .order("sort", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (!cancelled) setLocOptions((top as any) ?? []);
     }
 
     run();
     return () => {
       cancelled = true;
     };
-  }, [supabase, categorySlug, activeLoc]);
+  }, [supabase, categoryId, activeLoc]);
 
   // Load current-level subcategory options
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      const { data: cat } = await supabase.from("categories").select("id").eq("slug", categorySlug).maybeSingle();
-      const categoryId = Number((cat as any)?.id || 0);
       if (!categoryId) return;
 
       const last = activeSub[activeSub.length - 1] ?? null;
       const parentId = last?.id ?? null;
 
-      const q = supabase
+      // 1) дети текущего узла
+      const qChildren = supabase
         .from("category_subcategory_nodes")
         .select("id,category_id,parent_id,name,slug,aliases,sort")
         .eq("category_id", categoryId)
         .order("sort", { ascending: true })
         .order("name", { ascending: true });
 
-      parentId === null ? q.is("parent_id", null) : q.eq("parent_id", parentId);
+      parentId === null ? qChildren.is("parent_id", null) : qChildren.eq("parent_id", parentId);
 
-      const { data } = await q;
+      const { data: children } = await qChildren;
       if (cancelled) return;
-      setSubOptions((data as any) ?? []);
+
+      if ((children ?? []).length > 0) {
+        setSubOptions((children as any) ?? []);
+        return;
+      }
+
+      // 2) если детей нет — siblings уровня last (то есть узлы с тем же parent_id)
+      if (last) {
+        const qSiblings = supabase
+          .from("category_subcategory_nodes")
+          .select("id,category_id,parent_id,name,slug,aliases,sort")
+          .eq("category_id", categoryId)
+          .order("sort", { ascending: true })
+          .order("name", { ascending: true });
+
+        last.parent_id === null
+          ? qSiblings.is("parent_id", null)
+          : qSiblings.eq("parent_id", last.parent_id);
+
+        const { data: siblings } = await qSiblings;
+        if (cancelled) return;
+
+        setSubOptions((siblings as any) ?? []);
+        return;
+      }
+
+      // 3) fallback: top
+      const { data: top } = await supabase
+        .from("category_subcategory_nodes")
+        .select("id,category_id,parent_id,name,slug,aliases,sort")
+        .eq("category_id", categoryId)
+        .is("parent_id", null)
+        .order("sort", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (!cancelled) setSubOptions((top as any) ?? []);
     }
 
     run();
     return () => {
       cancelled = true;
     };
-  }, [supabase, categorySlug, activeSub]);
+  }, [supabase, categoryId, activeSub]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!categoryId || !activeLoc.province?.id) {
+        setProvinceCityTerms(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("category_location_nodes")
+        .select("name,slug,aliases")
+        .eq("category_id", categoryId)
+        .eq("kind", "city")
+        .eq("parent_id", activeLoc.province.id);
+
+      if (cancelled) return;
+
+      const terms = uniq(
+        (data ?? []).flatMap((r: any) => buildTermPack(r.name, r.slug, r.aliases))
+      );
+
+      setProvinceCityTerms(terms.length ? terms : null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, categoryId, activeLoc.province?.id]);
 
   // Build RPC params (smart)
   const rpcParams = useMemo(() => {
@@ -350,7 +505,12 @@ export default function CategoryGridClient({
     const district = activeLoc.district?.name ?? null;
 
     const countryTerms = activeLoc.country ? buildTermPack(activeLoc.country.name, activeLoc.country.slug, activeLoc.country.aliases) : null;
-    const provinceTerms = activeLoc.province ? buildTermPack(activeLoc.province.name, activeLoc.province.slug, activeLoc.province.aliases) : null;
+    const provinceTerms = activeLoc.province
+      ? uniq([
+        ...buildTermPack(activeLoc.province.name, activeLoc.province.slug, activeLoc.province.aliases),
+        ...(provinceCityTerms ?? []),
+      ])
+      : null;
     const cityTerms = activeLoc.city ? buildTermPack(activeLoc.city.name, activeLoc.city.slug, activeLoc.city.aliases) : null;
     const districtTerms = activeLoc.district ? buildTermPack(activeLoc.district.name, activeLoc.district.slug, activeLoc.district.aliases) : null;
 
@@ -402,7 +562,14 @@ export default function CategoryGridClient({
         .in("node_id", nodeIds);
 
       if (cancelled) return;
-      const ids = uniq((data ?? []).map((r: any) => String(r.service_id))).map((x) => Number(x)).filter(Boolean);
+      const sorted = (data ?? [])
+        .slice()
+        .sort((a: any, b: any) => (b.weight ?? 0) - (a.weight ?? 0));
+
+      const ids = uniq(sorted.map((r: any) => String(r.service_id)))
+        .map((x) => Number(x))
+        .filter(Boolean)
+        .slice(0, 200); // лимит, чтобы не раздувать RPC
       setServiceIds(ids.length ? ids : null);
     }
 
@@ -564,12 +731,7 @@ export default function CategoryGridClient({
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
         {/* LIST */}
         <div className="space-y-4">
-          <Breadcrumbs
-            items={[
-              { label: "Home page", href: "/" },
-              { label: categoryName ?? categorySlug },
-            ]}
-          />
+          <Breadcrumbs items={breadcrumbItems} />
 
           {loading && items.length === 0 ? (
             Array.from({ length: 6 }).map((_, i) => (

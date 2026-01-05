@@ -28,7 +28,7 @@ export async function generateMetadata({
   const { category, filters } = await params;
 
   const slug = decodeURIComponent(category).toLowerCase();
-  const segments = Array.isArray(filters) ? filters : [];
+  const segments = Array.isArray(filters) ? filters.map(decodeURIComponent) : [];
 
   const sb = await createServerClient();
 
@@ -38,16 +38,24 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
 
+  const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
+
   if (!cat) {
-    return buildCategoryMetadata(`/${slug}`, {
-      categoryLabelEn: cap(slug),
-    });
+    const base = buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
+    return {
+      ...base,
+      alternates: { canonical: urlPath },
+      openGraph: { ...(base.openGraph as any), url: urlPath },
+    };
   }
 
   let resolved: any = {
     location: null,
     treatmentLabel: null,
     matchedServiceSlugs: [],
+    locationSlugs: [],
+    subcatSlugs: [],
+    hasExtraSegments: false,
   };
 
   try {
@@ -56,28 +64,32 @@ export async function generateMetadata({
       categorySlug: slug,
       segments,
     });
-  } catch {
-    resolved = {
-      location: null,
-      treatmentLabel: null,
-      matchedServiceSlugs: [],
-    };
-  }
+  } catch {}
 
-  if (resolved.treatmentLabel) {
-    return buildTreatmentMetadata(`/${slug}`, {
-      treatmentLabel: resolved.treatmentLabel,
-      location: resolved.location,
-    });
-  }
+  // если в URL есть хвост, который не распарсили — noindex (SEO-чистота)
+  const consumedPath = "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/");
+  const hasExtra = Boolean(resolved.hasExtraSegments);
 
-  return buildCategoryMetadata(`/${slug}`, {
-    categoryLabelEn: cat.name ?? cap(slug),
-    categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
-    categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
-    location: resolved.location,
-  });
+  const base = resolved.treatmentLabel
+    ? buildTreatmentMetadata(consumedPath, {
+        treatmentLabel: resolved.treatmentLabel,
+        location: resolved.location,
+      })
+    : buildCategoryMetadata(consumedPath, {
+        categoryLabelEn: cat.name ?? cap(slug),
+        categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
+        categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
+        location: resolved.location,
+      });
+
+  return {
+    ...base,
+    alternates: { canonical: consumedPath },
+    robots: hasExtra ? { index: false, follow: true } : undefined,
+    openGraph: { ...(base.openGraph as any), url: consumedPath },
+  };
 }
+
 
 /* ---------------- PAGE ---------------- */
 
