@@ -157,11 +157,13 @@ export default function AppointmentWizard() {
 
     setBusy(true);
     try {
-      const r = await apiGet<{ items: CountryNode[] }>(
+      const r = await apiGet<any>(
         `/api/patient/appointment/location/countries?categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
         `&subcategoryNodeId=${encodeURIComponent(String(node.id))}`
       );
-      setCountries(r.items ?? []);
+
+      const list = (r.items ?? r.countries ?? r.data ?? []) as CountryNode[];
+      setCountries(list);
 
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
@@ -190,12 +192,14 @@ export default function AppointmentWizard() {
 
     setBusy(true);
     try {
-      const r = await apiGet<{ items: CityNode[] }>(
+      const r = await apiGet<any>(
         `/api/patient/appointment/location/cities?categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
         `&subcategoryNodeId=${encodeURIComponent(String(selectedSubcat.id))}` +
         `&country=${encodeURIComponent(c.country)}`
       );
-      setCities(r.items ?? []);
+
+      const list = (r.items ?? r.cities ?? r.data ?? []) as CityNode[];
+      setCities(list);
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
     } finally {
@@ -546,8 +550,8 @@ export default function AppointmentWizard() {
                     className="h-9 w-56 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   />
                   <button
-                    disabled={busy}
-                    onClick={() => loadClinics(selectedClinic?.clinic_id || "", +0, true)}
+                    disabled={busy || !selectedCity}
+                    onClick={() => selectedCity && loadClinics(selectedCity.city, 0, true)}
                     className="h-9 rounded-lg border border-gray-200 px-3 text-sm hover:bg-gray-50 disabled:opacity-60"
                   >
                     Search
@@ -579,7 +583,7 @@ export default function AppointmentWizard() {
 
               {clinics.length < clinicTotal && (
                 <button
-                  disabled={busy}
+                  disabled={busy || !selectedCity}
                   onClick={() => selectedCity && loadClinics(selectedCity.city, clinicOffset + 15, false)}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
                 >
