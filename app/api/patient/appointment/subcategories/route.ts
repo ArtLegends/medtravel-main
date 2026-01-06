@@ -19,11 +19,11 @@ export async function GET(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const items = (data ?? []).map((r: any) => ({
-    id: Number(r.id),
-    name: r.name ?? "",
-    clinics_count: Number(r.clinics_count ?? 0),
-  }));
+    const list = (data ?? []).map((n: any) => ({
+        id: Number(n.id),
+        name: n.name ?? "",
+        clinics_count: Number(n.clinics_count ?? n.clinicsCount ?? 0),
+    }));
 
-  return NextResponse.json({ items }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ items: list }, { headers: { "Cache-Control": "no-store" } });
 }

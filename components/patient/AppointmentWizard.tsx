@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 type Category = { id: string; name: string; slug?: string | null };
 
 type SubcategoryNode = { id: number; name: string; clinics_count: number };
-type CountryNode = { id: number; country: string; clinics_count: number };
-type CityNode = { id: number; city: string; clinics_count: number };
+type CountryNode = { country: string; clinics_count: number };
+type CityNode = { city: string; clinics_count: number };
 
 type ClinicRow = { clinic_id: string; clinic_name: string; country: string; city: string };
 
@@ -158,9 +158,11 @@ export default function AppointmentWizard() {
     setBusy(true);
     try {
       const r = await apiGet<{ items: CountryNode[] }>(
-        `/api/patient/appointment/location/countries?categoryId=${encodeURIComponent(String(selectedCategory.id))}`
+        `/api/patient/appointment/location/countries?categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
+        `&subcategoryNodeId=${encodeURIComponent(String(node.id))}`
       );
       setCountries(r.items ?? []);
+
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
     } finally {
@@ -169,6 +171,8 @@ export default function AppointmentWizard() {
   }
 
   async function pickCountry(c: CountryNode) {
+    if (!selectedCategory || !selectedSubcat) return;
+
     setErrorMsg(null);
     setSelectedCountry(c);
 
@@ -187,7 +191,9 @@ export default function AppointmentWizard() {
     setBusy(true);
     try {
       const r = await apiGet<{ items: CityNode[] }>(
-        `/api/patient/appointment/location/cities?countryNodeId=${encodeURIComponent(String(c.id))}`
+        `/api/patient/appointment/location/cities?categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
+        `&subcategoryNodeId=${encodeURIComponent(String(selectedSubcat.id))}` +
+        `&country=${encodeURIComponent(c.country)}`
       );
       setCities(r.items ?? []);
     } catch (e: any) {
@@ -197,20 +203,19 @@ export default function AppointmentWizard() {
     }
   }
 
-  async function loadClinics(nextOffset: number, replace = false) {
-    if (!selectedCategory || !selectedSubcat || !selectedCountry || !selectedCity) return;
 
-    const limit = 15;
+  async function loadClinics(city: string, nextOffset: number, replace = false) {
+  if (!selectedCategory || !selectedSubcat || !selectedCountry) return;
 
-    const url =
-      `/api/patient/appointment/clinics?` +
-      `categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
-      `&subcategoryNodeId=${encodeURIComponent(String(selectedSubcat.id))}` +
-      `&country=${encodeURIComponent(selectedCountry.country)}` +
-      `&city=${encodeURIComponent(selectedCity.city)}` +
-      `&q=${encodeURIComponent(clinicQ)}` +
-      `&limit=${encodeURIComponent(String(limit))}` +
-      `&offset=${encodeURIComponent(String(nextOffset))}`;
+  const limit = 15;
+  const url =
+    `/api/patient/appointment/clinics?` +
+    `categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
+    `&subcategoryNodeId=${encodeURIComponent(String(selectedSubcat.id))}` +
+    `&country=${encodeURIComponent(selectedCountry.country)}` +
+    `&city=${encodeURIComponent(city)}` +
+    `&q=${encodeURIComponent(clinicQ)}` +
+    `&limit=${limit}&offset=${nextOffset}`;
 
     setBusy(true);
     try {
@@ -245,7 +250,7 @@ export default function AppointmentWizard() {
     setClinicOffset(0);
     setClinicTotal(0);
 
-    await loadClinics(0, true);
+    await loadClinics(c.city, 0, true);
   }
 
   async function pickClinic(c: ClinicRow) {
@@ -462,10 +467,10 @@ export default function AppointmentWizard() {
               <div className="text-sm font-semibold text-gray-900">Available countries</div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {countries.map((c) => {
-                  const active = selectedCountry?.id === c.id;
+                  const active = selectedCountry?.country === c.country;
                   return (
                     <button
-                      key={c.id}
+                      key={c.country}
                       disabled={busy}
                       onClick={() => pickCountry(c)}
                       className={[
@@ -495,10 +500,10 @@ export default function AppointmentWizard() {
               <div className="text-sm font-semibold text-gray-900">Available cities</div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {cities.map((c) => {
-                  const active = selectedCity?.id === c.id;
+                  const active = selectedCity?.city === c.city;
                   return (
                     <button
-                      key={c.id}
+                      key={c.city}
                       disabled={busy}
                       onClick={() => pickCity(c)}
                       className={[
@@ -542,7 +547,7 @@ export default function AppointmentWizard() {
                   />
                   <button
                     disabled={busy}
-                    onClick={() => loadClinics(0, true)}
+                    onClick={() => loadClinics(selectedClinic?.clinic_id || "", +0, true)}
                     className="h-9 rounded-lg border border-gray-200 px-3 text-sm hover:bg-gray-50 disabled:opacity-60"
                   >
                     Search
@@ -575,7 +580,7 @@ export default function AppointmentWizard() {
               {clinics.length < clinicTotal && (
                 <button
                   disabled={busy}
-                  onClick={() => loadClinics(clinicOffset + 15, false)}
+                  onClick={() => selectedCity && loadClinics(selectedCity.city, clinicOffset + 15, false)}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
                 >
                   Load more
