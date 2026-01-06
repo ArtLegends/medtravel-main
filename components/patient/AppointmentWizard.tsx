@@ -219,7 +219,8 @@ export default function AppointmentWizard() {
     `&country=${encodeURIComponent(selectedCountry.country)}` +
     `&city=${encodeURIComponent(city)}` +
     `&q=${encodeURIComponent(clinicQ)}` +
-    `&limit=${limit}&offset=${nextOffset}`;
+    `&limit=${encodeURIComponent(String(limit))}` +
+    `&offset=${encodeURIComponent(String(nextOffset))}`;
 
     setBusy(true);
     try {
