@@ -4,10 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Category = { id: string; name: string; slug?: string | null };
-type ServiceRow = { service_id: string; service_name: string; clinics_count: number };
-type CountryRow = { country: string; clinics_count: number };
-type CityRow = { city: string; clinics_count: number };
+
+type SubcategoryNode = { id: number; name: string; clinics_count: number };
+type CountryNode = { id: number; country: string; clinics_count: number };
+type CityNode = { id: number; city: string; clinics_count: number };
+
 type ClinicRow = { clinic_id: string; clinic_name: string; country: string; city: string };
+
+type ClinicServiceRow = { service_id: string; service_name: string };
+
 
 type BookingMethod = "manual" | "automatic";
 
@@ -54,15 +59,25 @@ export default function AppointmentWizard() {
   const [method, setMethod] = useState<BookingMethod | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [services, setServices] = useState<ServiceRow[]>([]);
-  const [countries, setCountries] = useState<CountryRow[]>([]);
-  const [cities, setCities] = useState<CityRow[]>([]);
+
+  const [subcats, setSubcats] = useState<SubcategoryNode[]>([]);
+  const [countries, setCountries] = useState<CountryNode[]>([]);
+  const [cities, setCities] = useState<CityNode[]>([]);
   const [clinics, setClinics] = useState<ClinicRow[]>([]);
+  const [clinicServices, setClinicServices] = useState<ClinicServiceRow[]>([]);
+
+  const [selectedSubcat, setSelectedSubcat] = useState<SubcategoryNode | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<CountryNode | null>(null);
+  const [selectedCity, setSelectedCity] = useState<CityNode | null>(null);
+  const [selectedService, setSelectedService] = useState<ClinicServiceRow | null>(null);
+
+  // UI helpers for clinics list
+  const [clinicQ, setClinicQ] = useState("");
+  const [clinicOffset, setClinicOffset] = useState(0);
+  const [clinicTotal, setClinicTotal] = useState(0);
+
 
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedService, setSelectedService] = useState<ServiceRow | null>(null);
-  const [selectedCountry, setSelectedCountry] = useState<CountryRow | null>(null);
-  const [selectedCity, setSelectedCity] = useState<CityRow | null>(null);
   const [selectedClinic, setSelectedClinic] = useState<ClinicRow | null>(null);
 
   // Step 4 form
@@ -83,26 +98,35 @@ export default function AppointmentWizard() {
   }, []);
 
   function resetStep3Down() {
-    setServices([]);
+    setSubcats([]);
     setCountries([]);
     setCities([]);
     setClinics([]);
-    setSelectedService(null);
+    setClinicServices([]);
+
+    setSelectedSubcat(null);
     setSelectedCountry(null);
     setSelectedCity(null);
     setSelectedClinic(null);
+    setSelectedService(null);
+
+    setClinicQ("");
+    setClinicOffset(0);
+    setClinicTotal(0);
   }
+
 
   async function pickCategory(cat: Category) {
     setErrorMsg(null);
     setSelectedCategory(cat);
     resetStep3Down();
     setBusy(true);
+
     try {
-      const r = await apiGet<{ services: ServiceRow[] }>(
-        `/api/patient/appointment/services?categoryId=${encodeURIComponent(cat.id)}`,
+      const r = await apiGet<{ items: SubcategoryNode[] }>(
+        `/api/patient/appointment/subcategories?categoryId=${encodeURIComponent(String(cat.id))}`
       );
-      setServices(r.services ?? []);
+      setSubcats(r.items ?? []);
       setStep(3);
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
@@ -111,21 +135,32 @@ export default function AppointmentWizard() {
     }
   }
 
-  async function pickService(svc: ServiceRow) {
+  async function pickSubcat(node: SubcategoryNode) {
+    if (!selectedCategory) return;
+
     setErrorMsg(null);
-    setSelectedService(svc);
+    setSelectedSubcat(node);
+
     setSelectedCountry(null);
     setSelectedCity(null);
     setSelectedClinic(null);
+    setSelectedService(null);
+
     setCountries([]);
     setCities([]);
     setClinics([]);
+    setClinicServices([]);
+
+    setClinicQ("");
+    setClinicOffset(0);
+    setClinicTotal(0);
+
     setBusy(true);
     try {
-      const r = await apiGet<{ countries: CountryRow[] }>(
-        `/api/patient/appointment/countries?serviceId=${encodeURIComponent(svc.service_id)}`,
+      const r = await apiGet<{ items: CountryNode[] }>(
+        `/api/patient/appointment/location/countries?categoryId=${encodeURIComponent(String(selectedCategory.id))}`
       );
-      setCountries(r.countries ?? []);
+      setCountries(r.items ?? []);
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
     } finally {
@@ -133,22 +168,28 @@ export default function AppointmentWizard() {
     }
   }
 
-  async function pickCountry(c: CountryRow) {
-    if (!selectedService) return;
+  async function pickCountry(c: CountryNode) {
     setErrorMsg(null);
     setSelectedCountry(c);
+
     setSelectedCity(null);
     setSelectedClinic(null);
+    setSelectedService(null);
+
     setCities([]);
     setClinics([]);
+    setClinicServices([]);
+
+    setClinicQ("");
+    setClinicOffset(0);
+    setClinicTotal(0);
+
     setBusy(true);
     try {
-      const r = await apiGet<{ cities: CityRow[] }>(
-        `/api/patient/appointment/cities?serviceId=${encodeURIComponent(
-          selectedService.service_id,
-        )}&country=${encodeURIComponent(c.country)}`,
+      const r = await apiGet<{ items: CityNode[] }>(
+        `/api/patient/appointment/location/cities?countryNodeId=${encodeURIComponent(String(c.id))}`
       );
-      setCities(r.cities ?? []);
+      setCities(r.items ?? []);
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
     } finally {
@@ -156,20 +197,71 @@ export default function AppointmentWizard() {
     }
   }
 
-  async function pickCity(c: CityRow) {
-    if (!selectedService || !selectedCountry) return;
-    setErrorMsg(null);
-    setSelectedCity(c);
-    setSelectedClinic(null);
-    setClinics([]);
+  async function loadClinics(nextOffset: number, replace = false) {
+    if (!selectedCategory || !selectedSubcat || !selectedCountry || !selectedCity) return;
+
+    const limit = 15;
+
+    const url =
+      `/api/patient/appointment/clinics?` +
+      `categoryId=${encodeURIComponent(String(selectedCategory.id))}` +
+      `&subcategoryNodeId=${encodeURIComponent(String(selectedSubcat.id))}` +
+      `&country=${encodeURIComponent(selectedCountry.country)}` +
+      `&city=${encodeURIComponent(selectedCity.city)}` +
+      `&q=${encodeURIComponent(clinicQ)}` +
+      `&limit=${encodeURIComponent(String(limit))}` +
+      `&offset=${encodeURIComponent(String(nextOffset))}`;
+
     setBusy(true);
     try {
-      const r = await apiGet<{ clinics: ClinicRow[] }>(
-        `/api/patient/appointment/clinics?serviceId=${encodeURIComponent(
-          selectedService.service_id,
-        )}&country=${encodeURIComponent(selectedCountry.country)}&city=${encodeURIComponent(c.city)}`,
+      const r = await apiGet<{ items: any[]; total: number }>(url);
+      const list: ClinicRow[] = (r.items ?? []).map((c) => ({
+        clinic_id: String(c.clinic_id),
+        clinic_name: c.clinic_name ?? "",
+        country: c.country ?? "",
+        city: c.city ?? "",
+      }));
+
+      setClinicTotal(Number(r.total ?? 0));
+      setClinicOffset(nextOffset);
+
+      setClinics((prev) => (replace ? list : [...prev, ...list]));
+    } catch (e: any) {
+      setErrorMsg(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pickCity(c: CityNode) {
+    setErrorMsg(null);
+    setSelectedCity(c);
+
+    setSelectedClinic(null);
+    setSelectedService(null);
+
+    setClinics([]);
+    setClinicServices([]);
+    setClinicOffset(0);
+    setClinicTotal(0);
+
+    await loadClinics(0, true);
+  }
+
+  async function pickClinic(c: ClinicRow) {
+    if (!selectedSubcat) return;
+
+    setErrorMsg(null);
+    setSelectedClinic(c);
+    setSelectedService(null);
+    setClinicServices([]);
+
+    setBusy(true);
+    try {
+      const r = await apiGet<{ items: ClinicServiceRow[] }>(
+        `/api/patient/appointment/clinic-services?clinicId=${encodeURIComponent(c.clinic_id)}&subcategoryNodeId=${encodeURIComponent(String(selectedSubcat.id))}`
       );
-      setClinics(r.clinics ?? []);
+      setClinicServices(r.items ?? []);
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));
     } finally {
@@ -178,8 +270,15 @@ export default function AppointmentWizard() {
   }
 
   const canGoStep4 = useMemo(
-    () => method === "manual" && selectedCategory && selectedService && selectedCountry && selectedCity && selectedClinic,
-    [method, selectedCategory, selectedService, selectedCountry, selectedCity, selectedClinic],
+    () =>
+      method === "manual" &&
+      selectedCategory &&
+      selectedSubcat &&
+      selectedCountry &&
+      selectedCity &&
+      selectedClinic &&
+      selectedService,
+    [method, selectedCategory, selectedSubcat, selectedCountry, selectedCity, selectedClinic, selectedService]
   );
 
   async function submitBooking() {
@@ -313,9 +412,9 @@ export default function AppointmentWizard() {
         <section className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Select service & location</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Select filters</h2>
               <p className="mt-1 text-sm text-gray-500">
-                Choose service, country, city, and clinic
+                Choose subcategory, country, city, clinic, then service
               </p>
             </div>
             <button
@@ -326,23 +425,31 @@ export default function AppointmentWizard() {
             </button>
           </div>
 
-          {/* Services */}
+          {/* Subcategories */}
           <div>
-            <div className="text-sm font-semibold text-gray-900">Popular services</div>
-            <div className="mt-3 grid gap-2 md:grid-cols-4">
-              {services.map((s) => {
-                const active = selectedService?.service_id === s.service_id;
+            <div className="text-sm font-semibold text-gray-900">Choose subcategory</div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {subcats.map((n) => {
+                const active = selectedSubcat?.id === n.id;
                 return (
                   <button
-                    key={s.service_id}
+                    key={n.id}
                     disabled={busy}
-                    onClick={() => pickService(s)}
+                    onClick={() => pickSubcat(n)}
                     className={[
-                      "rounded-lg border px-3 py-2 text-sm font-medium",
+                      "rounded-xl border px-4 py-4 text-left",
                       active ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-gray-50",
                     ].join(" ")}
                   >
-                    {s.service_name}
+                    <div className="text-sm font-semibold">{n.name}</div>
+                    <div
+                      className={[
+                        "mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
+                        active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700",
+                      ].join(" ")}
+                    >
+                      {n.clinics_count} clinics
+                    </div>
                   </button>
                 );
               })}
@@ -350,15 +457,15 @@ export default function AppointmentWizard() {
           </div>
 
           {/* Countries */}
-          {selectedService && (
+          {selectedSubcat && (
             <div>
               <div className="text-sm font-semibold text-gray-900">Available countries</div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {countries.map((c) => {
-                  const active = selectedCountry?.country === c.country;
+                  const active = selectedCountry?.id === c.id;
                   return (
                     <button
-                      key={c.country}
+                      key={c.id}
                       disabled={busy}
                       onClick={() => pickCountry(c)}
                       className={[
@@ -367,8 +474,12 @@ export default function AppointmentWizard() {
                       ].join(" ")}
                     >
                       <div className="text-sm font-semibold">{c.country}</div>
-                      <div className={["mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
-                        active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"].join(" ")}>
+                      <div
+                        className={[
+                          "mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
+                          active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700",
+                        ].join(" ")}
+                      >
                         {c.clinics_count} clinics
                       </div>
                     </button>
@@ -384,10 +495,10 @@ export default function AppointmentWizard() {
               <div className="text-sm font-semibold text-gray-900">Available cities</div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {cities.map((c) => {
-                  const active = selectedCity?.city === c.city;
+                  const active = selectedCity?.id === c.id;
                   return (
                     <button
-                      key={c.city}
+                      key={c.id}
                       disabled={busy}
                       onClick={() => pickCity(c)}
                       className={[
@@ -396,8 +507,12 @@ export default function AppointmentWizard() {
                       ].join(" ")}
                     >
                       <div className="text-sm font-semibold">{c.city}</div>
-                      <div className={["mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
-                        active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"].join(" ")}>
+                      <div
+                        className={[
+                          "mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
+                          active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700",
+                        ].join(" ")}
+                      >
                         {c.clinics_count} clinics
                       </div>
                     </button>
@@ -409,16 +524,40 @@ export default function AppointmentWizard() {
 
           {/* Clinics */}
           {selectedCity && (
-            <div>
-              <div className="text-sm font-semibold text-gray-900">Available clinics</div>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">Available clinics</div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    Showing {clinics.length} of {clinicTotal}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    value={clinicQ}
+                    onChange={(e) => setClinicQ(e.target.value)}
+                    placeholder="Search clinic..."
+                    className="h-9 w-56 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  />
+                  <button
+                    disabled={busy}
+                    onClick={() => loadClinics(0, true)}
+                    className="h-9 rounded-lg border border-gray-200 px-3 text-sm hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
                 {clinics.map((c) => {
                   const active = selectedClinic?.clinic_id === c.clinic_id;
                   return (
                     <button
                       key={c.clinic_id}
                       disabled={busy}
-                      onClick={() => setSelectedClinic(c)}
+                      onClick={() => pickClinic(c)}
                       className={[
                         "rounded-xl border p-4 text-left",
                         active ? "border-emerald-600 ring-2 ring-emerald-100" : "hover:bg-gray-50",
@@ -433,28 +572,59 @@ export default function AppointmentWizard() {
                 })}
               </div>
 
-              <div className="mt-6 flex items-center justify-between gap-4">
+              {clinics.length < clinicTotal && (
                 <button
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
-                  onClick={() => {
-                    // “Previous” как на шаблоне
-                    setSelectedCity(null);
-                    setClinics([]);
-                  }}
+                  disabled={busy}
+                  onClick={() => loadClinics(clinicOffset + 15, false)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
                 >
-                  Previous
+                  Load more
                 </button>
+              )}
+            </div>
+          )}
 
-                <button
-                  disabled={!canGoStep4 || busy}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                  onClick={() => setStep(4)}
-                >
-                  Next →
-                </button>
+          {/* Services (after clinic selected) */}
+          {selectedClinic && (
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Choose service</div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {clinicServices.map((s) => {
+                  const active = selectedService?.service_id === s.service_id;
+                  return (
+                    <button
+                      key={s.service_id}
+                      disabled={busy}
+                      onClick={() => setSelectedService(s)}
+                      className={[
+                        "rounded-lg border px-3 py-2 text-sm font-medium",
+                        active ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-gray-50",
+                      ].join(" ")}
+                    >
+                      {s.service_name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
+
+          <div className="mt-6 flex items-center justify-between gap-4">
+            <button
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
+              onClick={() => setStep(2)}
+            >
+              Previous
+            </button>
+
+            <button
+              disabled={!canGoStep4 || busy}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              onClick={() => setStep(4)}
+            >
+              Next →
+            </button>
+          </div>
         </section>
       )}
 
