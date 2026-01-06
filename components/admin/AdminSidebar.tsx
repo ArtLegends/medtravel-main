@@ -34,6 +34,7 @@ const NAV: Item[] = [
   { label: "Clinic Inquiries", href: "/admin/clinic-inquiries", icon: LifeBuoy },
   { label: "Moderation", href: "/admin/moderation", icon: LifeBuoy },
   { label: "Partners", href: "/admin/partners", icon: Users },
+  { label: "Patients", href: "/admin/patients", icon: Users },
 ];
 
 export default function AdminSidebar() {
