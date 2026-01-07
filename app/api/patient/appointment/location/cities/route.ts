@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
   const supabase = await createRouteClient();
 
-  const { data, error } = await supabase.rpc("patient_location_cities_by_category_node_country", {
+  const { data, error } = await supabase.rpc("patient_location_city_nodes_by_category_node_country", {
     p_category_id: categoryId,
     p_node_id: subcategoryNodeId,
     p_country: country,
@@ -38,6 +38,7 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const items = (data ?? []).map((r: any) => ({
+    id: Number(r.city_node_id),
     city: r.city ?? "",
     clinics_count: Number(r.clinics_count ?? 0),
   }));

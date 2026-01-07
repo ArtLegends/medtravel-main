@@ -7,7 +7,7 @@ type Category = { id: string; name: string; slug?: string | null };
 
 type SubcategoryNode = { id: number; name: string; clinics_count: number };
 type CountryNode = { country: string; clinics_count: number };
-type CityNode = { city: string; clinics_count: number };
+type CityNode = { id: number; city: string; clinics_count: number };
 
 type ClinicRow = { clinic_id: string; clinic_name: string; country: string; city: string };
 
@@ -505,10 +505,10 @@ export default function AppointmentWizard() {
               <div className="text-sm font-semibold text-gray-900">Available cities</div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {cities.map((c) => {
-                  const active = selectedCity?.city === c.city;
+                  const active = selectedCity?.id === c.id;
                   return (
                     <button
-                      key={c.city}
+                      key={c.id}
                       disabled={busy}
                       onClick={() => pickCity(c)}
                       className={[
