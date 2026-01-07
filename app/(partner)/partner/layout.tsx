@@ -20,7 +20,6 @@ const MAIN_MENU = [
   { title: "Programs", href: "/partner/programs", icon: ListTree },
   { title: "Reports", href: "/partner/reports", icon: BarChart2 },
   { title: "Bookings", href: "/partner/bookings", icon: Calendar },
-  { title: "Settings", href: "/partner/settings", icon: Settings },
 ];
 
 const FINANCE_SUBMENU = [
