@@ -8,8 +8,9 @@ import { InputOtp, Button, Link } from "@heroui/react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browserClient";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
 
-const supabase = createClient();
+const { supabase } = useSupabase();
 
 type Props = {
   email: string;

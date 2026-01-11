@@ -17,23 +17,21 @@ function normalizeRole(asParam?: string | null): RoleName {
   return "GUEST";
 }
 
-async function ensureProfileAndRole(
-  supabase: any,
-  asParam: string | null,
-) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+function normCode(v: string) {
+  return String(v || "").trim().toUpperCase();
+}
+
+async function ensureProfileAndRole(supabase: any, asParam: string | null) {
+  const { data: u } = await supabase.auth.getUser();
+  const user = u?.user;
   if (!user) return;
 
   const userId = user.id;
   const email = user.email ?? null;
   const meta: any = user.user_metadata ?? {};
 
-  // 1) роль из ?as=...
   const fromAs = normalizeRole(asParam);
 
-  // 2) роль из user_metadata.requested_role (на всякий случай)
   const metaRoleRaw = (meta.requested_role as string | undefined)?.toUpperCase();
   const metaRole: RoleName =
     metaRoleRaw === "ADMIN" ||
@@ -43,38 +41,82 @@ async function ensureProfileAndRole(
       ? (metaRoleRaw as RoleName)
       : "GUEST";
 
-  // приоритет: ?as=... > metadata
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
-  // --- upsert в public.profiles (primary role = последний тип логина)
   await supabase
     .from("profiles")
     .upsert(
-      {
-        id: userId,
-        email,
-        role: finalRole.toLowerCase(), // admin / customer / partner / patient / guest
-      },
-      { onConflict: "id" },
+      { id: userId, email, role: finalRole.toLowerCase() },
+      { onConflict: "id" }
     );
 
-  // --- upsert в public.user_roles, добавляем роль к уже существующим
-  if (
-    finalRole === "ADMIN" ||
-    finalRole === "CUSTOMER" ||
-    finalRole === "PARTNER" ||
-    finalRole === "PATIENT"
-  ) {
+  if (finalRole !== "GUEST") {
     await supabase
       .from("user_roles")
       .upsert(
-        {
-          user_id: userId,
-          role: finalRole,
-        } as any,
-        { onConflict: "user_id,role" } as any,
+        { user_id: userId, role: finalRole } as any,
+        { onConflict: "user_id,role" } as any
       );
   }
+}
+
+async function attachReferralIfAny(
+  supabase: any,
+  res: NextResponse,
+  asParam: string | null,
+  store: Awaited<ReturnType<typeof cookies>>,
+  userId?: string | null
+) {
+  // прикрепляем рефералку ТОЛЬКО при входе как PATIENT
+  if (normalizeRole(asParam) !== "PATIENT") return;
+
+  const cookieCode = store.get("mt_ref_code")?.value ?? "";
+  const refCode = normCode(cookieCode);
+  if (!refCode) return;
+
+  // userId лучше взять из exchangeCodeForSession, но на всякий случай можно добрать
+  let uid = userId ?? null;
+  if (!uid) {
+    const { data: u } = await supabase.auth.getUser();
+    uid = u?.user?.id ?? null;
+  }
+  if (!uid) return;
+
+  // lookup владельца реф.кода через RPC
+  const { data: rows, error: lookupErr } = await supabase.rpc(
+    "partner_referral_code_lookup",
+    { p_ref_code: refCode }
+  );
+
+  // чистим cookie в любом случае, чтобы не висело
+  const clear = () => {
+    res.cookies.set("mt_ref_code", "", {
+      path: "/",
+      maxAge: 0,
+    });
+  };
+
+  if (lookupErr || !rows?.length) {
+    clear();
+    return;
+  }
+
+  const owner = rows[0] as { partner_user_id: string; program_key: string };
+
+  const { error: insErr } = await supabase.from("partner_referrals").insert({
+    ref_code: refCode,
+    partner_user_id: owner.partner_user_id,
+    program_key: owner.program_key,
+    patient_user_id: uid,
+  } as any);
+
+  // если дубль — это ок (у тебя unique на patient_user_id)
+  if (insErr && !String(insErr.message || "").toLowerCase().includes("duplicate")) {
+    // можно логировать, но не ломаем логин
+    // console.error("attachReferral error:", insErr);
+  }
+
+  clear();
 }
 
 export async function GET(req: NextRequest) {
@@ -83,48 +125,46 @@ export async function GET(req: NextRequest) {
   const next = url.searchParams.get("next") ?? "/";
   const asParam = url.searchParams.get("as"); // ADMIN / CUSTOMER / PARTNER / PATIENT
 
+  // редиректим туда, куда просили
   const res = NextResponse.redirect(new URL(next, req.url));
 
   const store = await cookies();
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll: () =>
-          store.getAll().map((c) => ({
-            name: c.name,
-            value: c.value,
-          })),
-        setAll: (all: Array<{ name: string; value: string; options?: any }>) => {
+          store.getAll().map((c) => ({ name: c.name, value: c.value })),
+        setAll: (all) => {
           all.forEach((cookie) => {
             res.cookies.set(cookie.name, cookie.value, cookie.options);
           });
         },
       },
-    },
+    }
   );
 
   if (!code) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
   if (error) {
-    res.cookies.set(
-      "mt_auth_error",
-      encodeURIComponent(error.message),
-      {
-        path: "/",
-        httpOnly: false,
-        maxAge: 60,
-      },
-    );
-    return NextResponse.redirect(new URL("/login?error=oauth", req.url));
+    // важно: редирект на /auth/login (а не /login)
+    const eurl = new URL("/auth/login", req.url);
+    eurl.searchParams.set("error", "oauth");
+    eurl.searchParams.set("message", error.message);
+    return NextResponse.redirect(eurl);
   }
 
-  // гарантируем profile + user_roles (включая PATIENT)
+  // гарантируем profile + user_roles
   await ensureProfileAndRole(supabase, asParam);
+
+  // гарантируем referral registration (на callback)
+  await attachReferralIfAny(supabase, res, asParam, store, data?.user?.id ?? null);
 
   return res;
 }

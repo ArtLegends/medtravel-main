@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 import EmailForm from "./EmailForm";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
 
 type RoleKind = "CUSTOMER" | "PARTNER" | "PATIENT" | "ADMIN";
 
@@ -16,7 +17,7 @@ export default function LoginManager() {
   const asParam = ((sp?.get("as") || "CUSTOMER").toUpperCase() ||
     "CUSTOMER") as RoleKind;
 
-  const supabase = createClient();
+  const { supabase } = useSupabase();
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 

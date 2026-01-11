@@ -7,8 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Input, Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { createClient } from "@/lib/supabase/browserClient";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
 
-const supabase = createClient();
+const { supabase } = useSupabase();
 
 type Props = {
   as: string; // "CUSTOMER" / "ADMIN" / ...

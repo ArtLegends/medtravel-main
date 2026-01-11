@@ -54,15 +54,18 @@ export async function GET(
   } as any);
 
   // ставим cookie (90 дней) + редиректим на логин пациента
-  const res = NextResponse.redirect(
-    new URL(`/auth/login?as=PATIENT&ref=${encodeURIComponent(code)}`, req.url),
-  );
+  const url = new URL("/auth/login", req.url);
+  url.searchParams.set("as", "PATIENT");
+  url.searchParams.set("next", "/patient"); // <-- важно
+  url.searchParams.set("ref", code);
+
+  const res = NextResponse.redirect(url);
 
   res.cookies.set("mt_ref_code", code, {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: true,
+    secure: process.env.NODE_ENV === "production", // <-- важно для локалки
     maxAge: 60 * 60 * 24 * 90,
   });
 
