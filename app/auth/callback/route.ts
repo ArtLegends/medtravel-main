@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { CookieOptions } from "@supabase/ssr";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -46,89 +46,92 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
 
   await supabase
     .from("profiles")
-    .upsert(
-      { id: userId, email, role: finalRole.toLowerCase() },
-      { onConflict: "id" }
-    );
+    .upsert({ id: userId, email, role: finalRole.toLowerCase() }, { onConflict: "id" });
 
   if (finalRole !== "GUEST") {
     await supabase
       .from("user_roles")
-      .upsert(
-        { user_id: userId, role: finalRole } as any,
-        { onConflict: "user_id,role" } as any
-      );
+      .upsert({ user_id: userId, role: finalRole } as any, { onConflict: "user_id,role" } as any);
   }
 }
 
+/**
+ * IMPORTANT:
+ * - делаем attach через SERVICE ROLE (RLS не мешает)
+ * - cookie очищаем всегда, чтобы не висела
+ */
 async function attachReferralIfAny(
-  supabase: any,
   res: NextResponse,
   asParam: string | null,
   store: Awaited<ReturnType<typeof cookies>>,
-  userId?: string | null
+  patientUserId: string | null,
 ) {
-  // прикрепляем рефералку ТОЛЬКО при входе как PATIENT
+  // прикрепляем только при входе как PATIENT
   if (normalizeRole(asParam) !== "PATIENT") return;
 
-  const cookieCode = store.get("mt_ref_code")?.value ?? "";
-  const refCode = normCode(cookieCode);
+  const refCode = normCode(store.get("mt_ref_code")?.value ?? "");
   if (!refCode) return;
 
-  // userId лучше взять из exchangeCodeForSession, но на всякий случай можно добрать
-  let uid = userId ?? null;
-  if (!uid) {
-    const { data: u } = await supabase.auth.getUser();
-    uid = u?.user?.id ?? null;
-  }
-  if (!uid) return;
-
-  // lookup владельца реф.кода через RPC
-  const { data: rows, error: lookupErr } = await supabase.rpc(
-    "partner_referral_code_lookup",
-    { p_ref_code: refCode }
-  );
-
-  // чистим cookie в любом случае, чтобы не висело
   const clear = () => {
-    res.cookies.set("mt_ref_code", "", {
-      path: "/",
-      maxAge: 0,
-    });
+    res.cookies.set("mt_ref_code", "", { path: "/", maxAge: 0 });
   };
 
-  if (lookupErr || !rows?.length) {
+  if (!patientUserId) {
     clear();
     return;
   }
 
-  const owner = rows[0] as { partner_user_id: string; program_key: string };
+  const sb = createServiceClient();
 
-  const { error: insErr } = await supabase.from("partner_referrals").insert({
-    ref_code: refCode,
-    partner_user_id: owner.partner_user_id,
-    program_key: owner.program_key,
-    patient_user_id: uid,
-  } as any);
+  // 1) найдём владельца кода (approved)
+  const { data: owner, error: ownerErr } = await sb
+    .from("partner_program_requests")
+    .select("user_id, program_key")
+    .eq("ref_code", refCode)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  // если дубль — это ок (у тебя unique на patient_user_id)
-  if (insErr && !String(insErr.message || "").toLowerCase().includes("duplicate")) {
-    // можно логировать, но не ломаем логин
-    // console.error("attachReferral error:", insErr);
+  if (ownerErr || !owner?.user_id) {
+    clear();
+    return;
+  }
+
+  // 2) пишем регистрацию (на дубль — ок)
+  // если у тебя unique на patient_user_id или на (patient_user_id, partner_user_id) — upsert/ignore must be safe
+  const { error: insErr } = await sb.from("partner_referrals").upsert(
+    {
+      ref_code: refCode,
+      partner_user_id: owner.user_id,
+      program_key: owner.program_key,
+      patient_user_id: patientUserId,
+    } as any,
+    { onConflict: "patient_user_id" }, // <-- если у тебя уникальность другая — скажешь, поправим
+  );
+
+  // если конфликт/дубль — не ломаем логин
+  // если ошибка реальная — тоже не ломаем, но можно поставить debug-cookie
+  if (insErr) {
+    res.cookies.set("mt_ref_attach_error", encodeURIComponent(insErr.message), {
+      path: "/",
+      httpOnly: false,
+      maxAge: 60,
+    });
   }
 
   clear();
 }
 
+type CookieToSet = { name: string; value: string; options?: any };
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next") ?? "/";
-  const asParam = url.searchParams.get("as"); // ADMIN / CUSTOMER / PARTNER / PATIENT
+  const asParam = url.searchParams.get("as");
 
-  // редиректим туда, куда просили
   const res = NextResponse.redirect(new URL(next, req.url));
-
   const store = await cookies();
 
   const supabase = createServerClient(
@@ -136,17 +139,14 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () =>
-          store.getAll().map((c) => ({ name: c.name, value: c.value })),
-        setAll: (
-          all: Array<{ name: string; value: string; options?: CookieOptions }>
-        ) => {
+        getAll: () => store.getAll().map((c) => ({ name: c.name, value: c.value })),
+        setAll: (all: CookieToSet[]) => {
           all.forEach((cookie) => {
             res.cookies.set(cookie.name, cookie.value, cookie.options);
           });
         },
       },
-    }
+    },
   );
 
   if (!code) {
@@ -156,18 +156,15 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    // важно: редирект на /auth/login (а не /login)
     const eurl = new URL("/auth/login", req.url);
     eurl.searchParams.set("error", "oauth");
     eurl.searchParams.set("message", error.message);
     return NextResponse.redirect(eurl);
   }
 
-  // гарантируем profile + user_roles
   await ensureProfileAndRole(supabase, asParam);
 
-  // гарантируем referral registration (на callback)
-  await attachReferralIfAny(supabase, res, asParam, store, data?.user?.id ?? null);
+  await attachReferralIfAny(res, asParam, store, data?.user?.id ?? null);
 
   return res;
 }
