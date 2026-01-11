@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { CookieOptions } from "@supabase/ssr";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -137,7 +138,9 @@ export async function GET(req: NextRequest) {
       cookies: {
         getAll: () =>
           store.getAll().map((c) => ({ name: c.name, value: c.value })),
-        setAll: (all) => {
+        setAll: (
+          all: Array<{ name: string; value: string; options?: CookieOptions }>
+        ) => {
           all.forEach((cookie) => {
             res.cookies.set(cookie.name, cookie.value, cookie.options);
           });
