@@ -4927,3 +4927,176 @@ export default function OtpForm({
   );
 }
 """
+
+---------------------------------------------
+
+выполнил правки, ошибок больше нет. начал деплоить и по завершению ошибки при деплое: """
+03:32:30.016 Running build in Washington, D.C., USA (East) – iad1
+03:32:30.020 Build machine configuration: 2 cores, 8 GB
+03:32:30.342 Cloning github.com/ArtLegends/medtravel-main (Branch: main, Commit: 4cf68d3)
+03:32:31.858 Cloning completed: 1.516s
+03:32:32.802 Restored build cache from previous deployment (2XP7pCteRjnwMJgskKsvE1PhD9Vm)
+03:32:34.079 Running "vercel build"
+03:32:34.501 Vercel CLI 50.1.6
+03:32:35.243 yarn config v1.22.19
+03:32:35.273 success Set "enableGlobalCache" to "false".
+03:32:35.274 Done in 0.03s.
+03:32:35.284 Installing dependencies...
+03:32:35.456 yarn install v1.22.19
+03:32:35.553 [1/4] Resolving packages...
+03:32:44.565 warning next@15.3.6: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11 for more details.
+03:32:50.340 warning supabase > node-fetch > fetch-blob > node-domexception@1.0.0: Use your platform's native DOMException instead
+03:32:50.960 [2/4] Fetching packages...
+03:33:20.103 warning tailwind-variants@0.3.0: The engine "pnpm" appears to be invalid.
+03:33:20.105 warning tailwind-variants@3.2.2: The engine "pnpm" appears to be invalid.
+03:33:20.118 [3/4] Linking dependencies...
+03:33:20.129 warning "@heroui/react > @heroui/theme@2.4.25" has incorrect peer dependency "tailwindcss@>=4.0.0".
+03:33:37.506 [4/4] Building fresh packages...
+03:33:41.260 success Saved lockfile.
+03:33:41.272 Done in 65.82s.
+03:33:41.336 Detected Next.js version: 15.3.6
+03:33:41.339 Running "yarn run build"
+03:33:41.519 yarn run v1.22.19
+03:33:41.551 $ next build
+03:33:42.239    ▲ Next.js 15.3.6
+03:33:42.239    - Environments: .env
+03:33:42.240 
+03:33:42.320    Creating an optimized production build ...
+03:34:03.537 
+03:34:03.538 [1m[33mwarn[39m[22m - The utility `data-[has-label=true]:mt-[calc(theme(fontSize.small)_+_10px)]` contains an invalid theme value and was not generated.
+03:34:11.747  ✓ Compiled successfully in 28.0s
+03:34:11.753    Skipping linting
+03:34:11.754    Checking validity of types ...
+03:34:32.271 Failed to compile.
+03:34:32.272 
+03:34:32.273 app/auth/login/page.tsx
+03:34:32.273 Type error: Type '{ searchParams: SP; }' does not satisfy the constraint 'PageProps'.
+03:34:32.273   Types of property 'searchParams' are incompatible.
+03:34:32.273     Type 'SP' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+03:34:32.273 
+03:34:32.324 Next.js build worker exited with code: 1 and signal: null
+03:34:32.390 error Command failed with exit code 1.
+03:34:32.390 info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
+03:34:32.412 Error: Command "yarn run build" exited with 1
+"""
+
+вот текущий файл app\auth\login\page.tsx: """
+// app/auth/login/page.tsx
+import AuthLoginClient from "@/components/auth/AuthLoginClient";
+
+export const dynamic = "force-dynamic";
+
+type SP = { [key: string]: string | string[] | undefined };
+
+function pick(sp: SP, key: string): string | undefined {
+  const v = sp[key];
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default function Page({ searchParams }: { searchParams: SP }) {
+  const as = pick(searchParams, "as");     // PATIENT / PARTNER / CUSTOMER
+  const next = pick(searchParams, "next"); // куда после логина
+
+  return <AuthLoginClient as={as} next={next} />;
+}
+"""
+а вот файл который был до нового app\auth\login\_old-page.tsx на всякий случай пришлю его: """
+// app/(auth)/login/page.tsx
+import { Metadata } from "next";
+import { Suspense } from "react";
+import { Card, CardBody } from "@/components/shared/HeroUIComponents";
+import LoginManager from "@/components/auth/LoginManager";
+
+export const metadata: Metadata = {
+  title: "Sign In - MedTravel",
+  description: "Sign in to your MedTravel account",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
+function LoginSkeleton() {
+  return (
+    <Card className="w-full max-w-md animate-pulse">
+      <CardBody className="space-y-4 p-6">
+        <div className="h-6 w-32 bg-default-200 rounded" />
+        <div className="h-4 w-48 bg-default-100 rounded" />
+        <div className="h-10 bg-default-100 rounded" />
+        <div className="h-10 bg-primary/20 rounded" />
+      </CardBody>
+    </Card>
+  );
+}
+
+// searchParams теперь Promise
+type Props = {
+  searchParams: Promise<{ as?: string; next?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: Props) {
+  const params = await searchParams;
+
+  const as = (params.as || "CUSTOMER").toUpperCase();
+  const isAdmin = as === "ADMIN";
+  const isPartner = as === "PARTNER";
+  const isPatient = as === "PATIENT";
+
+  const portalLabel = isAdmin
+    ? "Admin portal"
+    : isPartner
+    ? "Partner portal"
+    : isPatient
+    ? "Patient portal"
+    : "Clinic portal";
+
+  const title = isAdmin
+    ? "Sign in to admin panel"
+    : isPartner
+    ? "Sign in as partner"
+    : isPatient
+    ? "Sign in as patient"
+    : "Sign in";
+
+  const description = isAdmin
+    ? "Access the MedTravel admin dashboard."
+    : isPartner
+    ? "Access your MedTravel partner dashboard using Google or email."
+    : isPatient
+    ? "Access your MedTravel patient portal using Google or email."
+    : "Access your MedTravel clinic dashboard using Google or email.";
+
+  return (
+    <main className="min-h-screen w-full bg-gradient-to-b flex items-center justify-center px-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+            {portalLabel}
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {title}
+          </h1>
+          <p className="text-sm text-default-500">{description}</p>
+        </div>
+
+        <Card className="shadow-lg">
+          <CardBody className="pt-6 pb-6">
+            <Suspense fallback={<LoginSkeleton />}>
+              <LoginManager />
+            </Suspense>
+          </CardBody>
+        </Card>
+
+        <div className="text-center">
+          <a
+            href="/"
+            className="text-xs text-default-500 hover:text-default-700 underline underline-offset-2"
+          >
+            ← Back to MedTravel home
+          </a>
+        </div>
+      </div>
+    </main>
+  );
+}
+"""
