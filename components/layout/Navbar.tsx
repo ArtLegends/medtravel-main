@@ -96,15 +96,11 @@ MobileNavItem.displayName = "MobileNavItem";
 function ProfileDropdownAuth({
   session,
   roles,
-  activeRole,
-  setActiveRole,
   supabase,
   t,
 }: {
   session: any;
   roles: UserRole[];
-  activeRole: UserRole;
-  setActiveRole: (r: UserRole) => void;
   supabase: any;
   t: any;
 }) {
@@ -117,59 +113,6 @@ function ProfileDropdownAuth({
   }, [supabase, router]);
 
   const hasAdmin = roles.includes("ADMIN");
-  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
-  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
-  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
-
-  const goPortal = (role: UserRole) => {
-    setActiveRole(role);
-
-    // маршруты порталов
-    const map: Record<UserRole, string> = {
-      GUEST: "/",
-      PATIENT: "/patient",
-      PARTNER: "/partner",
-      CUSTOMER: "/customer",
-      ADMIN: "/admin",
-    };
-
-    router.push(map[role] ?? "/");
-  };
-
-  // какие пункты показать в “Switch portal”
-  const switchItems = ([
-    {
-      role: "PATIENT" as UserRole,
-      label: "Patient portal",
-      icon: "solar:heart-pulse-2-linear",
-      show: canAccessPatient,
-    },
-    {
-      role: "PARTNER" as UserRole,
-      label: "Partner dashboard",
-      icon: "solar:users-group-two-rounded-linear",
-      show: canAccessPartner,
-    },
-    {
-      role: "CUSTOMER" as UserRole,
-      label: "Clinic panel",
-      icon: "solar:hospital-linear",
-      show: canAccessCustomer,
-    },
-    {
-      role: "ADMIN" as UserRole,
-      label: "Admin panel",
-      icon: "solar:shield-user-bold",
-      show: hasAdmin,
-    },
-  ] as const satisfies ReadonlyArray<{
-    role: UserRole;
-    label: string;
-    icon: string;
-    show: boolean;
-  }>).filter((x) => x.show);
-
-  const switchableCount = switchItems.length;
 
   return (
     <Dropdown placement="bottom-end">
@@ -191,13 +134,6 @@ function ProfileDropdownAuth({
           </p>
         </DropdownItem>
 
-        <DropdownItem key="active-portal" className="cursor-default">
-          <div className="flex items-center justify-between w-full">
-            <span className="text-tiny text-default-500">Active portal</span>
-            <span className="text-tiny font-semibold">{activeRole}</span>
-          </div>
-        </DropdownItem>
-
         {/* единые настройки */}
         <DropdownItem
           key="settings"
@@ -207,28 +143,14 @@ function ProfileDropdownAuth({
           {tSafe(t, "navbar.mySettings", "My settings")}
         </DropdownItem>
 
-        {/* Switch portal */}
-        {switchableCount > 1 ? (
-          <>
-            <DropdownItem key="switch-title" className="cursor-default text-default-500">
-              {tSafe(t, "navbar.switchPortal", "Switch portal")}
-            </DropdownItem>
-
-            {switchItems.map((it) => (
-              <DropdownItem
-                key={`switch-${it.role}`}
-                onPress={() => goPortal(it.role)}
-                startContent={<Icon icon={it.icon} width={16} />}
-                endContent={
-                  activeRole === it.role ? (
-                    <Icon icon="solar:check-circle-bold" width={16} />
-                  ) : null
-                }
-              >
-                {it.label}
-              </DropdownItem>
-            ))}
-          </>
+        {roles.includes("ADMIN") ? (
+          <DropdownItem
+            key="admin"
+            onPress={() => router.push("/admin")}
+            startContent={<Icon icon="solar:shield-user-bold" width={16} />}
+          >
+            Admin panel
+          </DropdownItem>
         ) : null}
 
         <DropdownItem
@@ -343,24 +265,19 @@ export const Navbar = React.memo(() => {
               <ProfileDropdownAuth
                 session={session}
                 roles={roles}
-                activeRole={activeRole}
-                setActiveRole={setActiveRole}
                 supabase={supabase}
                 t={t}
               />
             ) : (
-              <Button
-                color="primary"
-                variant="flat"
-                startContent={<Icon icon="solar:user-linear" width={18} />}
-                onPress={() => {
-                  setAuthRole(null);     // важно: null => в модалке покажется выбор роли
-                  setAuthOpen(true);
-                }}
-                className="hidden sm:flex"
-              >
-                Sign in
-              </Button>
+                <Button
+                  variant="light"
+                  color="default"
+                  startContent={<Icon icon="solar:user-linear" width={18} />}
+                  onPress={() => { setAuthRole(null); setAuthOpen(true); }}
+                  className="hidden sm:flex"
+                >
+                  Sign up / Sign in
+                </Button>
             )}
 
             {!session ? (

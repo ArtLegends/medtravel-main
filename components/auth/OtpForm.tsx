@@ -13,6 +13,7 @@ type Props = {
   as?: string; // CUSTOMER / PARTNER / PATIENT / ADMIN
   next?: string; // куда редиректить после успешного ввода
   onBack?: () => void;
+  onSuccess?: () => void;
 };
 
 const schema = z.object({
@@ -26,6 +27,7 @@ export default function OtpForm({
   as = "CUSTOMER",
   next = "/",
   onBack,
+  onSuccess,
 }: Props) {
   const router = useRouter();
 
@@ -57,7 +59,7 @@ export default function OtpForm({
       const res = await fetch("/api/auth/email/send-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, as, next }),
+        body: JSON.stringify({ email, as, next, purpose: "verify_email" }),
         cache: "no-store",
       });
 
@@ -89,6 +91,7 @@ export default function OtpForm({
           token: data.token,
           as,
           next,
+          purpose: "verify_email",
         }),
         cache: "no-store",
       });
@@ -100,6 +103,7 @@ export default function OtpForm({
         return;
       }
 
+      onSuccess?.();
       router.replace(next || "/");
       router.refresh();
     } catch (e: any) {

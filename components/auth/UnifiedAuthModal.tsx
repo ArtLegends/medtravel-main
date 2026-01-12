@@ -14,29 +14,27 @@ import {
   Card,
   CardBody,
 } from "@heroui/react";
+import { useRouter } from "next/navigation";
 
 import type { UserRole } from "@/lib/supabase/supabase-provider";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 
-import EmailForm from "@/components/auth/EmailForm";
+import CredentialsForm from "@/components/auth/CredentialsForm";
 import OtpForm from "@/components/auth/OtpForm";
 
-type Step = "role" | "method" | "email" | "otp";
+type Step = "role" | "auth" | "otp";
+type Mode = "signin" | "signup";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-
-  /** если передан — модалка стартует сразу с выбранной роли */
   initialRole?: Exclude<UserRole, "ADMIN" | "GUEST"> | null;
-
-  /** куда редиректить после успешного логина */
   next?: string;
 };
 
 const ROLE_META: Record<
   Exclude<UserRole, "GUEST">,
-  { title: string; subtitle: string; icon: string; color?: any }
+  { title: string; subtitle: string; icon: string }
 > = {
   PATIENT: {
     title: "Patient",
@@ -70,43 +68,38 @@ export default function UnifiedAuthModal({
   initialRole = null,
   next = "/",
 }: Props) {
+  const router = useRouter();
   const { supabase } = useSupabase();
 
+  const safeNext = useMemo(() => {
+    const n = String(next || "/");
+    return n.startsWith("/") ? n : "/";
+  }, [next]);
+
   const [step, setStep] = useState<Step>("role");
+  const [mode, setMode] = useState<Mode>("signin");
   const [role, setRole] = useState<Exclude<UserRole, "ADMIN" | "GUEST"> | null>(
     null,
   );
   const [email, setEmail] = useState<string>("");
 
-  // reset при открытии
   useEffect(() => {
     if (!open) return;
 
     const r = isAllowedRole(initialRole) ? initialRole : null;
-
     setRole(r);
     setEmail("");
-    setStep(r ? "method" : "role");
+    setMode("signin");
+    setStep(r ? "auth" : "role");
   }, [open, initialRole]);
 
-  const roleLabel = useMemo(() => {
-    if (!role) return "";
-    return ROLE_META[role]?.title ?? role;
-  }, [role]);
+  const roleLabel = useMemo(() => (role ? ROLE_META[role]?.title ?? role : ""), [role]);
 
   const title = useMemo(() => {
     if (step === "role") return "Sign in / Sign up";
-    if (step === "method") return `Continue as ${roleLabel}`;
-    if (step === "email") return `Email verification (${roleLabel})`;
+    if (step === "auth") return role ? `${mode === "signin" ? "Sign in" : "Create account"} — ${roleLabel}` : "Sign in";
     return `Enter code (${roleLabel})`;
-  }, [step, roleLabel]);
-
-  const goBack = useCallback(() => {
-    if (step === "otp") return setStep("email");
-    if (step === "email") return setStep("method");
-    if (step === "method") return setStep(initialRole ? "method" : "role");
-    onClose();
-  }, [step, onClose, initialRole]);
+  }, [step, role, roleLabel, mode]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!role) return;
@@ -114,28 +107,23 @@ export default function UnifiedAuthModal({
     const origin = window.location.origin;
     const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
       role,
-    )}&next=${encodeURIComponent(next)}`;
+    )}&next=${encodeURIComponent(safeNext)}`;
 
-    // OAuth оставляем через Supabase (callback уже всё проставляет: profile/roles/referral)
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },
     });
-  }, [supabase, role, next]);
+  }, [supabase, role, safeNext]);
+
+  const goBack = useCallback(() => {
+    if (step === "otp") return setStep("auth");
+    if (step === "auth") return setStep(initialRole ? "auth" : "role");
+    onClose();
+  }, [step, onClose, initialRole]);
 
   const pickRole = (r: Exclude<UserRole, "ADMIN" | "GUEST">) => {
     setRole(r);
-    setStep("method");
-  };
-
-  const goEmail = () => {
-    if (!role) return;
-    setStep("email");
-  };
-
-  const onEmailSuccess = (e: string) => {
-    setEmail(e);
-    setStep("otp");
+    setStep("auth");
   };
 
   return (
@@ -189,17 +177,46 @@ export default function UnifiedAuthModal({
                 </div>
               ) : null}
 
-              {/* STEP: METHOD */}
-              {step === "method" ? (
-                <div className="flex flex-col gap-3">
-                  <Button
-                    color="primary"
-                    startContent={<Icon icon="solar:letter-bold" width={18} />}
-                    onPress={goEmail}
-                    className="justify-center"
-                  >
-                    Continue with email
-                  </Button>
+              {/* STEP: AUTH */}
+              {step === "auth" && role ? (
+                <div className="flex flex-col gap-4">
+                  {/* segmented sign in / sign up */}
+                  <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
+                    <Button
+                      className="flex-1"
+                      color={mode === "signin" ? "primary" : "default"}
+                      variant={mode === "signin" ? "solid" : "light"}
+                      onPress={() => setMode("signin")}
+                    >
+                      Sign in
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      color={mode === "signup" ? "primary" : "default"}
+                      variant={mode === "signup" ? "solid" : "light"}
+                      onPress={() => setMode("signup")}
+                    >
+                      Sign up
+                    </Button>
+                  </div>
+
+                  <CredentialsForm
+                    mode={mode}
+                    role={role}
+                    next={safeNext}
+                    onSignedIn={() => {
+                      close();
+                      onClose();
+                      router.replace(safeNext);
+                      router.refresh();
+                    }}
+                    onOtpRequired={(e) => {
+                      setEmail(e);
+                      setStep("otp");
+                    }}
+                  />
+
+                  <Divider />
 
                   <Button
                     variant="bordered"
@@ -210,16 +227,15 @@ export default function UnifiedAuthModal({
                     Continue with Google
                   </Button>
 
-                  <p className="text-tiny text-default-500 text-center mt-1">
-                    You’ll be signed in as <b>{roleLabel}</b>. You can switch portal later.
-                  </p>
-                </div>
-              ) : null}
-
-              {/* STEP: EMAIL */}
-              {step === "email" && role ? (
-                <div className="flex flex-col gap-4">
-                  <EmailForm as={role} next={next} onSuccess={onEmailSuccess} />
+                  {mode === "signup" ? (
+                    <p className="text-tiny text-default-500 text-center">
+                      We’ll send a 6-digit code to confirm your email.
+                    </p>
+                  ) : (
+                    <p className="text-tiny text-default-500 text-center">
+                      Use your email and password to sign in.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
@@ -229,8 +245,12 @@ export default function UnifiedAuthModal({
                   <OtpForm
                     email={email}
                     as={role}
-                    next={next}
-                    onBack={() => setStep("email")}
+                    next={safeNext}
+                    onBack={() => setStep("auth")}
+                    onSuccess={() => {
+                      // закроем модалку сразу, UX чище
+                      onClose();
+                    }}
                   />
                 </div>
               ) : null}
@@ -259,6 +279,7 @@ export default function UnifiedAuthModal({
                   onPress={() => {
                     setRole(null);
                     setEmail("");
+                    setMode("signin");
                     setStep("role");
                   }}
                   startContent={<Icon icon="solar:refresh-linear" width={16} />}

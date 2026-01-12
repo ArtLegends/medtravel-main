@@ -10,14 +10,15 @@ import { Button, Card, CardBody, Divider } from "@heroui/react";
 import type { UserRole } from "@/lib/supabase/supabase-provider";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 
-import EmailForm from "@/components/auth/EmailForm";
+import CredentialsForm from "@/components/auth/CredentialsForm";
 import OtpForm from "@/components/auth/OtpForm";
 
-type Step = "role" | "method" | "email" | "otp";
+type Step = "role" | "auth" | "otp";
+type Mode = "signin" | "signup";
 
 type Props = {
-  as?: string;   // из query
-  next?: string; // из query
+  as?: string;
+  next?: string;
 };
 
 const ROLE_META: Record<
@@ -46,7 +47,7 @@ const ROLE_META: Record<
   },
 };
 
-type LoginRole = Exclude<UserRole, "GUEST" | "ADMIN">; // PATIENT | PARTNER | CUSTOMER
+type LoginRole = Exclude<UserRole, "GUEST" | "ADMIN">;
 
 function normalizeRole(v?: string): LoginRole | null {
   const r = String(v || "").trim().toUpperCase();
@@ -54,27 +55,26 @@ function normalizeRole(v?: string): LoginRole | null {
   return null;
 }
 
-
 export default function AuthLoginClient({ as, next }: Props) {
   const router = useRouter();
   const { supabase } = useSupabase();
 
   const safeNext = useMemo(() => {
     const n = String(next || "/");
-    // защита от внешних редиректов
     return n.startsWith("/") ? n : "/";
   }, [next]);
 
   const [step, setStep] = useState<Step>("role");
+  const [mode, setMode] = useState<Mode>("signin");
   const [role, setRole] = useState<LoginRole | null>(null);
-
   const [email, setEmail] = useState("");
 
   useEffect(() => {
     const r = normalizeRole(as);
     setRole(r);
     setEmail("");
-    setStep(r ? "method" : "role");
+    setMode("signin");
+    setStep(r ? "auth" : "role");
   }, [as]);
 
   const roleLabel = role ? ROLE_META[role]?.title ?? role : "";
@@ -93,14 +93,9 @@ export default function AuthLoginClient({ as, next }: Props) {
     });
   }, [supabase, role, safeNext]);
 
-  const onEmailSuccess = (e: string) => {
-    setEmail(e);
-    setStep("otp");
-  };
-
   return (
     <div className="min-h-[calc(100vh-64px)] w-full flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[520px]">
+      <div className="w-full max-w-[560px]">
         <div className="mb-6 flex items-center justify-between">
           <NextLink
             href="/"
@@ -127,7 +122,11 @@ export default function AuthLoginClient({ as, next }: Props) {
             <div className="flex items-center gap-2">
               <Icon icon="solar:login-3-linear" width={20} />
               <div className="font-semibold text-lg">
-                {step === "role" ? "Sign in / Sign up" : `Continue as ${roleLabel}`}
+                {step === "role"
+                  ? "Sign in / Sign up"
+                  : role
+                  ? `${mode === "signin" ? "Sign in" : "Create account"} — ${roleLabel}`
+                  : "Sign in"}
               </div>
             </div>
 
@@ -142,9 +141,10 @@ export default function AuthLoginClient({ as, next }: Props) {
                     className="w-full text-left rounded-xl border border-divider hover:border-primary transition-colors p-4 flex items-center gap-4"
                     onClick={() => {
                       setRole(r);
-                      setStep("method");
-                      // обновляем URL параметр as (удобно шарить ссылку)
-                      router.replace(`/auth/login?as=${r}&next=${encodeURIComponent(safeNext)}`);
+                      setStep("auth");
+                      router.replace(
+                        `/auth/login?as=${r}&next=${encodeURIComponent(safeNext)}`,
+                      );
                     }}
                   >
                     <div className="h-10 w-10 rounded-full bg-default-100 flex items-center justify-center">
@@ -162,17 +162,43 @@ export default function AuthLoginClient({ as, next }: Props) {
               </div>
             ) : null}
 
-            {/* STEP: method */}
-            {step === "method" ? (
-              <div className="flex flex-col gap-3">
-                <Button
-                  color="primary"
-                  startContent={<Icon icon="solar:letter-bold" width={18} />}
-                  onPress={() => setStep("email")}
-                  className="justify-center"
-                >
-                  Continue with email
-                </Button>
+            {/* STEP: auth */}
+            {step === "auth" && role ? (
+              <div className="flex flex-col gap-4">
+                <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
+                  <Button
+                    className="flex-1"
+                    color={mode === "signin" ? "primary" : "default"}
+                    variant={mode === "signin" ? "solid" : "light"}
+                    onPress={() => setMode("signin")}
+                  >
+                    Sign in
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    color={mode === "signup" ? "primary" : "default"}
+                    variant={mode === "signup" ? "solid" : "light"}
+                    onPress={() => setMode("signup")}
+                  >
+                    Sign up
+                  </Button>
+                </div>
+
+                <CredentialsForm
+                  mode={mode}
+                  role={role}
+                  next={safeNext}
+                  onSignedIn={() => {
+                    router.replace(safeNext);
+                    router.refresh();
+                  }}
+                  onOtpRequired={(e) => {
+                    setEmail(e);
+                    setStep("otp");
+                  }}
+                />
+
+                <Divider />
 
                 <Button
                   variant="bordered"
@@ -183,7 +209,7 @@ export default function AuthLoginClient({ as, next }: Props) {
                   Continue with Google
                 </Button>
 
-                <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center justify-between">
                   <Button
                     variant="light"
                     onPress={() => {
@@ -203,16 +229,6 @@ export default function AuthLoginClient({ as, next }: Props) {
               </div>
             ) : null}
 
-            {/* STEP: email */}
-            {step === "email" && role ? (
-              <div className="flex flex-col gap-4">
-                <EmailForm as={role} next={safeNext} onSuccess={onEmailSuccess} />
-                <Button variant="light" onPress={() => setStep("method")}>
-                  Back
-                </Button>
-              </div>
-            ) : null}
-
             {/* STEP: otp */}
             {step === "otp" && role ? (
               <div className="flex flex-col gap-4">
@@ -220,7 +236,7 @@ export default function AuthLoginClient({ as, next }: Props) {
                   email={email}
                   as={role}
                   next={safeNext}
-                  onBack={() => setStep("email")}
+                  onBack={() => setStep("auth")}
                 />
               </div>
             ) : null}
