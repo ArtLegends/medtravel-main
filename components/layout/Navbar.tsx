@@ -24,17 +24,14 @@ import {
   Button,
 } from "@heroui/react";
 
-import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
+import type { UserRole } from "@/lib/supabase/supabase-provider";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
 import {
   getAccessibleNavItems,
-  getAccessibleProfileMenuItems,
 } from "@/config/nav";
-import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
-import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
-import PatientAuthModal from "@/components/auth/PatientAuthModal";
+import UnifiedAuthModal from "@/components/auth/UnifiedAuthModal";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 
 // безопасный текст без жёсткой завязки на i18n
@@ -95,56 +92,23 @@ const MobileNavItem = React.memo(
 );
 MobileNavItem.displayName = "MobileNavItem";
 
-/** Дропдаун гостя — выбор: клиника / партнёр / пациент */
-function ProfileDropdownGuest({
-  onOpenCustomerAuth,
-  onOpenPartnerAuth,
-  onOpenPatientAuth,
-}: {
-  onOpenCustomerAuth: () => void;
-  onOpenPartnerAuth: () => void;
-  onOpenPatientAuth: () => void;
-}) {
-  return (
-    <Dropdown placement="bottom-end">
-      <DropdownTrigger>
-        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
-          <Icon
-            className="text-default-500"
-            icon="solar:user-linear"
-            width={24}
-          />
-        </Button>
-      </DropdownTrigger>
-      <DropdownMenu aria-label="Guest Actions" variant="flat">
-        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
-          Sign in / Sign up as clinic
-        </DropdownItem>
-        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
-          Sign in / Sign up as partner
-        </DropdownItem>
-        <DropdownItem key="signin-patient" onPress={onOpenPatientAuth}>
-          Sign in / Sign up as patient
-        </DropdownItem>
-      </DropdownMenu>
-    </Dropdown>
-  );
-}
-
 /** Дропдаун авторизованного */
 function ProfileDropdownAuth({
   session,
-  role,
+  roles,
+  activeRole,
+  setActiveRole,
   supabase,
   t,
 }: {
   session: any;
-  role: any;
+  roles: UserRole[];
+  activeRole: UserRole;
+  setActiveRole: (r: UserRole) => void;
   supabase: any;
   t: any;
 }) {
   const router = useRouter();
-  const [roles, setRoles] = useState<string[] | null>(null);
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -152,80 +116,67 @@ function ProfileDropdownAuth({
     router.refresh();
   }, [supabase, router]);
 
-  // грузим все роли пользователя из user_roles + primary role из profile
-  useEffect(() => {
-    let cancelled = false;
+  const hasAdmin = roles.includes("ADMIN");
+  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
 
-    async function loadRoles() {
-      if (!session) {
-        if (!cancelled) setRoles(null);
-        return;
-      }
+  const goPortal = (role: UserRole) => {
+    setActiveRole(role);
 
-      let collected: string[] = [];
-
-      try {
-        const { data, error } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", session.user.id);
-
-        if (!error && Array.isArray(data)) {
-          collected = data
-            .map((r: any) => String(r.role || "").toUpperCase())
-            .filter(Boolean);
-        }
-      } catch {
-        // в крайнем случае просто используем profile.role
-      }
-
-      const primary = String(role || "").toUpperCase();
-      if (primary && !collected.includes(primary)) {
-        collected.push(primary);
-      }
-
-      if (!collected.length) {
-        collected.push("GUEST");
-      }
-
-      if (!cancelled) setRoles(collected);
-    }
-
-    loadRoles();
-
-    return () => {
-      cancelled = true;
+    // маршруты порталов
+    const map: Record<UserRole, string> = {
+      GUEST: "/",
+      PATIENT: "/patient",
+      PARTNER: "/partner",
+      CUSTOMER: "/customer",
+      ADMIN: "/admin",
     };
-  }, [session, supabase, role]);
 
-  const effectiveRoles =
-    roles && roles.length
-      ? roles
-      : [String(role || "").toUpperCase() || "GUEST"];
+    router.push(map[role] ?? "/");
+  };
 
-  const hasAdmin =
-    effectiveRoles.includes("ADMIN") || effectiveRoles.includes("SUPER_ADMIN");
+  // какие пункты показать в “Switch portal”
+  const switchItems = ([
+    {
+      role: "PATIENT" as UserRole,
+      label: "Patient portal",
+      icon: "solar:heart-pulse-2-linear",
+      show: canAccessPatient,
+    },
+    {
+      role: "PARTNER" as UserRole,
+      label: "Partner dashboard",
+      icon: "solar:users-group-two-rounded-linear",
+      show: canAccessPartner,
+    },
+    {
+      role: "CUSTOMER" as UserRole,
+      label: "Clinic panel",
+      icon: "solar:hospital-linear",
+      show: canAccessCustomer,
+    },
+    {
+      role: "ADMIN" as UserRole,
+      label: "Admin panel",
+      icon: "solar:shield-user-bold",
+      show: hasAdmin,
+    },
+  ] as const satisfies ReadonlyArray<{
+    role: UserRole;
+    label: string;
+    icon: string;
+    show: boolean;
+  }>).filter((x) => x.show);
 
-  const canAccessCustomer = hasAdmin || effectiveRoles.includes("CUSTOMER");
-  const canAccessPartner = hasAdmin || effectiveRoles.includes("PARTNER");
-  const canAccessPatient = hasAdmin || effectiveRoles.includes("PATIENT");
+  const switchableCount = switchItems.length;
 
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
         <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
-          <Badge
-            color="success"
-            content=""
-            placement="bottom-right"
-            shape="circle"
-            size="sm"
-          >
-            <Icon
-              className="text-default-500"
-              icon="solar:user-linear"
-              width={24}
-            />
+          <Badge color="success" content="" placement="bottom-right" shape="circle" size="sm">
+            <Icon className="text-default-500" icon="solar:user-linear" width={24} />
           </Badge>
         </Button>
       </DropdownTrigger>
@@ -240,7 +191,14 @@ function ProfileDropdownAuth({
           </p>
         </DropdownItem>
 
-        {/* единые настройки для любой роли */}
+        <DropdownItem key="active-portal" className="cursor-default">
+          <div className="flex items-center justify-between w-full">
+            <span className="text-tiny text-default-500">Active portal</span>
+            <span className="text-tiny font-semibold">{activeRole}</span>
+          </div>
+        </DropdownItem>
+
+        {/* единые настройки */}
         <DropdownItem
           key="settings"
           onPress={() => router.push("/settings")}
@@ -249,53 +207,28 @@ function ProfileDropdownAuth({
           {tSafe(t, "navbar.mySettings", "My settings")}
         </DropdownItem>
 
-        {/* Клиентская панель */}
-        {canAccessCustomer ? (
-          <DropdownItem
-            key="my-clinic"
-            onPress={() => router.push("/customer")}
-            startContent={<Icon icon="solar:hospital-linear" width={16} />}
-          >
-            My clinic
-          </DropdownItem>
-        ) : null}
+        {/* Switch portal */}
+        {switchableCount > 1 ? (
+          <>
+            <DropdownItem key="switch-title" className="cursor-default text-default-500">
+              {tSafe(t, "navbar.switchPortal", "Switch portal")}
+            </DropdownItem>
 
-        {/* Партнёрская панель */}
-        {canAccessPartner ? (
-          <DropdownItem
-            key="partner-dashboard"
-            onPress={() => router.push("/partner")}
-            startContent={
-              <Icon
-                icon="solar:users-group-two-rounded-linear"
-                width={16}
-              />
-            }
-          >
-            My partner dashboard
-          </DropdownItem>
-        ) : null}
-
-        {/* Пациентская панель */}
-        {canAccessPatient ? (
-          <DropdownItem
-            key="patient-dashboard"
-            onPress={() => router.push("/patient")}
-            startContent={<Icon icon="solar:heart-pulse-2-linear" width={16} />}
-          >
-            My patient portal
-          </DropdownItem>
-        ) : null}
-
-        {/* Admin panel */}
-        {hasAdmin ? (
-          <DropdownItem
-            key="admin"
-            onPress={() => router.push("/admin")}
-            startContent={<Icon icon="solar:shield-user-bold" width={16} />}
-          >
-            {tSafe(t, "navbar.adminPanel", "Admin panel")}
-          </DropdownItem>
+            {switchItems.map((it) => (
+              <DropdownItem
+                key={`switch-${it.role}`}
+                onPress={() => goPortal(it.role)}
+                startContent={<Icon icon={it.icon} width={16} />}
+                endContent={
+                  activeRole === it.role ? (
+                    <Icon icon="solar:check-circle-bold" width={16} />
+                  ) : null
+                }
+              >
+                {it.label}
+              </DropdownItem>
+            ))}
+          </>
         ) : null}
 
         <DropdownItem
@@ -311,19 +244,17 @@ function ProfileDropdownAuth({
   );
 }
 
+
 export const Navbar = React.memo(() => {
   const { t } = useTranslation();
-  const { supabase, session, role } =
-    useSupabase() as SupabaseContextType;
+  const { supabase, session, roles, activeRole, setActiveRole } = useSupabase();
 
   const pathname = usePathname() ?? "";
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
-  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
-  const [patientAuthOpen, setPatientAuthOpen] = React.useState(false);
+  const [authOpen, setAuthOpen] = React.useState(false);
+  const [authRole, setAuthRole] = React.useState<"CUSTOMER" | "PARTNER" | "PATIENT" | null>(null);
 
-  const navItems = useMemo(() => getAccessibleNavItems(role), [role]);
-  useMemo(() => getAccessibleProfileMenuItems(role), [role]);
+  const navItems = useMemo(() => getAccessibleNavItems(activeRole), [activeRole]);
 
   const isAuth = useMemo(
     () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
@@ -411,17 +342,40 @@ export const Navbar = React.memo(() => {
             {session ? (
               <ProfileDropdownAuth
                 session={session}
-                role={role}
+                roles={roles}
+                activeRole={activeRole}
+                setActiveRole={setActiveRole}
                 supabase={supabase}
                 t={t}
               />
             ) : (
-              <ProfileDropdownGuest
-                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
-                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
-                onOpenPatientAuth={() => setPatientAuthOpen(true)}
-              />
+              <Button
+                color="primary"
+                variant="flat"
+                startContent={<Icon icon="solar:user-linear" width={18} />}
+                onPress={() => {
+                  setAuthRole(null);     // важно: null => в модалке покажется выбор роли
+                  setAuthOpen(true);
+                }}
+                className="hidden sm:flex"
+              >
+                Sign in
+              </Button>
             )}
+
+            {!session ? (
+              <Button
+                className="h-8 w-8 min-w-0 p-0 sm:hidden"
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setAuthRole(null);
+                  setAuthOpen(true);
+                }}
+              >
+                <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+              </Button>
+            ) : null}
           </NavbarItem>
         </NavbarContent>
 
@@ -444,18 +398,11 @@ export const Navbar = React.memo(() => {
         </NavbarMenu>
       </HeroUINavbar>
 
-      {/* Модалки авторизации */}
-      <CustomerAuthModal
-        open={customerAuthOpen}
-        onClose={() => setCustomerAuthOpen(false)}
-      />
-      <PartnerAuthModal
-        open={partnerAuthOpen}
-        onClose={() => setPartnerAuthOpen(false)}
-      />
-      <PatientAuthModal
-        open={patientAuthOpen}
-        onClose={() => setPatientAuthOpen(false)}
+      <UnifiedAuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialRole={authRole}
+        next={pathname || "/"}
       />
     </>
   );

@@ -1,17 +1,15 @@
 // components/auth/EmailForm.tsx
 "use client";
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input, Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { createClient } from "@/lib/supabase/browserClient";
-
-const supabase = createClient();
 
 type Props = {
-  as: string; // "CUSTOMER" / "ADMIN" / ...
+  as: string; // "CUSTOMER" / "PARTNER" / "PATIENT" / "ADMIN"
   next: string;
   onSuccess?: (email: string) => void;
 };
@@ -31,21 +29,25 @@ export default function EmailForm({ as, next, onSuccess }: Props) {
   const onSubmit = async (data: FormValues) => {
     setErrorMsg(null);
 
-    const origin = window.location.origin;
-    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
-      as,
-    )}&next=${encodeURIComponent(next)}`;
+    try {
+      const res = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: data.email, as, next }),
+        cache: "no-store",
+      });
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: data.email,
-      options: {
-        emailRedirectTo: redirectTo,
-        data: { requested_role: as },
-      },
-    });
+      const json = await res.json().catch(() => ({}));
 
-    if (error) setErrorMsg(error.message);
-    else onSuccess?.(data.email);
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Failed to send code");
+        return;
+      }
+
+      onSuccess?.(data.email);
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    }
   };
 
   return (
@@ -59,7 +61,9 @@ export default function EmailForm({ as, next, onSuccess }: Props) {
         errorMessage={errors.email?.message}
         {...register("email")}
       />
+
       {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
       <Button
         color="primary"
         isLoading={isSubmitting}

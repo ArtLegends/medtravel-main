@@ -7,15 +7,30 @@ import { createClient } from "@/lib/supabase/browserClient";
 
 export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
 
+const ROLE_SET = new Set<UserRole>(["GUEST", "PATIENT", "CUSTOMER", "PARTNER", "ADMIN"]);
+
 const mapRole = (r?: string | null): UserRole => {
-  const v = String(r || "guest").toUpperCase() as UserRole;
-  return (["GUEST","PATIENT","CUSTOMER","PARTNER","ADMIN"] as const).includes(v) ? v : "GUEST";
+  const v = String(r || "guest").toUpperCase();
+  const vv = v as UserRole;
+  return ROLE_SET.has(vv) ? vv : "GUEST";
+};
+
+const readActiveRole = (): UserRole => {
+  if (typeof window === "undefined") return "GUEST";
+  return mapRole(window.localStorage.getItem("mt_active_role"));
+};
+
+const writeActiveRole = (role: UserRole) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem("mt_active_role", role);
 };
 
 export interface SupabaseContextType {
   supabase: ReturnType<typeof createClient>;
   session: Session | null;
-  role: UserRole | null;
+  roles: UserRole[];      // все роли пользователя
+  activeRole: UserRole;   // текущий портал/роль в UI
+  setActiveRole: (role: UserRole) => void;
 }
 
 const Ctx = createContext<SupabaseContextType | undefined>(undefined);
@@ -28,53 +43,86 @@ export function SupabaseProvider({
   initialSession?: Session | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+
   const [session, setSession] = useState<Session | null>(initialSession);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [roles, setRoles] = useState<UserRole[]>(["GUEST"]);
+  const [activeRole, _setActiveRole] = useState<UserRole>(readActiveRole());
+
+  const setActiveRole = (role: UserRole) => {
+    _setActiveRole(role);
+    writeActiveRole(role);
+  };
+
+  const fetchRoles = async (uid: string) => {
+    // 1) user_roles — источник истины
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", uid);
+
+    let collected: UserRole[] = [];
+
+    if (!error && Array.isArray(data) && data.length) {
+      collected = data
+        .map((r: any) => mapRole(r?.role))
+        .filter((x) => x !== "GUEST");
+    }
+
+    // 2) fallback на profiles.role
+    if (!collected.length) {
+      const { data: pr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", uid)
+        .maybeSingle();
+
+      const primary = mapRole(pr?.role ?? "guest");
+      collected = primary !== "GUEST" ? [primary] : ["GUEST"];
+    }
+
+    // нормализуем
+    const uniq = Array.from(new Set(collected));
+    setRoles(uniq.length ? uniq : ["GUEST"]);
+
+    // activeRole: если текущая активная роль недоступна — ставим первую доступную
+    const current = readActiveRole();
+    const ok = uniq.includes(current);
+    if (!ok) {
+      const next = uniq[0] ?? "GUEST";
+      setActiveRole(next);
+    }
+  };
 
   useEffect(() => {
-    // если initialSession нет — подтянем из SDK
+    // подтянуть сессию при старте
     if (!initialSession) {
       supabase.auth.getSession().then(({ data }) => {
         setSession(data.session);
-        if (data.session) fetchRole(data.session.user.id);
+        if (data.session) fetchRoles(data.session.user.id);
+        else setRoles(["GUEST"]);
       });
     } else {
-      fetchRole(initialSession.user.id);
+      fetchRoles(initialSession.user.id);
     }
 
     const { data: listener } = supabase.auth.onAuthStateChange((_e, sess) => {
       setSession(sess);
-      if (sess) fetchRole(sess.user.id);
-      else setRole(null);
+      if (sess) fetchRoles(sess.user.id);
+      else {
+        setRoles(["GUEST"]);
+        setActiveRole("GUEST");
+      }
     });
+
     return () => listener.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
-  const fetchRole = async (uid: string) => {
-    // 1) user_roles — источник истины
-    const { data: ur } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", uid)
-      .maybeSingle();
+  const value = useMemo(
+    () => ({ supabase, session, roles, activeRole, setActiveRole }),
+    [supabase, session, roles, activeRole],
+  );
 
-    if (ur?.role) {
-      setRole(mapRole(ur.role));
-      return;
-    }
-
-    // 2) profiles (fallback)
-    const { data: pr } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", uid)
-      .maybeSingle();
-
-    setRole(mapRole(pr?.role ?? "guest"));
-  };
-
-  const value = useMemo(() => ({ supabase, session, role }), [supabase, session, role]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

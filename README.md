@@ -3314,3 +3314,1616 @@ export default function NotificationsBell() {
 отлично, больше не редиректит на 404, а редиректит на логин, я авторизовался с новой почты через google auth, но почему-то не зарегистрировался как пациент, дальше редиректило только на главную с url - https://medtravel.me/?error=invalid_request&error_code=bad_oauth_state&error_description=OAuth+callback+with+invalid+state
 
 у партнера в My referrals, по ссылке которого я перешел, отобразился только клик, а регистрация нет(смотри скриншоты). у нас вообще регистрация и авторизация очень хромает, давай наверное сначала доведем до идеала авторизацию для всех ролей, а затем уже будем дорабатывать реферальную систему.
+
+----------------------------------------------------------
+
+resend: re_MDmbfUU2_7tBbx7Dki8CLDM7ZUqk8zCni
+welcome@medtravel.me
+----------------------------------------------------------
+
+отлично. в файле навбара все заменил по твоей инструкции, там только одна ошибка сейчас:
+[{
+	"resource": "/c:/Users/Artem/Desktop/АРТЕМ ПАПКА/medtravel-main/components/layout/Navbar.tsx",
+	"owner": "typescript",
+	"code": "2322",
+	"severity": 8,
+	"message": "Type '{ role: string; label: string; icon: string; show: boolean; }[]' is not assignable to type '{ role: UserRole; label: string; icon: string; show: boolean; }[]'.\n  Type '{ role: string; label: string; icon: string; show: boolean; }' is not assignable to type '{ role: UserRole; label: string; icon: string; show: boolean; }'.\n    Types of property 'role' are incompatible.\n      Type 'string' is not assignable to type 'UserRole'.",
+	"source": "ts",
+	"startLineNumber": 179,
+	"startColumn": 9,
+	"endLineNumber": 179,
+	"endColumn": 20,
+	"modelVersionId": 36,
+	"origin": "extHost1"
+}]
+
+далее, в таблице public.profiles успешно добавил твоим запросом колонку email_verified.
+
+в vercel environments добавил RESEND_API_KEY, RESEND_FROM=no-reply@medtravel.me, а NEXT_PUBLIC_SITE_URL=https://medtravel.me и NEXTAUTH_URL=https://medtravel.me и так были. в resend подтвержден домен. письма называть Medtravel.
+
+теперь давай поправим немного навбар, затем ты мне дашь готовые роуты, а далее UnifiedAuthModal и так далее по порядку.
+
+текущий полный файл навбара components\layout\Navbar.tsx: """
+// components/layout/Navbar.tsx
+"use client";
+
+import React, { useMemo, useCallback, useEffect, useState } from "react";
+import NextLink from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
+
+import {
+  Navbar as HeroUINavbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenu,
+  NavbarMenuItem,
+  NavbarMenuToggle,
+  Link,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Badge,
+  Button,
+} from "@heroui/react";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
+import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
+import {
+  getAccessibleNavItems,
+  getAccessibleProfileMenuItems,
+} from "@/config/nav";
+import CustomerAuthModal from "@/components/auth/CustomerAuthModal";
+import PartnerAuthModal from "@/components/auth/PartnerAuthModal";
+import PatientAuthModal from "@/components/auth/PatientAuthModal";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
+
+// безопасный текст без жёсткой завязки на i18n
+const tSafe = (t: any, key: string, fallback: string) => {
+  try {
+    const v = t(key);
+    if (!v || typeof v !== "string" || v.startsWith("navbar.")) return fallback;
+    return v;
+  } catch {
+    return fallback;
+  }
+};
+
+/** Desktop item */
+const NavItemLink = React.memo(
+  ({ item, active, t }: { item: any; active: boolean; t: any }) => (
+    <NavbarItem isActive={active}>
+      <NextLink
+        prefetch
+        className={`font-medium transition-colors ${
+          active ? "text-primary" : "text-foreground hover:text-primary"
+        }`}
+        href={item.href}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </NextLink>
+    </NavbarItem>
+  ),
+);
+NavItemLink.displayName = "NavItemLink";
+
+/** Mobile item */
+const MobileNavItem = React.memo(
+  ({
+    item,
+    active,
+    t,
+    onClose,
+  }: {
+    item: any;
+    active: boolean;
+    t: any;
+    onClose: () => void;
+  }) => (
+    <NavbarMenuItem isActive={active}>
+      <Link
+        prefetch
+        as={NextLink}
+        className="w-full flex items-center gap-4 font-medium text-lg py-2 px-2 justify-center"
+        color={active ? "primary" : "foreground"}
+        href={item.href}
+        onPress={onClose}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </Link>
+    </NavbarMenuItem>
+  ),
+);
+MobileNavItem.displayName = "MobileNavItem";
+
+/** Дропдаун гостя — выбор: клиника / партнёр / пациент */
+function ProfileDropdownGuest({
+  onOpenCustomerAuth,
+  onOpenPartnerAuth,
+  onOpenPatientAuth,
+}: {
+  onOpenCustomerAuth: () => void;
+  onOpenPartnerAuth: () => void;
+  onOpenPatientAuth: () => void;
+}) {
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
+          <Icon
+            className="text-default-500"
+            icon="solar:user-linear"
+            width={24}
+          />
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu aria-label="Guest Actions" variant="flat">
+        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
+          Sign in / Sign up as clinic
+        </DropdownItem>
+        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
+          Sign in / Sign up as partner
+        </DropdownItem>
+        <DropdownItem key="signin-patient" onPress={onOpenPatientAuth}>
+          Sign in / Sign up as patient
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+/** Дропдаун авторизованного */
+function ProfileDropdownAuth({
+  session,
+  roles,
+  activeRole,
+  setActiveRole,
+  supabase,
+  t,
+}: {
+  session: any;
+  roles: UserRole[];
+  activeRole: UserRole;
+  setActiveRole: (r: UserRole) => void;
+  supabase: any;
+  t: any;
+}) {
+  const router = useRouter();
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+    router.refresh();
+  }, [supabase, router]);
+
+  const hasAdmin = roles.includes("ADMIN");
+  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
+
+  const goPortal = (role: UserRole) => {
+    setActiveRole(role);
+
+    // маршруты порталов
+    const map: Record<UserRole, string> = {
+      GUEST: "/",
+      PATIENT: "/patient",
+      PARTNER: "/partner",
+      CUSTOMER: "/customer",
+      ADMIN: "/admin",
+    };
+
+    router.push(map[role] ?? "/");
+  };
+
+  // какие пункты показать в “Switch portal”
+  const switchItems: Array<{ role: UserRole; label: string; icon: string; show: boolean }> = [
+    {
+      role: "PATIENT",
+      label: "Patient portal",
+      icon: "solar:heart-pulse-2-linear",
+      show: canAccessPatient,
+    },
+    {
+      role: "PARTNER",
+      label: "Partner dashboard",
+      icon: "solar:users-group-two-rounded-linear",
+      show: canAccessPartner,
+    },
+    {
+      role: "CUSTOMER",
+      label: "Clinic panel",
+      icon: "solar:hospital-linear",
+      show: canAccessCustomer,
+    },
+    {
+      role: "ADMIN",
+      label: "Admin panel",
+      icon: "solar:shield-user-bold",
+      show: hasAdmin,
+    },
+  ].filter((x) => x.show);
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
+          <Badge color="success" content="" placement="bottom-right" shape="circle" size="sm">
+            <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+          </Badge>
+        </Button>
+      </DropdownTrigger>
+
+      <DropdownMenu aria-label="Profile Actions" variant="flat">
+        <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
+          <p className="font-semibold text-small">
+            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+          </p>
+          <p className="font-medium text-tiny text-default-500">
+            {session?.user?.email ?? ""}
+          </p>
+        </DropdownItem>
+
+        {/* единые настройки */}
+        <DropdownItem
+          key="settings"
+          onPress={() => router.push("/settings")}
+          startContent={<Icon icon="solar:settings-linear" width={16} />}
+        >
+          {tSafe(t, "navbar.mySettings", "My settings")}
+        </DropdownItem>
+
+        {/* Switch portal */}
+        {switchItems.length ? (
+          <>
+            <DropdownItem key="switch-title" className="cursor-default text-default-500">
+              {tSafe(t, "navbar.switchPortal", "Switch portal")}
+            </DropdownItem>
+
+            {switchItems.map((it) => (
+              <DropdownItem
+                key={`switch-${it.role}`}
+                onPress={() => goPortal(it.role)}
+                startContent={<Icon icon={it.icon} width={16} />}
+                endContent={
+                  activeRole === it.role ? (
+                    <Icon icon="solar:check-circle-bold" width={16} />
+                  ) : null
+                }
+              >
+                {it.label}
+              </DropdownItem>
+            ))}
+          </>
+        ) : null}
+
+        <DropdownItem
+          key="logout"
+          color="danger"
+          startContent={<Icon icon="solar:logout-linear" width={16} />}
+          onPress={handleLogout}
+        >
+          {tSafe(t, "navbar.logOut", "Log out")}
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+
+export const Navbar = React.memo(() => {
+  const { t } = useTranslation();
+  const { supabase, session, roles, activeRole, setActiveRole } = useSupabase();
+
+  const pathname = usePathname() ?? "";
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [customerAuthOpen, setCustomerAuthOpen] = React.useState(false);
+  const [partnerAuthOpen, setPartnerAuthOpen] = React.useState(false);
+  const [patientAuthOpen, setPatientAuthOpen] = React.useState(false);
+
+  const navItems = useMemo(() => getAccessibleNavItems(activeRole), [activeRole]);
+
+  const isAuth = useMemo(
+    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
+    [pathname],
+  );
+
+  // На /auth/* показываем урезанный navbar
+  if (isAuth) {
+    return (
+      <HeroUINavbar
+        className="border-b border-divider"
+        height="64px"
+        maxWidth="xl"
+      >
+        <NavbarContent justify="end">
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+        </NavbarContent>
+      </HeroUINavbar>
+    );
+  }
+
+  return (
+    <>
+      <HeroUINavbar
+        className="border-b border-divider bg-background/80 backdrop-blur-md"
+        height="64px"
+        maxWidth="xl"
+        shouldHideOnScroll
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+      >
+        <NavbarBrand className="gap-2">
+          <NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
+          <NextLink
+            prefetch
+            className="font-bold text-xl text-inherit hover:text-primary transition-colors"
+            href="/"
+          >
+            MedTravel
+          </NextLink>
+        </NavbarBrand>
+
+        <NavbarContent
+          className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6"
+          justify="center"
+        >
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
+            return (
+              <NavItemLink
+                key={item.key}
+                active={active}
+                item={item}
+                t={t}
+              />
+            );
+          })}
+        </NavbarContent>
+
+        <NavbarContent
+          className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0"
+          justify="end"
+        >
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+
+          {session && (
+            <NavbarItem>
+              <NotificationsBell />
+            </NavbarItem>
+          )}
+
+          <NavbarItem className="px-2">
+            {session ? (
+              <ProfileDropdownAuth
+                session={session}
+                roles={roles}
+                activeRole={activeRole}
+                setActiveRole={setActiveRole}
+                supabase={supabase}
+                t={t}
+              />
+            ) : (
+              <ProfileDropdownGuest
+                onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
+                onOpenPartnerAuth={() => setPartnerAuthOpen(true)}
+                onOpenPatientAuth={() => setPatientAuthOpen(true)}
+              />
+            )}
+          </NavbarItem>
+        </NavbarContent>
+
+        <NavbarMenu className="flex justify-center pt-6">
+          <div className="w-full max-w-screen-md mx-auto space-y-2">
+            {navItems.map((item) => (
+              <MobileNavItem
+                key={item.key}
+                active={
+                  pathname === item.href ||
+                  (item.href !== "/" &&
+                    pathname.startsWith(item.href))
+                }
+                item={item}
+                t={t}
+                onClose={() => setIsMenuOpen(false)}
+              />
+            ))}
+          </div>
+        </NavbarMenu>
+      </HeroUINavbar>
+
+      {/* Модалки авторизации */}
+      <CustomerAuthModal
+        open={customerAuthOpen}
+        onClose={() => setCustomerAuthOpen(false)}
+      />
+      <PartnerAuthModal
+        open={partnerAuthOpen}
+        onClose={() => setPartnerAuthOpen(false)}
+      />
+      <PatientAuthModal
+        open={patientAuthOpen}
+        onClose={() => setPatientAuthOpen(false)}
+      />
+    </>
+  );
+});
+Navbar.displayName = "Navbar";
+"""
+
+-------------------------------------------------
+
+отлично. в навбаре исправили switchItems, больше ошибки нет. файлы app\api\auth\email\send-otp\route.ts и app\api\auth\email\verify-otp\route.ts создал. в supabase smtp от resend включил и полностью настроил.
+
+в файлах components\auth\EmailForm.tsx и components\auth\OtpForm.tsx сейчас ничего не трогал, ниже дал их полные текущие версии, если надо то давай подключим в них send/verify otp. а далее UnifiedAuthModal и так далее.
+ответ на твой вопрос, в otp сейчас 6 цифр.
+
+components\auth\EmailForm.tsx: """
+// components/auth/EmailForm.tsx
+"use client";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Input, Button } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { createClient } from "@/lib/supabase/browserClient";
+
+const supabase = createClient();
+
+type Props = {
+  as: string; // "CUSTOMER" / "ADMIN" / ...
+  next: string;
+  onSuccess?: (email: string) => void;
+};
+
+const schema = z.object({ email: z.string().email("Enter a valid email") });
+type FormValues = z.infer<typeof schema>;
+
+export default function EmailForm({ as, next, onSuccess }: Props) {
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+
+    const origin = window.location.origin;
+    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+      as,
+    )}&next=${encodeURIComponent(next)}`;
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: data.email,
+      options: {
+        emailRedirectTo: redirectTo,
+        data: { requested_role: as },
+      },
+    });
+
+    if (error) setErrorMsg(error.message);
+    else onSuccess?.(data.email);
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <Input
+        isRequired
+        placeholder="you@clinic.com"
+        className="h-full"
+        type="email"
+        variant="bordered"
+        errorMessage={errors.email?.message}
+        {...register("email")}
+      />
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+      <Button
+        color="primary"
+        isLoading={isSubmitting}
+        startContent={<Icon className="text-2xl" icon="solar:letter-bold" />}
+        type="submit"
+      >
+        Continue with email
+      </Button>
+    </form>
+  );
+}
+"""
+components\auth\OtpForm.tsx: """
+// components/auth/OtpForm.tsx
+"use client";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { InputOtp, Button, Link } from "@heroui/react";
+import { useTranslation } from "react-i18next";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/browserClient";
+
+const supabase = createClient();
+
+type Props = {
+  email: string;
+  as?: string;    // CUSTOMER / PARTNER / PATIENT / ADMIN
+  next?: string;  // куда редиректить после успешного ввода
+  onBack?: () => void;
+};
+
+const schema = z.object({
+  token: z
+    .string()
+    .length(6, "6 digits")
+    .regex(/^[0-9]{6}$/),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+export default function OtpForm({ email, as = "CUSTOMER", next = "/", onBack }: Props) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [seconds, setSeconds] = useState(60);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const resend = async () => {
+    if (seconds === 0) {
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+        as
+      )}&next=${encodeURIComponent(next)}`;
+
+      await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectTo,
+          data: { requested_role: as },
+        },
+      });
+      setSeconds(60);
+      reset();
+    }
+  };
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: data.token,
+      type: "email",
+    });
+
+    if (error) {
+      setErrorMsg(error.message);
+    } else {
+      router.replace(next || "/");
+      router.refresh();
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <InputOtp
+        isRequired
+        aria-label="OTP input"
+        length={6}
+        placeholder="0"
+        {...register("token")}
+      />
+      {errors.token && (
+        <p className="text-danger text-small">{errors.token.message}</p>
+      )}
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+      <p className="text-tiny text-default-500">
+        Didn&apos;t receive code?{" "}
+        <Link as="button" disabled={seconds !== 0} size="sm" onClick={resend}>
+          Resend{seconds ? ` (${seconds}s)` : ""}
+        </Link>
+      </p>
+      <Button color="primary" isLoading={isSubmitting} type="submit">
+        Verify
+      </Button>
+      <Button
+        type="button"
+        variant="light"
+        onClick={onBack || (() => window.history.back())}
+      >
+        Back
+      </Button>
+    </form>
+  );
+}
+"""
+
+------------------------------------------------
+
+отлично. я пока еще ничего не деплоил и не тестировал, давай сначала закончим с UnifiedAuthModal, навбаром и доведем ux/ui и в целом auth до идеала, а уже после я все задеплою разом и буду тестировать.
+
+------------------------------------------------
+
+хорошо. так, изменения я выполнил, все обновил. давай пока что чуть остановимся. я могу уже деплоить и тестировать? или нам нужно еще дойти до логической точки, чтобы не запутаться? просто уже много чего сделали и все еще продолжаем.
+в файле components\auth\AuthLoginClient.tsx есть одна ошибка: """
+[{
+	"resource": "/c:/Users/Artem/Desktop/АРТЕМ ПАПКА/medtravel-main/components/auth/AuthLoginClient.tsx",
+	"owner": "typescript",
+	"code": "2345",
+	"severity": 8,
+	"message": "Argument of type '\"GUEST\" | \"PATIENT\" | \"CUSTOMER\" | \"PARTNER\" | null' is not assignable to parameter of type 'SetStateAction<\"PATIENT\" | \"CUSTOMER\" | \"PARTNER\" | null>'.\n  Type '\"GUEST\"' is not assignable to type 'SetStateAction<\"PATIENT\" | \"CUSTOMER\" | \"PARTNER\" | null>'.",
+	"source": "ts",
+	"startLineNumber": 73,
+	"startColumn": 13,
+	"endLineNumber": 73,
+	"endColumn": 14,
+	"modelVersionId": 2,
+	"origin": "extHost1"
+}]
+"""
+
+ниже предоставил нектороые файлы, остальное вроде бы не трогалось. проверь все тщательно пожалуйста и дай правки если что-то не так.
+а в целом давай поправим что надо, все перепроверим, дойдем до логической точки, затем я задеплою и просмотрю, протестирую как работает все, а уже потом будем думать и расписывать что дальше и тд.
+
+components\layout\Navbar.tsx: """
+// components/layout/Navbar.tsx
+"use client";
+
+import React, { useMemo, useCallback, useEffect, useState } from "react";
+import NextLink from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
+
+import {
+  Navbar as HeroUINavbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenu,
+  NavbarMenuItem,
+  NavbarMenuToggle,
+  Link,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Badge,
+  Button,
+} from "@heroui/react";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
+import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
+import {
+  getAccessibleNavItems,
+  getAccessibleProfileMenuItems,
+} from "@/config/nav";
+import UnifiedAuthModal from "@/components/auth/UnifiedAuthModal";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
+
+// безопасный текст без жёсткой завязки на i18n
+const tSafe = (t: any, key: string, fallback: string) => {
+  try {
+    const v = t(key);
+    if (!v || typeof v !== "string" || v.startsWith("navbar.")) return fallback;
+    return v;
+  } catch {
+    return fallback;
+  }
+};
+
+/** Desktop item */
+const NavItemLink = React.memo(
+  ({ item, active, t }: { item: any; active: boolean; t: any }) => (
+    <NavbarItem isActive={active}>
+      <NextLink
+        prefetch
+        className={`font-medium transition-colors ${
+          active ? "text-primary" : "text-foreground hover:text-primary"
+        }`}
+        href={item.href}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </NextLink>
+    </NavbarItem>
+  ),
+);
+NavItemLink.displayName = "NavItemLink";
+
+/** Mobile item */
+const MobileNavItem = React.memo(
+  ({
+    item,
+    active,
+    t,
+    onClose,
+  }: {
+    item: any;
+    active: boolean;
+    t: any;
+    onClose: () => void;
+  }) => (
+    <NavbarMenuItem isActive={active}>
+      <Link
+        prefetch
+        as={NextLink}
+        className="w-full flex items-center gap-4 font-medium text-lg py-2 px-2 justify-center"
+        color={active ? "primary" : "foreground"}
+        href={item.href}
+        onPress={onClose}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </Link>
+    </NavbarMenuItem>
+  ),
+);
+MobileNavItem.displayName = "MobileNavItem";
+
+/** Дропдаун гостя — выбор: клиника / партнёр / пациент */
+function ProfileDropdownGuest({
+  onOpenCustomerAuth,
+  onOpenPartnerAuth,
+  onOpenPatientAuth,
+}: {
+  onOpenCustomerAuth: () => void;
+  onOpenPartnerAuth: () => void;
+  onOpenPatientAuth: () => void;
+}) {
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
+          <Icon
+            className="text-default-500"
+            icon="solar:user-linear"
+            width={24}
+          />
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu aria-label="Guest Actions" variant="flat">
+        <DropdownItem key="signin-clinic" onPress={onOpenCustomerAuth}>
+          Sign in / Sign up as clinic
+        </DropdownItem>
+        <DropdownItem key="signin-partner" onPress={onOpenPartnerAuth}>
+          Sign in / Sign up as partner
+        </DropdownItem>
+        <DropdownItem key="signin-patient" onPress={onOpenPatientAuth}>
+          Sign in / Sign up as patient
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+/** Дропдаун авторизованного */
+function ProfileDropdownAuth({
+  session,
+  roles,
+  activeRole,
+  setActiveRole,
+  supabase,
+  t,
+}: {
+  session: any;
+  roles: UserRole[];
+  activeRole: UserRole;
+  setActiveRole: (r: UserRole) => void;
+  supabase: any;
+  t: any;
+}) {
+  const router = useRouter();
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+    router.refresh();
+  }, [supabase, router]);
+
+  const hasAdmin = roles.includes("ADMIN");
+  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
+
+  const goPortal = (role: UserRole) => {
+    setActiveRole(role);
+
+    // маршруты порталов
+    const map: Record<UserRole, string> = {
+      GUEST: "/",
+      PATIENT: "/patient",
+      PARTNER: "/partner",
+      CUSTOMER: "/customer",
+      ADMIN: "/admin",
+    };
+
+    router.push(map[role] ?? "/");
+  };
+
+  // какие пункты показать в “Switch portal”
+  const switchItems = ([
+    {
+      role: "PATIENT" as UserRole,
+      label: "Patient portal",
+      icon: "solar:heart-pulse-2-linear",
+      show: canAccessPatient,
+    },
+    {
+      role: "PARTNER" as UserRole,
+      label: "Partner dashboard",
+      icon: "solar:users-group-two-rounded-linear",
+      show: canAccessPartner,
+    },
+    {
+      role: "CUSTOMER" as UserRole,
+      label: "Clinic panel",
+      icon: "solar:hospital-linear",
+      show: canAccessCustomer,
+    },
+    {
+      role: "ADMIN" as UserRole,
+      label: "Admin panel",
+      icon: "solar:shield-user-bold",
+      show: hasAdmin,
+    },
+  ] as const satisfies ReadonlyArray<{
+    role: UserRole;
+    label: string;
+    icon: string;
+    show: boolean;
+  }>).filter((x) => x.show);
+
+  const switchableCount = switchItems.length;
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
+          <Badge color="success" content="" placement="bottom-right" shape="circle" size="sm">
+            <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+          </Badge>
+        </Button>
+      </DropdownTrigger>
+
+      <DropdownMenu aria-label="Profile Actions" variant="flat">
+        <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
+          <p className="font-semibold text-small">
+            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+          </p>
+          <p className="font-medium text-tiny text-default-500">
+            {session?.user?.email ?? ""}
+          </p>
+        </DropdownItem>
+
+        <DropdownItem key="active-portal" className="cursor-default">
+          <div className="flex items-center justify-between w-full">
+            <span className="text-tiny text-default-500">Active portal</span>
+            <span className="text-tiny font-semibold">{activeRole}</span>
+          </div>
+        </DropdownItem>
+
+        {/* единые настройки */}
+        <DropdownItem
+          key="settings"
+          onPress={() => router.push("/settings")}
+          startContent={<Icon icon="solar:settings-linear" width={16} />}
+        >
+          {tSafe(t, "navbar.mySettings", "My settings")}
+        </DropdownItem>
+
+        {/* Switch portal */}
+        {switchableCount > 1 ? (
+          <>
+            <DropdownItem key="switch-title" className="cursor-default text-default-500">
+              {tSafe(t, "navbar.switchPortal", "Switch portal")}
+            </DropdownItem>
+
+            {switchItems.map((it) => (
+              <DropdownItem
+                key={`switch-${it.role}`}
+                onPress={() => goPortal(it.role)}
+                startContent={<Icon icon={it.icon} width={16} />}
+                endContent={
+                  activeRole === it.role ? (
+                    <Icon icon="solar:check-circle-bold" width={16} />
+                  ) : null
+                }
+              >
+                {it.label}
+              </DropdownItem>
+            ))}
+          </>
+        ) : null}
+
+        <DropdownItem
+          key="logout"
+          color="danger"
+          startContent={<Icon icon="solar:logout-linear" width={16} />}
+          onPress={handleLogout}
+        >
+          {tSafe(t, "navbar.logOut", "Log out")}
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+
+export const Navbar = React.memo(() => {
+  const { t } = useTranslation();
+  const { supabase, session, roles, activeRole, setActiveRole } = useSupabase();
+
+  const pathname = usePathname() ?? "";
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [authOpen, setAuthOpen] = React.useState(false);
+  const [authRole, setAuthRole] = React.useState<"CUSTOMER" | "PARTNER" | "PATIENT" | null>(null);
+
+  const navItems = useMemo(() => getAccessibleNavItems(activeRole), [activeRole]);
+
+  const isAuth = useMemo(
+    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
+    [pathname],
+  );
+
+  // На /auth/* показываем урезанный navbar
+  if (isAuth) {
+    return (
+      <HeroUINavbar
+        className="border-b border-divider"
+        height="64px"
+        maxWidth="xl"
+      >
+        <NavbarContent justify="end">
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+        </NavbarContent>
+      </HeroUINavbar>
+    );
+  }
+
+  return (
+    <>
+      <HeroUINavbar
+        className="border-b border-divider bg-background/80 backdrop-blur-md"
+        height="64px"
+        maxWidth="xl"
+        shouldHideOnScroll
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+      >
+        <NavbarBrand className="gap-2">
+          <NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
+          <NextLink
+            prefetch
+            className="font-bold text-xl text-inherit hover:text-primary transition-colors"
+            href="/"
+          >
+            MedTravel
+          </NextLink>
+        </NavbarBrand>
+
+        <NavbarContent
+          className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6"
+          justify="center"
+        >
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
+            return (
+              <NavItemLink
+                key={item.key}
+                active={active}
+                item={item}
+                t={t}
+              />
+            );
+          })}
+        </NavbarContent>
+
+        <NavbarContent
+          className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0"
+          justify="end"
+        >
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+
+          {session && (
+            <NavbarItem>
+              <NotificationsBell />
+            </NavbarItem>
+          )}
+
+          <NavbarItem className="px-2">
+            {session ? (
+              <ProfileDropdownAuth
+                session={session}
+                roles={roles}
+                activeRole={activeRole}
+                setActiveRole={setActiveRole}
+                supabase={supabase}
+                t={t}
+              />
+            ) : (
+              <Button
+                color="primary"
+                variant="flat"
+                startContent={<Icon icon="solar:user-linear" width={18} />}
+                onPress={() => {
+                  setAuthRole(null);     // важно: null => в модалке покажется выбор роли
+                  setAuthOpen(true);
+                }}
+                className="hidden sm:flex"
+              >
+                Sign in
+              </Button>
+            )}
+
+            {!session ? (
+              <Button
+                className="h-8 w-8 min-w-0 p-0 sm:hidden"
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setAuthRole(null);
+                  setAuthOpen(true);
+                }}
+              >
+                <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+              </Button>
+            ) : null}
+          </NavbarItem>
+        </NavbarContent>
+
+        <NavbarMenu className="flex justify-center pt-6">
+          <div className="w-full max-w-screen-md mx-auto space-y-2">
+            {navItems.map((item) => (
+              <MobileNavItem
+                key={item.key}
+                active={
+                  pathname === item.href ||
+                  (item.href !== "/" &&
+                    pathname.startsWith(item.href))
+                }
+                item={item}
+                t={t}
+                onClose={() => setIsMenuOpen(false)}
+              />
+            ))}
+          </div>
+        </NavbarMenu>
+      </HeroUINavbar>
+
+      <UnifiedAuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialRole={authRole}
+        next={pathname || "/"}
+      />
+    </>
+  );
+});
+Navbar.displayName = "Navbar";
+"""
+app\auth\login\page.tsx: """
+// app/auth/login/page.tsx
+import AuthLoginClient from "@/components/auth/AuthLoginClient";
+
+export const dynamic = "force-dynamic";
+
+type SP = { [key: string]: string | string[] | undefined };
+
+function pick(sp: SP, key: string): string | undefined {
+  const v = sp[key];
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default function Page({ searchParams }: { searchParams: SP }) {
+  const as = pick(searchParams, "as");     // PATIENT / PARTNER / CUSTOMER
+  const next = pick(searchParams, "next"); // куда после логина
+
+  return <AuthLoginClient as={as} next={next} />;
+}
+"""
+components\auth\AuthLoginClient.tsx: """
+// components/auth/AuthLoginClient.tsx
+"use client";
+
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import NextLink from "next/link";
+import { useRouter } from "next/navigation";
+import { Icon } from "@iconify/react";
+import { Button, Card, CardBody, Divider } from "@heroui/react";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+import EmailForm from "@/components/auth/EmailForm";
+import OtpForm from "@/components/auth/OtpForm";
+
+type Step = "role" | "method" | "email" | "otp";
+
+type Props = {
+  as?: string;   // из query
+  next?: string; // из query
+};
+
+const ROLE_META: Record<
+  Exclude<UserRole, "GUEST">,
+  { title: string; subtitle: string; icon: string }
+> = {
+  PATIENT: {
+    title: "Patient",
+    subtitle: "Book appointments, manage visits",
+    icon: "solar:heart-pulse-2-linear",
+  },
+  PARTNER: {
+    title: "Partner",
+    subtitle: "Referral links, programs, reports",
+    icon: "solar:users-group-two-rounded-linear",
+  },
+  CUSTOMER: {
+    title: "Clinic",
+    subtitle: "Manage clinic profile and bookings",
+    icon: "solar:hospital-linear",
+  },
+  ADMIN: {
+    title: "Admin",
+    subtitle: "Administration panel",
+    icon: "solar:shield-user-bold",
+  },
+};
+
+function normalizeRole(v?: string): Exclude<UserRole,'s GUEST' | "ADMIN"> | null {
+  const r = String(v || "").trim().toUpperCase();
+  if (r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER") return r;
+  return null;
+}
+
+export default function AuthLoginClient({ as, next }: Props) {
+  const router = useRouter();
+  const { supabase } = useSupabase();
+
+  const safeNext = useMemo(() => {
+    const n = String(next || "/");
+    // защита от внешних редиректов
+    return n.startsWith("/") ? n : "/";
+  }, [next]);
+
+  const [step, setStep] = useState<Step>("role");
+  const [role, setRole] = useState<Exclude<UserRole, "GUEST" | "ADMIN"> | null>(
+    null,
+  );
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const r = normalizeRole(as);
+    setRole(r);
+    setEmail("");
+    setStep(r ? "method" : "role");
+  }, [as]);
+
+  const roleLabel = role ? ROLE_META[role]?.title ?? role : "";
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!role) return;
+
+    const origin = window.location.origin;
+    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+      role,
+    )}&next=${encodeURIComponent(safeNext)}`;
+
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+  }, [supabase, role, safeNext]);
+
+  const onEmailSuccess = (e: string) => {
+    setEmail(e);
+    setStep("otp");
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-64px)] w-full flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-[520px]">
+        <div className="mb-6 flex items-center justify-between">
+          <NextLink
+            href="/"
+            className="text-sm text-default-500 hover:text-primary transition-colors inline-flex items-center gap-2"
+          >
+            <Icon icon="solar:alt-arrow-left-linear" width={18} />
+            Back to home
+          </NextLink>
+
+          <div className="text-sm text-default-500">
+            {role ? (
+              <span className="inline-flex items-center gap-2">
+                <Icon icon={ROLE_META[role].icon} width={16} />
+                {roleLabel}
+              </span>
+            ) : (
+              "Choose role"
+            )}
+          </div>
+        </div>
+
+        <Card className="border border-divider">
+          <CardBody className="p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:login-3-linear" width={20} />
+              <div className="font-semibold text-lg">
+                {step === "role" ? "Sign in / Sign up" : `Continue as ${roleLabel}`}
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* STEP: role */}
+            {step === "role" ? (
+              <div className="grid grid-cols-1 gap-3">
+                {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
+                  <button
+                    key={r}
+                    className="w-full text-left rounded-xl border border-divider hover:border-primary transition-colors p-4 flex items-center gap-4"
+                    onClick={() => {
+                      setRole(r);
+                      setStep("method");
+                      // обновляем URL параметр as (удобно шарить ссылку)
+                      router.replace(`/auth/login?as=${r}&next=${encodeURIComponent(safeNext)}`);
+                    }}
+                  >
+                    <div className="h-10 w-10 rounded-full bg-default-100 flex items-center justify-center">
+                      <Icon icon={ROLE_META[r].icon} width={22} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="font-semibold">{ROLE_META[r].title}</div>
+                      <div className="text-tiny text-default-500">{ROLE_META[r].subtitle}</div>
+                    </div>
+                    <div className="ml-auto text-default-400">
+                      <Icon icon="solar:alt-arrow-right-linear" width={18} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {/* STEP: method */}
+            {step === "method" ? (
+              <div className="flex flex-col gap-3">
+                <Button
+                  color="primary"
+                  startContent={<Icon icon="solar:letter-bold" width={18} />}
+                  onPress={() => setStep("email")}
+                  className="justify-center"
+                >
+                  Continue with email
+                </Button>
+
+                <Button
+                  variant="bordered"
+                  startContent={<Icon icon="logos:google-icon" width={18} />}
+                  onPress={signInWithGoogle}
+                  className="justify-center"
+                >
+                  Continue with Google
+                </Button>
+
+                <div className="flex items-center justify-between mt-2">
+                  <Button
+                    variant="light"
+                    onPress={() => {
+                      setRole(null);
+                      setStep("role");
+                      router.replace(`/auth/login?next=${encodeURIComponent(safeNext)}`);
+                    }}
+                    startContent={<Icon icon="solar:refresh-linear" width={16} />}
+                  >
+                    Change role
+                  </Button>
+
+                  <span className="text-tiny text-default-500">
+                    Next: <b>{safeNext}</b>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* STEP: email */}
+            {step === "email" && role ? (
+              <div className="flex flex-col gap-4">
+                <EmailForm as={role} next={safeNext} onSuccess={onEmailSuccess} />
+                <Button variant="light" onPress={() => setStep("method")}>
+                  Back
+                </Button>
+              </div>
+            ) : null}
+
+            {/* STEP: otp */}
+            {step === "otp" && role ? (
+              <div className="flex flex-col gap-4">
+                <OtpForm
+                  email={email}
+                  as={role}
+                  next={safeNext}
+                  onBack={() => setStep("email")}
+                />
+              </div>
+            ) : null}
+          </CardBody>
+        </Card>
+      </div>
+    </div>
+  );
+}
+"""
+components\auth\EmailForm.tsx: """
+// components/auth/EmailForm.tsx
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Input, Button } from "@heroui/react";
+import { Icon } from "@iconify/react";
+
+type Props = {
+  as: string; // "CUSTOMER" / "PARTNER" / "PATIENT" / "ADMIN"
+  next: string;
+  onSuccess?: (email: string) => void;
+};
+
+const schema = z.object({ email: z.string().email("Enter a valid email") });
+type FormValues = z.infer<typeof schema>;
+
+export default function EmailForm({ as, next, onSuccess }: Props) {
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: data.email, as, next }),
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Failed to send code");
+        return;
+      }
+
+      onSuccess?.(data.email);
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <Input
+        isRequired
+        placeholder="you@clinic.com"
+        className="h-full"
+        type="email"
+        variant="bordered"
+        errorMessage={errors.email?.message}
+        {...register("email")}
+      />
+
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
+      <Button
+        color="primary"
+        isLoading={isSubmitting}
+        startContent={<Icon className="text-2xl" icon="solar:letter-bold" />}
+        type="submit"
+      >
+        Continue with email
+      </Button>
+    </form>
+  );
+}
+"""
+components\auth\OtpForm.tsx: """
+// components/auth/OtpForm.tsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { InputOtp, Button, Link } from "@heroui/react";
+import { useRouter } from "next/navigation";
+
+type Props = {
+  email: string;
+  as?: string; // CUSTOMER / PARTNER / PATIENT / ADMIN
+  next?: string; // куда редиректить после успешного ввода
+  onBack?: () => void;
+};
+
+const schema = z.object({
+  token: z.string().length(6, "6 digits").regex(/^[0-9]{6}$/),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+export default function OtpForm({
+  email,
+  as = "CUSTOMER",
+  next = "/",
+  onBack,
+}: Props) {
+  const router = useRouter();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [seconds, setSeconds] = useState(60);
+  const [resending, setResending] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const resend = async () => {
+    if (seconds !== 0 || resending) return;
+
+    setErrorMsg(null);
+    setResending(true);
+
+    try {
+      const res = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, as, next }),
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Failed to resend code");
+        return;
+      }
+
+      setSeconds(60);
+      reset();
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch("/api/auth/email/verify-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email,
+          token: data.token,
+          as,
+          next,
+        }),
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Invalid code");
+        return;
+      }
+
+      router.replace(next || "/");
+      router.refresh();
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <InputOtp
+        isRequired
+        aria-label="OTP input"
+        length={6}
+        placeholder="0"
+        {...register("token")}
+      />
+
+      {errors.token && (
+        <p className="text-danger text-small">{errors.token.message}</p>
+      )}
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
+      <p className="text-tiny text-default-500">
+        Didn&apos;t receive code?{" "}
+        <Link
+          as="button"
+          disabled={seconds !== 0 || resending}
+          size="sm"
+          onClick={resend}
+        >
+          Resend{seconds ? ` (${seconds}s)` : ""}
+        </Link>
+      </p>
+
+      <Button color="primary" isLoading={isSubmitting} type="submit">
+        Verify
+      </Button>
+
+      <Button
+        type="button"
+        variant="light"
+        onClick={onBack || (() => window.history.back())}
+      >
+        Back
+      </Button>
+    </form>
+  );
+}
+"""
