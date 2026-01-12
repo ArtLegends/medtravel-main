@@ -331,10 +331,11 @@ export const Navbar = React.memo(() => {
               <ProfileDropdownAuth
                 session={session}
                 roles={roles}
+                activeRole={activeRole}
+                setActiveRole={setActiveRole}
                 supabase={supabase}
-                t={t} activeRole={"GUEST"} setActiveRole={function (r: UserRole): void {
-                  throw new Error("Function not implemented.");
-                } }              />
+                t={t}
+                />
             ) : (
                 <Button
                   variant="light"

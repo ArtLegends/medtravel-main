@@ -5100,3 +5100,1577 @@ export default async function LoginPage({ searchParams }: Props) {
   );
 }
 """
+
+------------------------------------------------------
+
+так, вот результаты после деплоя и ниже актуальные, текущие версии файлов.
+в меню дропдауна вернулись панели, но по ним нельзя перейти, а в консоли ошибки: """
+layout-0d632149ae37c573.js:1 Uncaught Error: Function not implemented.
+    at setActiveRole (layout-0d632149ae37c573.js:1:21141)
+    at T (layout-0d632149ae37c573.js:1:17543)
+    at onPress (layout-0d632149ae37c573.js:1:19093)
+    at heroui-31f4f7c9b523916c.js:1:746065
+    at vendors-2d3e66f9ed74f2cb.js:25:177500
+    at onClick (vendors-2d3e66f9ed74f2cb.js:25:180764)
+    at vendors-2d3e66f9ed74f2cb.js:31:659826
+    at uY (vendors-2d3e66f9ed74f2cb.js:31:463717)
+    at vendors-2d3e66f9ed74f2cb.js:31:469795
+    at tE (vendors-2d3e66f9ed74f2cb.js:31:350135)
+    at u2 (vendors-2d3e66f9ed74f2cb.js:31:464950)
+    at s7 (vendors-2d3e66f9ed74f2cb.js:31:491000)
+    at s6 (vendors-2d3e66f9ed74f2cb.js:31:490822)
+"""
+
+при попытке через email + password зарегистрироваться прилетает уведомление Password must be at least 8 characters, причем в любом случае, я вводил пароль более 8 символов, и ошибки в консоли: """
+Failed to load resource: the server responded with a status of 400 ()
+"""
+
+таблица public.email_otps создана. в env на vercel все есть.
+
+смотри скриншоты. 
+
+components\layout\Navbar.tsx: """
+// components/layout/Navbar.tsx
+"use client";
+
+import React, { useMemo, useCallback, useEffect, useState } from "react";
+import NextLink from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
+
+import {
+  Navbar as HeroUINavbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenu,
+  NavbarMenuItem,
+  NavbarMenuToggle,
+  Link,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Badge,
+  Button,
+} from "@heroui/react";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
+import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
+import {
+  getAccessibleNavItems,
+} from "@/config/nav";
+import UnifiedAuthModal from "@/components/auth/UnifiedAuthModal";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
+
+// безопасный текст без жёсткой завязки на i18n
+const tSafe = (t: any, key: string, fallback: string) => {
+  try {
+    const v = t(key);
+    if (!v || typeof v !== "string" || v.startsWith("navbar.")) return fallback;
+    return v;
+  } catch {
+    return fallback;
+  }
+};
+
+/** Desktop item */
+const NavItemLink = React.memo(
+  ({ item, active, t }: { item: any; active: boolean; t: any }) => (
+    <NavbarItem isActive={active}>
+      <NextLink
+        prefetch
+        className={`font-medium transition-colors ${
+          active ? "text-primary" : "text-foreground hover:text-primary"
+        }`}
+        href={item.href}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </NextLink>
+    </NavbarItem>
+  ),
+);
+NavItemLink.displayName = "NavItemLink";
+
+/** Mobile item */
+const MobileNavItem = React.memo(
+  ({
+    item,
+    active,
+    t,
+    onClose,
+  }: {
+    item: any;
+    active: boolean;
+    t: any;
+    onClose: () => void;
+  }) => (
+    <NavbarMenuItem isActive={active}>
+      <Link
+        prefetch
+        as={NextLink}
+        className="w-full flex items-center gap-4 font-medium text-lg py-2 px-2 justify-center"
+        color={active ? "primary" : "foreground"}
+        href={item.href}
+        onPress={onClose}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </Link>
+    </NavbarMenuItem>
+  ),
+);
+MobileNavItem.displayName = "MobileNavItem";
+
+/** Дропдаун авторизованного */
+function ProfileDropdownAuth({
+  session,
+  roles,
+  activeRole,
+  setActiveRole,
+  supabase,
+  t,
+}: {
+  session: any;
+  roles: UserRole[];
+  activeRole: UserRole;
+  setActiveRole: (r: UserRole) => void;
+  supabase: any;
+  t: any;
+}) {
+  const router = useRouter();
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+    router.refresh();
+  }, [supabase, router]);
+
+  const hasAdmin = roles.includes("ADMIN");
+  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
+
+  const goPortal = (role: UserRole) => {
+    setActiveRole(role);
+
+    const map: Record<UserRole, string> = {
+      GUEST: "/",
+      PATIENT: "/patient",
+      PARTNER: "/partner",
+      CUSTOMER: "/customer",
+      ADMIN: "/admin",
+    };
+
+    router.push(map[role] ?? "/");
+  };
+
+  const portalItems = ([
+    {
+      role: "PATIENT" as const,
+      label: "Patient portal",
+      icon: "solar:heart-pulse-2-linear",
+      show: canAccessPatient,
+    },
+    {
+      role: "PARTNER" as const,
+      label: "Partner dashboard",
+      icon: "solar:users-group-two-rounded-linear",
+      show: canAccessPartner,
+    },
+    {
+      role: "CUSTOMER" as const,
+      label: "Clinic panel",
+      icon: "solar:hospital-linear",
+      show: canAccessCustomer,
+    },
+    {
+      role: "ADMIN" as const,
+      label: "Admin panel",
+      icon: "solar:shield-user-bold",
+      show: hasAdmin,
+    },
+  ] satisfies ReadonlyArray<{
+    role: UserRole;
+    label: string;
+    icon: string;
+    show: boolean;
+  }>).filter((x) => x.show);
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
+          <Badge
+            color="success"
+            content=""
+            placement="bottom-right"
+            shape="circle"
+            size="sm"
+          >
+            <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+          </Badge>
+        </Button>
+      </DropdownTrigger>
+
+      <DropdownMenu aria-label="Profile Actions" variant="flat">
+        <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
+          <p className="font-semibold text-small">
+            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+          </p>
+          <p className="font-medium text-tiny text-default-500">
+            {session?.user?.email ?? ""}
+          </p>
+        </DropdownItem>
+
+        <DropdownItem
+          key="settings"
+          onPress={() => router.push("/settings")}
+          startContent={<Icon icon="solar:settings-linear" width={16} />}
+        >
+          {tSafe(t, "navbar.mySettings", "My settings")}
+        </DropdownItem>
+
+        {/* ПАНЕЛИ (вернули) */}
+        {portalItems.length ? (
+          <>
+            <DropdownItem key="portals-title" className="cursor-default text-default-500">
+              Portals
+            </DropdownItem>
+
+            {portalItems.map((it) => (
+              <DropdownItem
+                key={`portal-${it.role}`}
+                onPress={() => goPortal(it.role)}
+                startContent={<Icon icon={it.icon} width={16} />}
+              >
+                {it.label}
+              </DropdownItem>
+            ))}
+          </>
+        ) : null}
+
+        <DropdownItem
+          key="logout"
+          color="danger"
+          startContent={<Icon icon="solar:logout-linear" width={16} />}
+          onPress={handleLogout}
+        >
+          {tSafe(t, "navbar.logOut", "Log out")}
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+export const Navbar = React.memo(() => {
+  const { t } = useTranslation();
+  const { supabase, session, roles, activeRole, setActiveRole } = useSupabase();
+
+  const pathname = usePathname() ?? "";
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [authOpen, setAuthOpen] = React.useState(false);
+  const [authRole, setAuthRole] = React.useState<"CUSTOMER" | "PARTNER" | "PATIENT" | null>(null);
+
+  const navItems = useMemo(() => getAccessibleNavItems(activeRole), [activeRole]);
+
+  const isAuth = useMemo(
+    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
+    [pathname],
+  );
+
+  // На /auth/* показываем урезанный navbar
+  if (isAuth) {
+    return (
+      <HeroUINavbar
+        className="border-b border-divider"
+        height="64px"
+        maxWidth="xl"
+      >
+        <NavbarContent justify="end">
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+        </NavbarContent>
+      </HeroUINavbar>
+    );
+  }
+
+  return (
+    <>
+      <HeroUINavbar
+        className="border-b border-divider bg-background/80 backdrop-blur-md"
+        height="64px"
+        maxWidth="xl"
+        shouldHideOnScroll
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+      >
+        <NavbarBrand className="gap-2">
+          <NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
+          <NextLink
+            prefetch
+            className="font-bold text-xl text-inherit hover:text-primary transition-colors"
+            href="/"
+          >
+            MedTravel
+          </NextLink>
+        </NavbarBrand>
+
+        <NavbarContent
+          className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6"
+          justify="center"
+        >
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
+            return (
+              <NavItemLink
+                key={item.key}
+                active={active}
+                item={item}
+                t={t}
+              />
+            );
+          })}
+        </NavbarContent>
+
+        <NavbarContent
+          className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0"
+          justify="end"
+        >
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+
+          {session && (
+            <NavbarItem>
+              <NotificationsBell />
+            </NavbarItem>
+          )}
+
+          <NavbarItem className="px-2">
+            {session ? (
+              <ProfileDropdownAuth
+                session={session}
+                roles={roles}
+                supabase={supabase}
+                t={t} activeRole={"GUEST"} setActiveRole={function (r: UserRole): void {
+                  throw new Error("Function not implemented.");
+                } }              />
+            ) : (
+                <Button
+                  variant="light"
+                  color="default"
+                  startContent={<Icon icon="solar:user-linear" width={18} />}
+                  onPress={() => { setAuthRole(null); setAuthOpen(true); }}
+                  className="hidden sm:flex"
+                >
+                  Sign up / Sign in
+                </Button>
+            )}
+
+            {!session ? (
+              <Button
+                className="h-8 w-8 min-w-0 p-0 sm:hidden"
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setAuthRole(null);
+                  setAuthOpen(true);
+                }}
+              >
+                <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+              </Button>
+            ) : null}
+          </NavbarItem>
+        </NavbarContent>
+
+        <NavbarMenu className="flex justify-center pt-6">
+          <div className="w-full max-w-screen-md mx-auto space-y-2">
+            {navItems.map((item) => (
+              <MobileNavItem
+                key={item.key}
+                active={
+                  pathname === item.href ||
+                  (item.href !== "/" &&
+                    pathname.startsWith(item.href))
+                }
+                item={item}
+                t={t}
+                onClose={() => setIsMenuOpen(false)}
+              />
+            ))}
+          </div>
+        </NavbarMenu>
+      </HeroUINavbar>
+
+      <UnifiedAuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialRole={authRole}
+        next={pathname || "/"}
+      />
+    </>
+  );
+});
+Navbar.displayName = "Navbar";
+"""
+app\api\auth\email\signup\route.ts: """
+import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
+
+export const runtime = "nodejs";
+
+function sha256(input: string) {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+function makeCode6() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function isValidEmail(email: unknown) {
+  return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const email = String(body?.email || "").trim().toLowerCase();
+    const password = String(body?.password || "");
+    const as = String(body?.as || "").trim().toUpperCase();
+    const next = String(body?.next || "/");
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    }
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters" },
+        { status: 400 },
+      );
+    }
+    if (!["PATIENT", "PARTNER", "CUSTOMER"].includes(as)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(url, serviceKey);
+
+    // 1) create user (НЕ отправляет письма)
+    const { data: created, error: createErr } =
+      await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: { requested_role: as },
+      });
+
+    // если пользователь уже существует — это не критично для UX:
+    // мы просто отправим OTP ещё раз (но при login он пойдёт в Sign in)
+    if (createErr && !String(createErr.message).toLowerCase().includes("already")) {
+      return NextResponse.json({ error: createErr.message }, { status: 400 });
+    }
+
+    // 2) гарантируем profiles.email_verified=false
+    // (если у тебя есть триггер on auth.users -> profiles, он уже вставит строку; здесь просто upsert)
+    await supabase
+      .from("profiles")
+      .upsert({ id: created?.user?.id, email_verified: false }, { onConflict: "id" });
+
+    // 3) генерим OTP + сохраняем hash
+    const code = makeCode6();
+    const otpSecret = process.env.OTP_SECRET || "dev-secret";
+    const purpose = "verify_email";
+    const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);
+
+    // защита от спама: удаляем старые и создаём новый
+    await supabase.from("email_otps").delete().eq("email", email).eq("purpose", purpose);
+
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+    const { error: insErr } = await supabase.from("email_otps").insert({
+      email,
+      purpose,
+      code_hash: codeHash,
+      expires_at: expiresAt.toISOString(),
+    });
+
+    if (insErr) {
+      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+
+    // 4) отправляем письмо через Resend (без SDK, просто fetch)
+    const from = process.env.RESEND_FROM!;
+    const apiKey = process.env.RESEND_API_KEY!;
+
+    const subject = "Your MedTravel verification code";
+    const html = `
+      <div style="font-family: Inter, Arial, sans-serif; line-height: 1.5">
+        <h2 style="margin:0 0 12px">Confirm your email</h2>
+        <p style="margin:0 0 16px">Use this code to finish signup:</p>
+        <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:12px 16px; background:#f2f4f7; display:inline-block; border-radius:10px">
+          ${code}
+        </div>
+        <p style="margin:16px 0 0; color:#667085">Code expires in 10 minutes.</p>
+      </div>
+    `;
+
+    const resendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject,
+        html,
+      }),
+    });
+
+    if (!resendRes.ok) {
+      const errText = await resendRes.text().catch(() => "");
+      return NextResponse.json(
+        { error: `Resend error: ${errText || resendRes.statusText}` },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, email, as, next });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  }
+}
+"""
+components\auth\AuthLoginClient.tsx: """
+// components/auth/AuthLoginClient.tsx
+"use client";
+
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import NextLink from "next/link";
+import { useRouter } from "next/navigation";
+import { Icon } from "@iconify/react";
+import { Button, Card, CardBody, Divider } from "@heroui/react";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+import CredentialsForm from "@/components/auth/CredentialsForm";
+import OtpForm from "@/components/auth/OtpForm";
+
+type Step = "role" | "auth" | "otp";
+type Mode = "signin" | "signup";
+
+type Props = {
+  as?: string;
+  next?: string;
+};
+
+const ROLE_META: Record<
+  Exclude<UserRole, "GUEST">,
+  { title: string; subtitle: string; icon: string }
+> = {
+  PATIENT: {
+    title: "Patient",
+    subtitle: "Book appointments, manage visits",
+    icon: "solar:heart-pulse-2-linear",
+  },
+  PARTNER: {
+    title: "Partner",
+    subtitle: "Referral links, programs, reports",
+    icon: "solar:users-group-two-rounded-linear",
+  },
+  CUSTOMER: {
+    title: "Clinic",
+    subtitle: "Manage clinic profile and bookings",
+    icon: "solar:hospital-linear",
+  },
+  ADMIN: {
+    title: "Admin",
+    subtitle: "Administration panel",
+    icon: "solar:shield-user-bold",
+  },
+};
+
+type LoginRole = Exclude<UserRole, "GUEST" | "ADMIN">;
+
+function normalizeRole(v?: string): LoginRole | null {
+  const r = String(v || "").trim().toUpperCase();
+  if (r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER") return r as LoginRole;
+  return null;
+}
+
+export default function AuthLoginClient({ as, next }: Props) {
+  const router = useRouter();
+  const { supabase } = useSupabase();
+
+  const safeNext = useMemo(() => {
+    const n = String(next || "/");
+    return n.startsWith("/") ? n : "/";
+  }, [next]);
+
+  const [step, setStep] = useState<Step>("role");
+  const [mode, setMode] = useState<Mode>("signin");
+  const [role, setRole] = useState<LoginRole | null>(null);
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const r = normalizeRole(as);
+    setRole(r);
+    setEmail("");
+    setMode("signin");
+    setStep(r ? "auth" : "role");
+  }, [as]);
+
+  const roleLabel = role ? ROLE_META[role]?.title ?? role : "";
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!role) return;
+
+    const origin = window.location.origin;
+    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+      role,
+    )}&next=${encodeURIComponent(safeNext)}`;
+
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+  }, [supabase, role, safeNext]);
+
+  return (
+    <div className="min-h-[calc(100vh-64px)] w-full flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-[560px]">
+        <div className="mb-6 flex items-center justify-between">
+          <NextLink
+            href="/"
+            className="text-sm text-default-500 hover:text-primary transition-colors inline-flex items-center gap-2"
+          >
+            <Icon icon="solar:alt-arrow-left-linear" width={18} />
+            Back to home
+          </NextLink>
+
+          <div className="text-sm text-default-500">
+            {role ? (
+              <span className="inline-flex items-center gap-2">
+                <Icon icon={ROLE_META[role].icon} width={16} />
+                {roleLabel}
+              </span>
+            ) : (
+              "Choose role"
+            )}
+          </div>
+        </div>
+
+        <Card className="border border-divider">
+          <CardBody className="p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:login-3-linear" width={20} />
+              <div className="font-semibold text-lg">
+                {step === "role"
+                  ? "Sign in / Sign up"
+                  : role
+                  ? `${mode === "signin" ? "Sign in" : "Create account"} — ${roleLabel}`
+                  : "Sign in"}
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* STEP: role */}
+            {step === "role" ? (
+              <div className="grid grid-cols-1 gap-3">
+                {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
+                  <button
+                    key={r}
+                    className="w-full text-left rounded-xl border border-divider hover:border-primary transition-colors p-4 flex items-center gap-4"
+                    onClick={() => {
+                      setRole(r);
+                      setStep("auth");
+                      router.replace(
+                        `/auth/login?as=${r}&next=${encodeURIComponent(safeNext)}`,
+                      );
+                    }}
+                  >
+                    <div className="h-10 w-10 rounded-full bg-default-100 flex items-center justify-center">
+                      <Icon icon={ROLE_META[r].icon} width={22} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="font-semibold">{ROLE_META[r].title}</div>
+                      <div className="text-tiny text-default-500">{ROLE_META[r].subtitle}</div>
+                    </div>
+                    <div className="ml-auto text-default-400">
+                      <Icon icon="solar:alt-arrow-right-linear" width={18} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {/* STEP: auth */}
+            {step === "auth" && role ? (
+              <div className="flex flex-col gap-4">
+                <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
+                  <Button
+                    className="flex-1"
+                    color={mode === "signin" ? "primary" : "default"}
+                    variant={mode === "signin" ? "solid" : "light"}
+                    onPress={() => setMode("signin")}
+                  >
+                    Sign in
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    color={mode === "signup" ? "primary" : "default"}
+                    variant={mode === "signup" ? "solid" : "light"}
+                    onPress={() => setMode("signup")}
+                  >
+                    Sign up
+                  </Button>
+                </div>
+
+                <CredentialsForm
+                  mode={mode}
+                  role={role}
+                  next={safeNext}
+                  onSignedIn={() => {
+                    router.replace(safeNext);
+                    router.refresh();
+                  }}
+                  onOtpRequired={(e) => {
+                    setEmail(e);
+                    setStep("otp");
+                  }}
+                />
+
+                <Divider />
+
+                <Button
+                  variant="bordered"
+                  startContent={<Icon icon="logos:google-icon" width={18} />}
+                  onPress={signInWithGoogle}
+                  className="justify-center"
+                >
+                  Continue with Google
+                </Button>
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="light"
+                    onPress={() => {
+                      setRole(null);
+                      setStep("role");
+                      router.replace(`/auth/login?next=${encodeURIComponent(safeNext)}`);
+                    }}
+                    startContent={<Icon icon="solar:refresh-linear" width={16} />}
+                  >
+                    Change role
+                  </Button>
+
+                  <span className="text-tiny text-default-500">
+                    Next: <b>{safeNext}</b>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* STEP: otp */}
+            {step === "otp" && role ? (
+              <div className="flex flex-col gap-4">
+                <OtpForm
+                  email={email}
+                  as={role}
+                  next={safeNext}
+                  onBack={() => setStep("auth")}
+                />
+              </div>
+            ) : null}
+          </CardBody>
+        </Card>
+      </div>
+    </div>
+  );
+}
+"""
+app\api\auth\email\send-otp\route.ts: """
+// app/api/auth/email/send-otp/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
+
+type AllowedRole = "PATIENT" | "PARTNER" | "CUSTOMER" | "ADMIN";
+
+function isAllowedRole(v: any): v is AllowedRole {
+  return v === "PATIENT" || v === "PARTNER" || v === "CUSTOMER" || v === "ADMIN";
+}
+
+function safeNext(v: any): string {
+  const s = String(v || "/");
+  return s.startsWith("/") ? s : "/";
+}
+
+function normalizeEmail(v: any): string {
+  return String(v || "").trim().toLowerCase();
+}
+
+function generateOtp6(): string {
+  const n = crypto.randomInt(0, 1_000_000);
+  return String(n).padStart(6, "0");
+}
+
+function sha256(input: string): string {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+async function sendViaResend(params: { to: string; subject: string; html: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+
+  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
+  if (!from) throw new Error("Missing EMAIL_FROM (e.g. no-reply@medtravel.me)");
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(json?.message || "Resend: failed to send email");
+  }
+
+  return json;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+
+    const email = normalizeEmail(body.email);
+    const roleRaw = String(body.as ?? body.role ?? "").trim().toUpperCase();
+    const role = isAllowedRole(roleRaw) ? roleRaw : null;
+
+    // В signup-флоу пароль обязателен (по твоим требованиям)
+    const password = String(body.password ?? "").trim();
+
+    const next = safeNext(body.next);
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    }
+
+    // В модалке ты используешь только PATIENT/PARTNER/CUSTOMER,
+    // но на всякий случай разрешаем ADMIN если надо.
+    if (!role || role === "ADMIN") {
+      // если ADMIN не нужен для email signup — просто запрети:
+      // return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      // пока оставлю мягко:
+    }
+
+    if (!password || password.length < 8) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters" },
+        { status: 400 },
+      );
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return NextResponse.json(
+        { error: "Server auth is not configured (missing Supabase envs)" },
+        { status: 500 },
+      );
+    }
+
+    const supabaseAdmin = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // 1) Проверим существует ли уже пользователь
+    const { data: existingList, error: listErr } =
+      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+
+    if (listErr) {
+      return NextResponse.json({ error: listErr.message }, { status: 500 });
+    }
+
+    const exists = (existingList?.users || []).some(
+      (u) => (u.email || "").toLowerCase() === email,
+    );
+
+    if (exists) {
+      return NextResponse.json(
+        { error: "Account already exists. Please sign in." },
+        { status: 409 },
+      );
+    }
+
+    // 2) Создаём пользователя без подтверждения email (подтвердим после verify-otp)
+    const { data: created, error: createErr } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: {
+          requested_role: role ?? "CUSTOMER",
+        },
+      });
+
+    if (createErr || !created?.user) {
+      return NextResponse.json(
+        { error: createErr?.message || "Failed to create user" },
+        { status: 500 },
+      );
+    }
+
+    const userId = created.user.id;
+
+    // 3) Генерим OTP, сохраняем HASH в public.email_otps
+    const otp = generateOtp6();
+    const expiresInMinutes = 10;
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
+
+    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
+    const tokenHash = sha256(`${email}:${otp}:${otpSecret}`);
+
+    // удаляем предыдущие незавершённые для email (на всякий)
+    await supabaseAdmin.from("email_otps").delete().eq("email", email);
+
+    const { error: insErr } = await supabaseAdmin.from("email_otps").insert({
+      email,
+      user_id: userId,
+      role: role ?? "CUSTOMER",
+      next,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
+
+    if (insErr) {
+      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+
+    // 4) Отправка письма через Resend API
+    const subject = "Your MedTravel verification code";
+    const html = `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height:1.5">
+        <h2 style="margin:0 0 12px">Your verification code</h2>
+        <p style="margin:0 0 16px">Enter this 6-digit code to confirm your email:</p>
+        <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:14px 16px; background:#f4f4f5; border-radius:12px; display:inline-block">
+          ${otp}
+        </div>
+        <p style="margin:16px 0 0; color:#71717a">This code expires in ${expiresInMinutes} minutes.</p>
+        <p style="margin:8px 0 0; color:#71717a">If you didn’t request this, you can ignore this email.</p>
+      </div>
+    `;
+
+    await sendViaResend({ to: email, subject, html });
+
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message || "Internal Server Error" },
+      { status: 500 },
+    );
+  }
+}
+"""
+app\api\auth\email\verify-otp\route.ts: """
+import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
+
+export const runtime = "nodejs";
+
+function sha256(input: string) {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const email = String(body?.email || "").trim().toLowerCase();
+    const token = String(body?.token || "").trim();
+    const purpose = String(body?.purpose || "verify_email");
+
+    if (!email || !/^[0-9]{6}$/.test(token)) {
+      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(url, serviceKey);
+
+    const { data: rows, error: selErr } = await supabase
+      .from("email_otps")
+      .select("*")
+      .eq("email", email)
+      .eq("purpose", purpose)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+
+    const row = rows?.[0];
+    if (!row) return NextResponse.json({ error: "Code not found" }, { status: 400 });
+
+    const expired = new Date(row.expires_at).getTime() < Date.now();
+    if (expired) {
+      await supabase.from("email_otps").delete().eq("id", row.id);
+      return NextResponse.json({ error: "Code expired" }, { status: 400 });
+    }
+
+    const otpSecret = process.env.OTP_SECRET || "dev-secret";
+    const expected = sha256(`${email}:${purpose}:${token}:${otpSecret}`);
+
+    if (expected !== row.code_hash) {
+      // увеличим attempts
+      const attempts = Number(row.attempts || 0) + 1;
+      await supabase.from("email_otps").update({ attempts }).eq("id", row.id);
+
+      if (attempts >= 5) {
+        await supabase.from("email_otps").delete().eq("id", row.id);
+        return NextResponse.json({ error: "Too many attempts. Request new code." }, { status: 400 });
+      }
+
+      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
+    }
+
+    // валидно → удаляем OTP
+    await supabase.from("email_otps").delete().eq("id", row.id);
+
+    // находим user id по email в auth.users
+    const { data: au, error: auErr } = await supabase
+      .schema("auth")
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .limit(1);
+
+    if (auErr) return NextResponse.json({ error: auErr.message }, { status: 500 });
+
+    const userId = au?.[0]?.id;
+    if (!userId) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // подтверждаем email в Supabase Auth
+    const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+    });
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    // ставим флаг в profiles
+    await supabase.from("profiles").update({ email_verified: true }).eq("id", userId);
+
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  }
+}
+"""
+components\auth\CredentialsForm.tsx: """
+// components/auth/CredentialsForm.tsx
+"use client";
+
+import React, { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button, Input } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+type Mode = "signin" | "signup";
+
+type Props = {
+  mode: Mode;
+  role: string; // PATIENT | PARTNER | CUSTOMER
+  next: string;
+
+  onOtpRequired: (email: string) => void;
+  onSignedIn?: () => void; // для модалки: закрыть
+};
+
+export default function CredentialsForm({
+  mode,
+  role,
+  next,
+  onOtpRequired,
+  onSignedIn,
+}: Props) {
+  const { supabase } = useSupabase();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showPass, setShowPass] = useState(false);
+
+  const schema = useMemo(() => {
+    const base = {
+      email: z.string().email("Enter a valid email"),
+      password: z.string().min(8, "Password must be at least 8 characters"),
+    };
+
+    if (mode === "signin") {
+      return z.object(base);
+    }
+
+    return z
+      .object({
+        ...base,
+        password2: z.string().min(8, "Password must be at least 8 characters"),
+      })
+      .refine((v) => v.password === v.password2, {
+        message: "Passwords do not match",
+        path: ["password2"],
+      });
+  }, [mode]);
+
+  type FormValues = z.infer<typeof schema>;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+
+    const email = String(data.email).trim().toLowerCase();
+    const password = String(data.password);
+
+    try {
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          setErrorMsg(error.message);
+          return;
+        }
+
+        // (необязательно, но полезно для контекста)
+        await supabase.auth.updateUser({
+          data: { requested_role: role },
+        });
+
+        onSignedIn?.();
+        return;
+      }
+
+      // signup
+      const res = await fetch("/api/auth/email/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password, as: role, next }),
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Failed to sign up");
+        return;
+      }
+
+      // отправляем OTP (теперь user уже существует, send-otp пропустит)
+      const res2 = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, as: role, next, purpose: "verify_email" }),
+        cache: "no-store",
+      });
+
+      const json2 = await res2.json().catch(() => ({}));
+      if (!res2.ok) {
+        setErrorMsg(json2?.error || "Failed to send code");
+        return;
+      }
+
+      onOtpRequired(email);
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <Input
+        isRequired
+        type="email"
+        variant="bordered"
+        placeholder="you@email.com"
+        errorMessage={errors.email?.message as any}
+        {...register("email")}
+      />
+
+      <Input
+        isRequired
+        type={showPass ? "text" : "password"}
+        variant="bordered"
+        placeholder="Password"
+        errorMessage={errors.password?.message as any}
+        endContent={
+          <button
+            type="button"
+            className="text-default-500"
+            onClick={() => setShowPass((s) => !s)}
+            aria-label="toggle password"
+          >
+            <Icon icon={showPass ? "solar:eye-closed-linear" : "solar:eye-linear"} width={18} />
+          </button>
+        }
+        {...register("password")}
+      />
+
+      {mode === "signup" ? (
+        <Input
+          isRequired
+          type={showPass ? "text" : "password"}
+          variant="bordered"
+          placeholder="Confirm password"
+          errorMessage={(errors as any).password2?.message}
+          {...register("password2" as any)}
+        />
+      ) : null}
+
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
+      <Button
+        color="primary"
+        isLoading={isSubmitting}
+        type="submit"
+        className="justify-center"
+        startContent={<Icon icon={mode === "signin" ? "solar:login-3-linear" : "solar:user-plus-linear"} width={18} />}
+      >
+        {mode === "signin" ? "Sign in" : "Create account"}
+      </Button>
+    </form>
+  );
+}
+"""
+components\auth\UnifiedAuthModal.tsx: """
+// components/auth/UnifiedAuthModal.tsx
+"use client";
+
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { Icon } from "@iconify/react";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Divider,
+  Card,
+  CardBody,
+} from "@heroui/react";
+import { useRouter } from "next/navigation";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+import CredentialsForm from "@/components/auth/CredentialsForm";
+import OtpForm from "@/components/auth/OtpForm";
+
+type Step = "role" | "auth" | "otp";
+type Mode = "signin" | "signup";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  initialRole?: Exclude<UserRole, "ADMIN" | "GUEST"> | null;
+  next?: string;
+};
+
+const ROLE_META: Record<
+  Exclude<UserRole, "GUEST">,
+  { title: string; subtitle: string; icon: string }
+> = {
+  PATIENT: {
+    title: "Patient",
+    subtitle: "Book appointments, manage visits, chat with clinics",
+    icon: "solar:heart-pulse-2-linear",
+  },
+  PARTNER: {
+    title: "Partner",
+    subtitle: "Referral links, programs, reports, payouts",
+    icon: "solar:users-group-two-rounded-linear",
+  },
+  CUSTOMER: {
+    title: "Clinic",
+    subtitle: "Manage clinic profile, services, doctors and bookings",
+    icon: "solar:hospital-linear",
+  },
+  ADMIN: {
+    title: "Admin",
+    subtitle: "Administration panel",
+    icon: "solar:shield-user-bold",
+  },
+};
+
+function isAllowedRole(r: any): r is Exclude<UserRole, "ADMIN" | "GUEST"> {
+  return r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER";
+}
+
+export default function UnifiedAuthModal({
+  open,
+  onClose,
+  initialRole = null,
+  next = "/",
+}: Props) {
+  const router = useRouter();
+  const { supabase } = useSupabase();
+
+  const safeNext = useMemo(() => {
+    const n = String(next || "/");
+    return n.startsWith("/") ? n : "/";
+  }, [next]);
+
+  const [step, setStep] = useState<Step>("role");
+  const [mode, setMode] = useState<Mode>("signin");
+  const [role, setRole] = useState<Exclude<UserRole, "ADMIN" | "GUEST"> | null>(
+    null,
+  );
+  const [email, setEmail] = useState<string>("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    const r = isAllowedRole(initialRole) ? initialRole : null;
+    setRole(r);
+    setEmail("");
+    setMode("signin");
+    setStep(r ? "auth" : "role");
+  }, [open, initialRole]);
+
+  const roleLabel = useMemo(() => (role ? ROLE_META[role]?.title ?? role : ""), [role]);
+
+  const title = useMemo(() => {
+    if (step === "role") return "Sign in / Sign up";
+    if (step === "auth") return role ? `${mode === "signin" ? "Sign in" : "Create account"} — ${roleLabel}` : "Sign in";
+    return `Enter code (${roleLabel})`;
+  }, [step, role, roleLabel, mode]);
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!role) return;
+
+    const origin = window.location.origin;
+    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
+      role,
+    )}&next=${encodeURIComponent(safeNext)}`;
+
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+  }, [supabase, role, safeNext]);
+
+  const goBack = useCallback(() => {
+    if (step === "otp") return setStep("auth");
+    if (step === "auth") return setStep(initialRole ? "auth" : "role");
+    onClose();
+  }, [step, onClose, initialRole]);
+
+  const pickRole = (r: Exclude<UserRole, "ADMIN" | "GUEST">) => {
+    setRole(r);
+    setStep("auth");
+  };
+
+  return (
+    <Modal
+      isOpen={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+      placement="center"
+      backdrop="blur"
+      size="md"
+      scrollBehavior="inside"
+    >
+      <ModalContent>
+        {(close) => (
+          <>
+            <ModalHeader className="flex items-center gap-2">
+              <Icon icon="solar:login-3-linear" width={20} />
+              <span>{title}</span>
+            </ModalHeader>
+
+            <Divider />
+
+            <ModalBody className="py-5">
+              {/* STEP: ROLE */}
+              {step === "role" ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
+                    <Card
+                      key={r}
+                      isPressable
+                      onPress={() => pickRole(r)}
+                      className="border border-divider hover:border-primary transition-colors"
+                    >
+                      <CardBody className="flex flex-row items-center gap-4 py-4">
+                        <div className="h-10 w-10 rounded-full bg-default-100 flex items-center justify-center">
+                          <Icon icon={ROLE_META[r].icon} width={22} />
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="font-semibold">{ROLE_META[r].title}</div>
+                          <div className="text-tiny text-default-500">
+                            {ROLE_META[r].subtitle}
+                          </div>
+                        </div>
+                        <div className="ml-auto text-default-400">
+                          <Icon icon="solar:alt-arrow-right-linear" width={18} />
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* STEP: AUTH */}
+              {step === "auth" && role ? (
+                <div className="flex flex-col gap-4">
+                  {/* segmented sign in / sign up */}
+                  <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
+                    <Button
+                      className="flex-1"
+                      color={mode === "signin" ? "primary" : "default"}
+                      variant={mode === "signin" ? "solid" : "light"}
+                      onPress={() => setMode("signin")}
+                    >
+                      Sign in
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      color={mode === "signup" ? "primary" : "default"}
+                      variant={mode === "signup" ? "solid" : "light"}
+                      onPress={() => setMode("signup")}
+                    >
+                      Sign up
+                    </Button>
+                  </div>
+
+                  <CredentialsForm
+                    mode={mode}
+                    role={role}
+                    next={safeNext}
+                    onSignedIn={() => {
+                      close();
+                      onClose();
+                      router.replace(safeNext);
+                      router.refresh();
+                    }}
+                    onOtpRequired={(e) => {
+                      setEmail(e);
+                      setStep("otp");
+                    }}
+                  />
+
+                  <Divider />
+
+                  <Button
+                    variant="bordered"
+                    startContent={<Icon icon="logos:google-icon" width={18} />}
+                    onPress={signInWithGoogle}
+                    className="justify-center"
+                  >
+                    Continue with Google
+                  </Button>
+
+                  {mode === "signup" ? (
+                    <p className="text-tiny text-default-500 text-center">
+                      We’ll send a 6-digit code to confirm your email.
+                    </p>
+                  ) : (
+                    <p className="text-tiny text-default-500 text-center">
+                      Use your email and password to sign in.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              {/* STEP: OTP */}
+              {step === "otp" && role ? (
+                <div className="flex flex-col gap-4">
+                  <OtpForm
+                    email={email}
+                    as={role}
+                    next={safeNext}
+                    onBack={() => setStep("auth")}
+                    onSuccess={() => {
+                      // закроем модалку сразу, UX чище
+                      onClose();
+                    }}
+                  />
+                </div>
+              ) : null}
+            </ModalBody>
+
+            <Divider />
+
+            <ModalFooter className="flex items-center justify-between">
+              <Button
+                variant="light"
+                onPress={() => {
+                  if (step === "role") {
+                    close();
+                    onClose();
+                    return;
+                  }
+                  goBack();
+                }}
+              >
+                Back
+              </Button>
+
+              {step !== "role" && !initialRole ? (
+                <Button
+                  variant="light"
+                  onPress={() => {
+                    setRole(null);
+                    setEmail("");
+                    setMode("signin");
+                    setStep("role");
+                  }}
+                  startContent={<Icon icon="solar:refresh-linear" width={16} />}
+                >
+                  Change role
+                </Button>
+              ) : (
+                <span />
+              )}
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
+  );
+}
+"""

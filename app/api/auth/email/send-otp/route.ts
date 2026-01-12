@@ -1,21 +1,20 @@
-// app/api/auth/email/send-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
-type AllowedRole = "PATIENT" | "PARTNER" | "CUSTOMER" | "ADMIN";
-
-function isAllowedRole(v: any): v is AllowedRole {
-  return v === "PATIENT" || v === "PARTNER" || v === "CUSTOMER" || v === "ADMIN";
-}
-
-function safeNext(v: any): string {
-  const s = String(v || "/");
-  return s.startsWith("/") ? s : "/";
-}
+export const runtime = "nodejs";
 
 function normalizeEmail(v: any): string {
   return String(v || "").trim().toLowerCase();
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function safePurpose(v: any): string {
+  const p = String(v || "verify_email").trim();
+  return p.replace(/[^a-zA-Z0-9_\-]/g, "").slice(0, 64) || "verify_email";
 }
 
 function generateOtp6(): string {
@@ -29,10 +28,10 @@ function sha256(input: string): string {
 
 async function sendViaResend(params: { to: string; subject: string; html: string }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
+  const from = process.env.RESEND_FROM ?? process.env.EMAIL_FROM;
 
   if (!apiKey) throw new Error("Missing RESEND_API_KEY");
-  if (!from) throw new Error("Missing EMAIL_FROM (e.g. no-reply@medtravel.me)");
+  if (!from) throw new Error("Missing RESEND_FROM (or EMAIL_FROM)");
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -42,19 +41,16 @@ async function sendViaResend(params: { to: string; subject: string; html: string
     },
     body: JSON.stringify({
       from,
-      to: params.to,
+      to: [params.to],
       subject: params.subject,
       html: params.html,
     }),
   });
 
-  const json = await res.json().catch(() => ({}));
-
   if (!res.ok) {
-    throw new Error(json?.message || "Resend: failed to send email");
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Resend: failed to send email");
   }
-
-  return json;
 }
 
 export async function POST(req: NextRequest) {
@@ -62,31 +58,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
 
     const email = normalizeEmail(body.email);
-    const roleRaw = String(body.as ?? body.role ?? "").trim().toUpperCase();
-    const role = isAllowedRole(roleRaw) ? roleRaw : null;
+    const purpose = safePurpose(body.purpose);
 
-    // В signup-флоу пароль обязателен (по твоим требованиям)
-    const password = String(body.password ?? "").trim();
-
-    const next = safeNext(body.next);
-
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!email || !isValidEmail(email)) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
-    }
-
-    // В модалке ты используешь только PATIENT/PARTNER/CUSTOMER,
-    // но на всякий случай разрешаем ADMIN если надо.
-    if (!role || role === "ADMIN") {
-      // если ADMIN не нужен для email signup — просто запрети:
-      // return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-      // пока оставлю мягко:
-    }
-
-    if (!password || password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 },
-      );
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -99,84 +74,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createClient(url, serviceKey, {
+    const supabase = createClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // 1) Проверим существует ли уже пользователь
-    const { data: existingList, error: listErr } =
-      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    // Важно: код шлём только существующему пользователю
+    // (иначе можно спамить на любые email)
+    let userId: string | null = null;
 
-    if (listErr) {
-      return NextResponse.json({ error: listErr.message }, { status: 500 });
+    // 1) ищем user в auth.users по email (как у тебя в verify-otp)
+    const { data: au, error: auErr } = await supabase
+      .schema("auth")
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .limit(1);
+
+    if (auErr) return NextResponse.json({ error: auErr.message }, { status: 500 });
+
+    userId = au?.[0]?.id ?? null;
+    if (!userId) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const exists = (existingList?.users || []).some(
-      (u) => (u.email || "").toLowerCase() === email,
-    );
+    // 2) генерим OTP + hash
+    const code = generateOtp6();
+    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
+    const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);
 
-    if (exists) {
-      return NextResponse.json(
-        { error: "Account already exists. Please sign in." },
-        { status: 409 },
-      );
-    }
-
-    // 2) Создаём пользователя без подтверждения email (подтвердим после verify-otp)
-    const { data: created, error: createErr } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: false,
-        user_metadata: {
-          requested_role: role ?? "CUSTOMER",
-        },
-      });
-
-    if (createErr || !created?.user) {
-      return NextResponse.json(
-        { error: createErr?.message || "Failed to create user" },
-        { status: 500 },
-      );
-    }
-
-    const userId = created.user.id;
-
-    // 3) Генерим OTP, сохраняем HASH в public.email_otps
-    const otp = generateOtp6();
     const expiresInMinutes = 10;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
 
-    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
-    const tokenHash = sha256(`${email}:${otp}:${otpSecret}`);
+    // 3) удаляем старые для email+purpose, вставляем новый
+    await supabase.from("email_otps").delete().eq("email", email).eq("purpose", purpose);
 
-    // удаляем предыдущие незавершённые для email (на всякий)
-    await supabaseAdmin.from("email_otps").delete().eq("email", email);
-
-    const { error: insErr } = await supabaseAdmin.from("email_otps").insert({
+    const { error: insErr } = await supabase.from("email_otps").insert({
       email,
-      user_id: userId,
-      role: role ?? "CUSTOMER",
-      next,
-      token_hash: tokenHash,
+      purpose,
+      code_hash: codeHash,
       expires_at: expiresAt,
+      attempts: 0,
     });
 
     if (insErr) {
       return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
 
-    // 4) Отправка письма через Resend API
+    // 4) шлём письмо
     const subject = "Your MedTravel verification code";
     const html = `
       <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height:1.5">
         <h2 style="margin:0 0 12px">Your verification code</h2>
         <p style="margin:0 0 16px">Enter this 6-digit code to confirm your email:</p>
         <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:14px 16px; background:#f4f4f5; border-radius:12px; display:inline-block">
-          ${otp}
+          ${code}
         </div>
         <p style="margin:16px 0 0; color:#71717a">This code expires in ${expiresInMinutes} minutes.</p>
-        <p style="margin:8px 0 0; color:#71717a">If you didn’t request this, you can ignore this email.</p>
       </div>
     `;
 
