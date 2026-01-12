@@ -1,135 +1,192 @@
 // app/api/auth/email/send-otp/route.ts
-import { NextResponse } from "next/server";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
-export const runtime = "nodejs";
+type AllowedRole = "PATIENT" | "PARTNER" | "CUSTOMER" | "ADMIN";
 
-function sha256(input: string) {
+function isAllowedRole(v: any): v is AllowedRole {
+  return v === "PATIENT" || v === "PARTNER" || v === "CUSTOMER" || v === "ADMIN";
+}
+
+function safeNext(v: any): string {
+  const s = String(v || "/");
+  return s.startsWith("/") ? s : "/";
+}
+
+function normalizeEmail(v: any): string {
+  return String(v || "").trim().toLowerCase();
+}
+
+function generateOtp6(): string {
+  const n = crypto.randomInt(0, 1_000_000);
+  return String(n).padStart(6, "0");
+}
+
+function sha256(input: string): string {
   return crypto.createHash("sha256").update(input).digest("hex");
 }
 
-function makeCode6() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+async function sendViaResend(params: { to: string; subject: string; html: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+
+  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
+  if (!from) throw new Error("Missing EMAIL_FROM (e.g. no-reply@medtravel.me)");
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(json?.message || "Resend: failed to send email");
+  }
+
+  return json;
 }
 
-function isValidEmail(email: unknown) {
-  return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    const email = String(body?.email || "").trim().toLowerCase();
-    const as = String(body?.as || "").trim().toUpperCase(); // для текста письма/контекста
-    const purpose = String(body?.purpose || "verify_email").trim(); // пока используем только verify_email
+    const email = normalizeEmail(body.email);
+    const roleRaw = String(body.as ?? body.role ?? "").trim().toUpperCase();
+    const role = isAllowedRole(roleRaw) ? roleRaw : null;
 
-    if (!isValidEmail(email)) {
+    // В signup-флоу пароль обязателен (по твоим требованиям)
+    const password = String(body.password ?? "").trim();
+
+    const next = safeNext(body.next);
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
 
-    if (purpose !== "verify_email") {
-      return NextResponse.json({ error: "Invalid purpose" }, { status: 400 });
+    // В модалке ты используешь только PATIENT/PARTNER/CUSTOMER,
+    // но на всякий случай разрешаем ADMIN если надо.
+    if (!role || role === "ADMIN") {
+      // если ADMIN не нужен для email signup — просто запрети:
+      // return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      // пока оставлю мягко:
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabase = createClient(url, serviceKey);
-
-    // 1) user должен существовать (иначе resend бессмысленен)
-    const { data: au, error: auErr } = await supabase
-      .schema("auth")
-      .from("users")
-      .select("id, email_confirmed_at")
-      .eq("email", email)
-      .limit(1);
-
-    if (auErr) {
-      return NextResponse.json({ error: auErr.message }, { status: 500 });
-    }
-
-    const user = au?.[0];
-    if (!user?.id) {
+    if (!password || password.length < 8) {
       return NextResponse.json(
-        { error: "User not found. Please sign up first." },
-        { status: 404 },
-      );
-    }
-
-    if (user.email_confirmed_at) {
-      return NextResponse.json(
-        { error: "Email is already verified." },
+        { error: "Password must be at least 8 characters" },
         { status: 400 },
       );
     }
 
-    // 2) генерим код и hash
-    const code = makeCode6();
-    const otpSecret = process.env.OTP_SECRET || "dev-secret";
-    const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // 3) удаляем старые otp для этого email/purpose, пишем новый
-    await supabase.from("email_otps").delete().eq("email", email).eq("purpose", purpose);
+    if (!url || !serviceKey) {
+      return NextResponse.json(
+        { error: "Server auth is not configured (missing Supabase envs)" },
+        { status: 500 },
+      );
+    }
 
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 минут
+    const supabaseAdmin = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-    const { error: insErr } = await supabase.from("email_otps").insert({
+    // 1) Проверим существует ли уже пользователь
+    const { data: existingList, error: listErr } =
+      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+
+    if (listErr) {
+      return NextResponse.json({ error: listErr.message }, { status: 500 });
+    }
+
+    const exists = (existingList?.users || []).some(
+      (u) => (u.email || "").toLowerCase() === email,
+    );
+
+    if (exists) {
+      return NextResponse.json(
+        { error: "Account already exists. Please sign in." },
+        { status: 409 },
+      );
+    }
+
+    // 2) Создаём пользователя без подтверждения email (подтвердим после verify-otp)
+    const { data: created, error: createErr } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: {
+          requested_role: role ?? "CUSTOMER",
+        },
+      });
+
+    if (createErr || !created?.user) {
+      return NextResponse.json(
+        { error: createErr?.message || "Failed to create user" },
+        { status: 500 },
+      );
+    }
+
+    const userId = created.user.id;
+
+    // 3) Генерим OTP, сохраняем HASH в public.email_otps
+    const otp = generateOtp6();
+    const expiresInMinutes = 10;
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
+
+    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
+    const tokenHash = sha256(`${email}:${otp}:${otpSecret}`);
+
+    // удаляем предыдущие незавершённые для email (на всякий)
+    await supabaseAdmin.from("email_otps").delete().eq("email", email);
+
+    const { error: insErr } = await supabaseAdmin.from("email_otps").insert({
       email,
-      purpose,
-      code_hash: codeHash,
-      expires_at: expiresAt.toISOString(),
+      user_id: userId,
+      role: role ?? "CUSTOMER",
+      next,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
     });
 
     if (insErr) {
       return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
 
-    // 4) отправка через Resend
-    const from = process.env.RESEND_FROM!;
-    const apiKey = process.env.RESEND_API_KEY!;
-
-    const roleLabel =
-      as === "PATIENT" ? "Patient" : as === "PARTNER" ? "Partner" : as === "CUSTOMER" ? "Clinic" : "MedTravel";
-
+    // 4) Отправка письма через Resend API
     const subject = "Your MedTravel verification code";
     const html = `
-      <div style="font-family: Inter, Arial, sans-serif; line-height: 1.5">
-        <h2 style="margin:0 0 12px">Confirm your email</h2>
-        <p style="margin:0 0 8px">Continue as <b>${roleLabel}</b>.</p>
-        <p style="margin:0 0 16px">Use this code to verify your email:</p>
-        <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:12px 16px; background:#f2f4f7; display:inline-block; border-radius:10px">
-          ${code}
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height:1.5">
+        <h2 style="margin:0 0 12px">Your verification code</h2>
+        <p style="margin:0 0 16px">Enter this 6-digit code to confirm your email:</p>
+        <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:14px 16px; background:#f4f4f5; border-radius:12px; display:inline-block">
+          ${otp}
         </div>
-        <p style="margin:16px 0 0; color:#667085">Code expires in 10 minutes.</p>
-        <p style="margin:6px 0 0; color:#667085">If you didn't request this, you can ignore this email.</p>
+        <p style="margin:16px 0 0; color:#71717a">This code expires in ${expiresInMinutes} minutes.</p>
+        <p style="margin:8px 0 0; color:#71717a">If you didn’t request this, you can ignore this email.</p>
       </div>
     `;
 
-    const resendRes = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [email],
-        subject,
-        html,
-      }),
-    });
-
-    if (!resendRes.ok) {
-      const errText = await resendRes.text().catch(() => "");
-      return NextResponse.json(
-        { error: `Resend error: ${errText || resendRes.statusText}` },
-        { status: 500 },
-      );
-    }
+    await sendViaResend({ to: email, subject, html });
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

@@ -96,11 +96,15 @@ MobileNavItem.displayName = "MobileNavItem";
 function ProfileDropdownAuth({
   session,
   roles,
+  activeRole,
+  setActiveRole,
   supabase,
   t,
 }: {
   session: any;
   roles: UserRole[];
+  activeRole: UserRole;
+  setActiveRole: (r: UserRole) => void;
   supabase: any;
   t: any;
 }) {
@@ -113,12 +117,67 @@ function ProfileDropdownAuth({
   }, [supabase, router]);
 
   const hasAdmin = roles.includes("ADMIN");
+  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
+
+  const goPortal = (role: UserRole) => {
+    setActiveRole(role);
+
+    const map: Record<UserRole, string> = {
+      GUEST: "/",
+      PATIENT: "/patient",
+      PARTNER: "/partner",
+      CUSTOMER: "/customer",
+      ADMIN: "/admin",
+    };
+
+    router.push(map[role] ?? "/");
+  };
+
+  const portalItems = ([
+    {
+      role: "PATIENT" as const,
+      label: "Patient portal",
+      icon: "solar:heart-pulse-2-linear",
+      show: canAccessPatient,
+    },
+    {
+      role: "PARTNER" as const,
+      label: "Partner dashboard",
+      icon: "solar:users-group-two-rounded-linear",
+      show: canAccessPartner,
+    },
+    {
+      role: "CUSTOMER" as const,
+      label: "Clinic panel",
+      icon: "solar:hospital-linear",
+      show: canAccessCustomer,
+    },
+    {
+      role: "ADMIN" as const,
+      label: "Admin panel",
+      icon: "solar:shield-user-bold",
+      show: hasAdmin,
+    },
+  ] satisfies ReadonlyArray<{
+    role: UserRole;
+    label: string;
+    icon: string;
+    show: boolean;
+  }>).filter((x) => x.show);
 
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
         <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
-          <Badge color="success" content="" placement="bottom-right" shape="circle" size="sm">
+          <Badge
+            color="success"
+            content=""
+            placement="bottom-right"
+            shape="circle"
+            size="sm"
+          >
             <Icon className="text-default-500" icon="solar:user-linear" width={24} />
           </Badge>
         </Button>
@@ -134,7 +193,6 @@ function ProfileDropdownAuth({
           </p>
         </DropdownItem>
 
-        {/* единые настройки */}
         <DropdownItem
           key="settings"
           onPress={() => router.push("/settings")}
@@ -143,14 +201,23 @@ function ProfileDropdownAuth({
           {tSafe(t, "navbar.mySettings", "My settings")}
         </DropdownItem>
 
-        {roles.includes("ADMIN") ? (
-          <DropdownItem
-            key="admin"
-            onPress={() => router.push("/admin")}
-            startContent={<Icon icon="solar:shield-user-bold" width={16} />}
-          >
-            Admin panel
-          </DropdownItem>
+        {/* ПАНЕЛИ (вернули) */}
+        {portalItems.length ? (
+          <>
+            <DropdownItem key="portals-title" className="cursor-default text-default-500">
+              Portals
+            </DropdownItem>
+
+            {portalItems.map((it) => (
+              <DropdownItem
+                key={`portal-${it.role}`}
+                onPress={() => goPortal(it.role)}
+                startContent={<Icon icon={it.icon} width={16} />}
+              >
+                {it.label}
+              </DropdownItem>
+            ))}
+          </>
         ) : null}
 
         <DropdownItem
@@ -165,7 +232,6 @@ function ProfileDropdownAuth({
     </Dropdown>
   );
 }
-
 
 export const Navbar = React.memo(() => {
   const { t } = useTranslation();
@@ -266,8 +332,9 @@ export const Navbar = React.memo(() => {
                 session={session}
                 roles={roles}
                 supabase={supabase}
-                t={t}
-              />
+                t={t} activeRole={"GUEST"} setActiveRole={function (r: UserRole): void {
+                  throw new Error("Function not implemented.");
+                } }              />
             ) : (
                 <Button
                   variant="light"
