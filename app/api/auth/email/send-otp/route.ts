@@ -14,7 +14,8 @@ function isValidEmail(email: string) {
 
 function safePurpose(v: any): string {
   const p = String(v || "verify_email").trim();
-  return p.replace(/[^a-zA-Z0-9_\-]/g, "").slice(0, 64) || "verify_email";
+  // лучше жёстко разрешить только verify_email, чтобы не плодить мусор:
+  return p === "verify_email" ? "verify_email" : "verify_email";
 }
 
 function generateOtp6(): string {
@@ -37,7 +38,7 @@ async function sendViaResend(params: { to: string; subject: string; html: string
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       from,
@@ -78,26 +79,16 @@ export async function POST(req: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Важно: код шлём только существующему пользователю
-    // (иначе можно спамить на любые email)
-    let userId: string | null = null;
+    // ✅ ВАЖНО: НЕ schema("auth"). Только Admin API.
+    const { data: userRes, error: userErr } = await supabase.auth.admin.getUserById(email);
+    if (userErr) return NextResponse.json({ error: userErr.message }, { status: 500 });
 
-    // 1) ищем user в auth.users по email (как у тебя в verify-otp)
-    const { data: au, error: auErr } = await supabase
-      .schema("auth")
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .limit(1);
-
-    if (auErr) return NextResponse.json({ error: auErr.message }, { status: 500 });
-
-    userId = au?.[0]?.id ?? null;
-    if (!userId) {
+    const user = userRes?.user;
+    if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // 2) генерим OTP + hash
+    // 1) генерим OTP + hash (как у тебя в verify-otp)
     const code = generateOtp6();
     const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
     const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);
@@ -105,10 +96,16 @@ export async function POST(req: NextRequest) {
     const expiresInMinutes = 10;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
 
-    // 3) удаляем старые для email+purpose, вставляем новый
-    await supabase.from("email_otps").delete().eq("email", email).eq("purpose", purpose);
+    // 2) удаляем старые и вставляем новый
+    const del = await supabase
+      .from("email_otps")
+      .delete()
+      .eq("email", email)
+      .eq("purpose", purpose);
 
-    const { error: insErr } = await supabase.from("email_otps").insert({
+    if (del.error) return NextResponse.json({ error: del.error.message }, { status: 500 });
+
+    const ins = await supabase.from("email_otps").insert({
       email,
       purpose,
       code_hash: codeHash,
@@ -116,11 +113,11 @@ export async function POST(req: NextRequest) {
       attempts: 0,
     });
 
-    if (insErr) {
-      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    if (ins.error) {
+      return NextResponse.json({ error: ins.error.message }, { status: 500 });
     }
 
-    // 4) шлём письмо
+    // 3) письмо
     const subject = "Your MedTravel verification code";
     const html = `
       <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height:1.5">
@@ -137,9 +134,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || "Internal Server Error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: e?.message || "Internal Server Error" }, { status: 500 });
   }
 }

@@ -6674,3 +6674,444 @@ export default function UnifiedAuthModal({
   );
 }
 """
+
+--------------------------------------------------
+
+это уже пиздец, мы не можем реализовать supabase auth/register по email + password + otp.
+не работает, я захожу регистрироваться и выдает "The schema must be one of the following: public, graphql_public",
+и ошибку в консоли: """
+layout-379791e5db57da5c.js:1 
+ POST https://medtravel.me/api/auth/email/send-otp 500 (Internal Server Error)
+"""
+хотя в базе в users уже создается пользователь. как так???
+письма на почту не приходят, а я тут еще заметил что оно приходило, после какого-то деплоя, а я просто не заметил, это было 2 с половиной часа назад. оно приходило, но видимо тогда в модалке ничего для ввода otp не следовало. в таблице email_otps никаких теперь записей не появляется. после повторного нажатия create account следует "Account already exists. Please sign in." и ошибка: """
+POST https://medtravel.me/api/auth/email/signup 409 (Conflict)
+"""
+
+проанализируй в чем проблема, где она находится и как ее решать.
+
+----------------------------------------------------------
+
+ты мне сейчас продублировал все что было в прошлом запросе. я если ты вдруг еще не понял, то выполняю правки по твоим инструкциям, если не выполняю то пишу об этом, даже если выполняю то не редко пишу что все выполнил. в прошлом запросе я дал тебе результат, который не изменился. вот ниже актуальные файлы. уже пора довести все до рабочего состояния, чтобы я мог зарегистрироваться как новый пользователь, чтобы мне пришло письмо с otp на почту и подтвердилось. просто нужна рабочая регистрация и авторизация по email и password.
+
+app\api\auth\email\send-otp\route.ts: """
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
+
+export const runtime = "nodejs";
+
+function normalizeEmail(v: any): string {
+  return String(v || "").trim().toLowerCase();
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function safePurpose(v: any): string {
+  const p = String(v || "verify_email").trim();
+  return p.replace(/[^a-zA-Z0-9_\-]/g, "").slice(0, 64) || "verify_email";
+}
+
+function generateOtp6(): string {
+  const n = crypto.randomInt(0, 1_000_000);
+  return String(n).padStart(6, "0");
+}
+
+function sha256(input: string): string {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+async function sendViaResend(params: { to: string; subject: string; html: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM ?? process.env.EMAIL_FROM;
+
+  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
+  if (!from) throw new Error("Missing RESEND_FROM (or EMAIL_FROM)");
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [params.to],
+      subject: params.subject,
+      html: params.html,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Resend: failed to send email");
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+
+    const email = normalizeEmail(body.email);
+    const purpose = safePurpose(body.purpose);
+
+    if (!email || !isValidEmail(email)) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return NextResponse.json(
+        { error: "Server auth is not configured (missing Supabase envs)" },
+        { status: 500 },
+      );
+    }
+
+    const supabase = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Важно: код шлём только существующему пользователю
+    // (иначе можно спамить на любые email)
+    let userId: string | null = null;
+
+    // 1) ищем user в auth.users по email (как у тебя в verify-otp)
+    const { data: au, error: auErr } = await supabase
+      .schema("auth")
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .limit(1);
+
+    if (auErr) return NextResponse.json({ error: auErr.message }, { status: 500 });
+
+    userId = au?.[0]?.id ?? null;
+    if (!userId) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // 2) генерим OTP + hash
+    const code = generateOtp6();
+    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
+    const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);
+
+    const expiresInMinutes = 10;
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
+
+    // 3) удаляем старые для email+purpose, вставляем новый
+    await supabase.from("email_otps").delete().eq("email", email).eq("purpose", purpose);
+
+    const { error: insErr } = await supabase.from("email_otps").insert({
+      email,
+      purpose,
+      code_hash: codeHash,
+      expires_at: expiresAt,
+      attempts: 0,
+    });
+
+    if (insErr) {
+      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+
+    // 4) шлём письмо
+    const subject = "Your MedTravel verification code";
+    const html = `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height:1.5">
+        <h2 style="margin:0 0 12px">Your verification code</h2>
+        <p style="margin:0 0 16px">Enter this 6-digit code to confirm your email:</p>
+        <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:14px 16px; background:#f4f4f5; border-radius:12px; display:inline-block">
+          ${code}
+        </div>
+        <p style="margin:16px 0 0; color:#71717a">This code expires in ${expiresInMinutes} minutes.</p>
+      </div>
+    `;
+
+    await sendViaResend({ to: email, subject, html });
+
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message || "Internal Server Error" },
+      { status: 500 },
+    );
+  }
+}
+"""
+app\api\auth\email\verify-otp\route.ts: """
+import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
+
+export const runtime = "nodejs";
+
+function sha256(input: string) {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const email = String(body?.email || "").trim().toLowerCase();
+    const token = String(body?.token || "").trim();
+    const purpose = String(body?.purpose || "verify_email");
+
+    if (!email || !/^[0-9]{6}$/.test(token)) {
+      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(url, serviceKey);
+
+    const { data: rows, error: selErr } = await supabase
+      .from("email_otps")
+      .select("*")
+      .eq("email", email)
+      .eq("purpose", purpose)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+
+    const row = rows?.[0];
+    if (!row) return NextResponse.json({ error: "Code not found" }, { status: 400 });
+
+    const expired = new Date(row.expires_at).getTime() < Date.now();
+    if (expired) {
+      await supabase.from("email_otps").delete().eq("id", row.id);
+      return NextResponse.json({ error: "Code expired" }, { status: 400 });
+    }
+
+    const otpSecret = process.env.OTP_SECRET || "dev-secret";
+    const expected = sha256(`${email}:${purpose}:${token}:${otpSecret}`);
+
+    if (expected !== row.code_hash) {
+      // увеличим attempts
+      const attempts = Number(row.attempts || 0) + 1;
+      await supabase.from("email_otps").update({ attempts }).eq("id", row.id);
+
+      if (attempts >= 5) {
+        await supabase.from("email_otps").delete().eq("id", row.id);
+        return NextResponse.json({ error: "Too many attempts. Request new code." }, { status: 400 });
+      }
+
+      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
+    }
+
+    // валидно → удаляем OTP
+    await supabase.from("email_otps").delete().eq("id", row.id);
+
+    // находим user id по email в auth.users
+    const { data: au, error: auErr } = await supabase
+      .schema("auth")
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .limit(1);
+
+    if (auErr) return NextResponse.json({ error: auErr.message }, { status: 500 });
+
+    const userId = au?.[0]?.id;
+    if (!userId) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // подтверждаем email в Supabase Auth
+    const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+    });
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    // ставим флаг в profiles
+    await supabase.from("profiles").update({ email_verified: true }).eq("id", userId);
+
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  }
+}
+"""
+components\auth\CredentialsForm.tsx: """
+// components/auth/CredentialsForm.tsx
+"use client";
+
+import React, { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button, Input } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+type Mode = "signin" | "signup";
+
+type Props = {
+  mode: Mode;
+  role: string; // PATIENT | PARTNER | CUSTOMER
+  next: string;
+
+  onOtpRequired: (email: string) => void;
+  onSignedIn?: () => void; // для модалки: закрыть
+};
+
+export default function CredentialsForm({
+  mode,
+  role,
+  next,
+  onOtpRequired,
+  onSignedIn,
+}: Props) {
+  const { supabase } = useSupabase();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showPass, setShowPass] = useState(false);
+
+  const schema = useMemo(() => {
+    const base = {
+      email: z.string().email("Enter a valid email"),
+      password: z.string().min(8, "Password must be at least 8 characters"),
+    };
+
+    if (mode === "signin") {
+      return z.object(base);
+    }
+
+    return z
+      .object({
+        ...base,
+        password2: z.string().min(8, "Password must be at least 8 characters"),
+      })
+      .refine((v) => v.password === v.password2, {
+        message: "Passwords do not match",
+        path: ["password2"],
+      });
+  }, [mode]);
+
+  type FormValues = z.infer<typeof schema>;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+
+    const email = String(data.email).trim().toLowerCase();
+    const password = String(data.password);
+
+    try {
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          setErrorMsg(error.message);
+          return;
+        }
+
+        // (необязательно, но полезно для контекста)
+        await supabase.auth.updateUser({
+          data: { requested_role: role },
+        });
+
+        onSignedIn?.();
+        return;
+      }
+
+      // signup
+      const res = await fetch("/api/auth/email/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password, as: role, next }),
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Failed to sign up");
+        return;
+      }
+
+      // отправляем OTP (теперь user уже существует, send-otp пропустит)
+      const res2 = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, as: role, next, purpose: "verify_email" }),
+        cache: "no-store",
+      });
+
+      const json2 = await res2.json().catch(() => ({}));
+      if (!res2.ok) {
+        setErrorMsg(json2?.error || "Failed to send code");
+        return;
+      }
+
+      onOtpRequired(email);
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <Input
+        isRequired
+        type="email"
+        variant="bordered"
+        placeholder="you@email.com"
+        errorMessage={errors.email?.message as any}
+        {...register("email")}
+      />
+
+      <Input
+        isRequired
+        type={showPass ? "text" : "password"}
+        variant="bordered"
+        placeholder="Password"
+        errorMessage={errors.password?.message as any}
+        endContent={
+          <button
+            type="button"
+            className="text-default-500"
+            onClick={() => setShowPass((s) => !s)}
+            aria-label="toggle password"
+          >
+            <Icon icon={showPass ? "solar:eye-closed-linear" : "solar:eye-linear"} width={18} />
+          </button>
+        }
+        {...register("password")}
+      />
+
+      {mode === "signup" ? (
+        <Input
+          isRequired
+          type={showPass ? "text" : "password"}
+          variant="bordered"
+          placeholder="Confirm password"
+          errorMessage={(errors as any).password2?.message}
+          {...register("password2" as any)}
+        />
+      ) : null}
+
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
+      <Button
+        color="primary"
+        isLoading={isSubmitting}
+        type="submit"
+        className="justify-center"
+        startContent={<Icon icon={mode === "signin" ? "solar:login-3-linear" : "solar:user-plus-linear"} width={18} />}
+      >
+        {mode === "signin" ? "Sign in" : "Create account"}
+      </Button>
+    </form>
+  );
+}
+"""

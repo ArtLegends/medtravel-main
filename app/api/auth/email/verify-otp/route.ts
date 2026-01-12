@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const email = String(body?.email || "").trim().toLowerCase();
     const token = String(body?.token || "").trim();
-    const purpose = String(body?.purpose || "verify_email");
+    const purpose = String(body?.purpose || "verify_email").trim() || "verify_email";
 
     if (!email || !/^[0-9]{6}$/.test(token)) {
       return NextResponse.json({ error: "Invalid code" }, { status: 400 });
@@ -21,7 +21,9 @@ export async function POST(req: Request) {
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabase = createClient(url, serviceKey);
+    const supabase = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const { data: rows, error: selErr } = await supabase
       .from("email_otps")
@@ -42,17 +44,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Code expired" }, { status: 400 });
     }
 
-    const otpSecret = process.env.OTP_SECRET || "dev-secret";
+    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
     const expected = sha256(`${email}:${purpose}:${token}:${otpSecret}`);
 
     if (expected !== row.code_hash) {
-      // увеличим attempts
       const attempts = Number(row.attempts || 0) + 1;
       await supabase.from("email_otps").update({ attempts }).eq("id", row.id);
 
       if (attempts >= 5) {
         await supabase.from("email_otps").delete().eq("id", row.id);
-        return NextResponse.json({ error: "Too many attempts. Request new code." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Too many attempts. Request new code." },
+          { status: 400 },
+        );
       }
 
       return NextResponse.json({ error: "Invalid code" }, { status: 400 });
@@ -61,17 +65,11 @@ export async function POST(req: Request) {
     // валидно → удаляем OTP
     await supabase.from("email_otps").delete().eq("id", row.id);
 
-    // находим user id по email в auth.users
-    const { data: au, error: auErr } = await supabase
-      .schema("auth")
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .limit(1);
+    // ✅ ВАЖНО: НЕ schema("auth"). Только Admin API.
+    const { data: userRes, error: userErr } = await supabase.auth.admin.getUserById(email);
+    if (userErr) return NextResponse.json({ error: userErr.message }, { status: 500 });
 
-    if (auErr) return NextResponse.json({ error: auErr.message }, { status: 500 });
-
-    const userId = au?.[0]?.id;
+    const userId = userRes?.user?.id;
     if (!userId) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     // подтверждаем email в Supabase Auth
@@ -80,7 +78,7 @@ export async function POST(req: Request) {
     });
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
-    // ставим флаг в profiles
+    // ставим флаг в profiles (если есть такая колонка)
     await supabase.from("profiles").update({ email_verified: true }).eq("id", userId);
 
     return NextResponse.json({ ok: true });
