@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  startTransition,
   useEffect,
   useMemo,
   useState,
@@ -139,7 +140,9 @@ function normalizeAmenityLabel(label: string) {
 
 export default function ClinicProfilePage() {
   const [active, setActive] = useState<SectionKey>("basic");
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, startLoading] = useTransition();        // initial load
+  const [isSubmitting, startSubmitting] = useTransition();  // publish/update
+  const [isSaving, startSaving] = useTransition();          // save draft
 
   const [basic, setBasic] = useState({
     name: "",
@@ -182,7 +185,7 @@ export default function ClinicProfilePage() {
 
   // загрузка драфта
   useEffect(() => {
-    startTransition(async () => {
+    startLoading(async () => {
       try {
         const [draftRes, catsRes] = await Promise.allSettled([
           getDraft(),
@@ -352,8 +355,8 @@ export default function ClinicProfilePage() {
     const status = (clinicMeta.status ?? "").toLowerCase();
 
     if (clinicMeta.is_published) return "Published";
-    if (clinicMeta.moderation_status === "pending") return "Pending review";
-    if ((clinicMeta.status ?? "").toLowerCase() === "draft") return "Draft";
+    if (moderation === "pending") return "Pending review";
+    if (status === "draft") return "Draft";
 
     return "Not published";
   }, [clinicMeta]);
@@ -439,7 +442,7 @@ export default function ClinicProfilePage() {
           <Card className="p-4 space-y-3">
             <div className="flex flex-col gap-2">
               <button
-                disabled={publishDisabled || isPending}
+                disabled={publishDisabled || isSubmitting}
                 onClick={() => {
                   startTransition(async () => {
                     await saveDraftSection("basic_info", basic);
@@ -460,11 +463,11 @@ export default function ClinicProfilePage() {
                     : "bg-blue-600 hover:bg-blue-700"
                 )}
               >
-                {isPending
+                {isSubmitting
                   ? isPublished
                     ? "Updating..."
-                    : "Publishing..."
-                  : sidebarPrimaryLabel}
+                    : "Submitting..."
+                  : submitButtonLabel}
               </button>
 
               {/* Кнопка "My clinic" – только когда клиника уже опубликована */}
@@ -603,40 +606,39 @@ export default function ClinicProfilePage() {
                   location,
                   pricing: payments,
                 };
-                startTransition(async () => {
+
+                startSaving(async () => {
                   await saveDraftWhole(snapshot);
                 });
               }}
               className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              disabled={isPending}
+              disabled={isLoading || isSubmitting || isSaving}
             >
-              {isPending ? "Saving..." : "Save as Draft"}
+              {isSaving ? "Saving..." : "Save as Draft"}
             </button>
 
             <button
               onClick={() => {
-                startTransition(async () => {
-                  await saveDraftWhole({
-                    basic_info: basic,
-                    services,
-                    doctors,
-                    facilities: additional,
-                    hours,
-                    gallery,
-                    location,
-                    pricing: payments,
-                  });
+                startSubmitting(async () => {
+                  await saveDraftSection("basic_info", basic);
+                  await saveDraftSection("services", services);
+                  await saveDraftSection("doctors", doctors);
+                  await saveDraftSection("facilities", additional);
+                  await saveDraftSection("hours", hours);
+                  await saveDraftSection("gallery", gallery);
+                  await saveDraftSection("location", location);
+                  await saveDraftSection("pricing", payments);
                   await submitForReview();
                 });
               }}
               className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"
-              disabled={publishDisabled || isPending}
+              disabled={publishDisabled || isSubmitting}
             >
-              {isPending
+              {isSubmitting
                 ? isPublished
                   ? "Updating..."
-                  : "Submitting..."
-                : submitButtonLabel}
+                  : "Publishing..."
+                : sidebarPrimaryLabel}
             </button>
           </div>
           <p className="text-xs text-gray-500">
