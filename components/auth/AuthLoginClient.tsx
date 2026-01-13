@@ -215,6 +215,7 @@ export default function AuthLoginClient({ as, next }: Props) {
                 <div className="flex items-center justify-between">
                   <Button
                     variant="ghost"
+                    color="primary"
                     onPress={() => {
                       setRole(null);
                       setStep("role");

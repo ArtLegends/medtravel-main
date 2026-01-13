@@ -261,6 +261,7 @@ export default function UnifiedAuthModal({
             <ModalFooter className="flex items-center justify-between">
               <Button
                 variant="ghost"
+                color="primary"
                 onPress={() => {
                   if (step === "role") {
                     close();
@@ -276,6 +277,7 @@ export default function UnifiedAuthModal({
               {step !== "role" && !initialRole ? (
                 <Button
                   variant="ghost"
+                  color="primary"
                   onPress={() => {
                     setRole(null);
                     setEmail("");
