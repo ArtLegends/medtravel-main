@@ -18,6 +18,7 @@ import {
   uploadGallery,
   uploadDoctorImage,
   uploadAccreditationLogo,
+  getClinicMeta,
 } from "./actions";
 import { clinicHref } from "@/lib/clinic-url";
 
@@ -182,6 +183,26 @@ export default function ClinicProfilePage() {
     city: string | null;
     district: string | null;
   } | null>(null);
+
+  const refreshClinicMeta = async () => {
+    try {
+      const clinic = await getClinicMeta();
+      if (clinic) {
+        setClinicMeta({
+          is_published: !!clinic.is_published,
+          moderation_status: clinic.moderation_status ?? null,
+          status: clinic.status ?? null,
+          slug: clinic.slug ?? null,
+          country: clinic.country ?? null,
+          province: clinic.province ?? null,
+          city: clinic.city ?? null,
+          district: clinic.district ?? null,
+        });
+      }
+    } catch {
+      // no-op
+    }
+  };
 
   // загрузка драфта
   useEffect(() => {
@@ -454,6 +475,7 @@ export default function ClinicProfilePage() {
                     await saveDraftSection("location", location);
                     await saveDraftSection("pricing", payments);
                     await submitForReview();
+                    await refreshClinicMeta();
                   });
                 }}
                 className={clsx(
@@ -609,6 +631,7 @@ export default function ClinicProfilePage() {
 
                 startSaving(async () => {
                   await saveDraftWhole(snapshot);
+                  await refreshClinicMeta();
                 });
               }}
               className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -629,6 +652,7 @@ export default function ClinicProfilePage() {
                   await saveDraftSection("location", location);
                   await saveDraftSection("pricing", payments);
                   await submitForReview();
+                  await refreshClinicMeta();
                 });
               }}
               className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"

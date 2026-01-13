@@ -469,3 +469,17 @@ export async function syncClinicRelationsFromDraft(clinicId: string) {
   });
   if (error) throw error;
 }
+
+export async function getClinicMeta() {
+  const clinicId = await ensureClinicForOwner();
+  const client = await getSupa();
+
+  const { data: clinic, error } = await client
+    .from("clinics")
+    .select("is_published, moderation_status, status, slug, country, province, city, district")
+    .eq("id", clinicId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return clinic;
+}

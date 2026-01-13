@@ -14,7 +14,7 @@ type ModerationQueueRow = {
   slug: string | null;
   city: string | null;
   country: string | null;
-  moderation_status: "pending" | "approved" | "rejected" | null;
+  moderation_status: "draft" | "pending" | "approved" | "rejected" | null;
   draft_status: "editing" | "pending" | "published" | "draft" | null;
   draft_updated_at: string | null;
 };
@@ -56,13 +56,13 @@ export default async function ModerationPage({ searchParams }: ModerationPagePro
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  // ---- запрос к moderation_queue_v2 ----------------------------------------
   let query = supabase
     .from("moderation_queue_v2")
     .select("*", { count: "exact" })
-    // прячем DEV-клиники
     .not("slug", "ilike", "dev-%")
-    .not("name", "ilike", "dev%");
+    .not("name", "ilike", "dev%")
+    // ✅ показываем только отправленные на модерацию / уже обработанные
+    .in("moderation_status", ["pending", "approved", "rejected"]);
 
   if (statusFilter !== "all") {
     query = query.eq("moderation_status", statusFilter);
