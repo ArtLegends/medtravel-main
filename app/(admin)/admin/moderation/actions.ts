@@ -17,17 +17,16 @@ export async function approveClinic(formData: FormData) {
 
   const supabase = createAdminClient();
 
-  // 1) основная логика в БД (services, staff, images, hours, accreditations, category + статусы)
-  const { error: rpcError } = await supabase.rpc("publish_clinic_from_draft", {
+  // 1) на всякий случай ещё раз синкнем связи (если уже синкалось — должно быть безопасно)
+  const { error: syncErr } = await supabase.rpc("sync_clinic_relations_from_draft", {
     p_clinic_id: clinicId,
   });
-
-  if (rpcError) {
-    console.error("publish_clinic_from_draft error:", rpcError);
-    throw rpcError;
+  if (syncErr) {
+    console.error("sync_clinic_relations_from_draft error:", syncErr);
+    throw syncErr;
   }
 
-  // 2) забираем из драфта pricing -> собираем payments JSON для clinics
+  // 2) pricing -> payments (как у тебя)
   const { data: draft, error: draftError } = await supabase
     .from("clinic_profile_drafts")
     .select("pricing")
@@ -41,39 +40,27 @@ export async function approveClinic(formData: FormData) {
   let payments: { method: string }[] | null = null;
 
   if (draft && Array.isArray(draft.pricing)) {
-    const pricingArray: unknown[] = draft.pricing as unknown[];
-
-    const methods = pricingArray
-      .map((item: unknown): string | null => {
+    const methods = (draft.pricing as unknown[])
+      .map((item) => {
         if (typeof item === "string") return item;
         const obj = item as { method?: unknown; name?: unknown } | null;
         if (obj && typeof obj.method === "string") return obj.method;
         if (obj && typeof obj.name === "string") return obj.name;
         return null;
       })
-      .filter(
-        (v: unknown): v is string =>
-          typeof v === "string" && v.trim().length > 0
-      );
+      .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
 
-    const uniqMethods = Array.from(new Set(methods));
-    payments =
-      uniqMethods.length > 0
-        ? uniqMethods.map((method) => ({ method }))
-        : null;
+    const uniq = Array.from(new Set(methods.map((m) => m.trim())));
+    payments = uniq.length ? uniq.map((method) => ({ method })) : null;
   }
 
-  // Обновляем строку в clinics: статусы + payments (если есть)
+  // 3) финальные статусы клиники
   const updatePayload: Record<string, unknown> = {
     is_published: true,
     moderation_status: "approved",
     status: "published",
   };
-
-  // если payments вычислены — явно пишем их (можно и null)
-  if (payments !== null) {
-    updatePayload.payments = payments;
-  }
+  if (payments !== null) updatePayload.payments = payments;
 
   const { error: clinicsUpdateError } = await supabase
     .from("clinics")
@@ -81,23 +68,17 @@ export async function approveClinic(formData: FormData) {
     .eq("id", clinicId);
 
   if (clinicsUpdateError) {
-    console.error("clinics status/payments update error:", clinicsUpdateError);
+    console.error("clinics update error:", clinicsUpdateError);
     throw clinicsUpdateError;
   }
 
-  // 3) уведомление владельцу клиники о публикации
+  // 4) уведомление владельцу
   try {
-    const { data: clinicRow, error: ownerErr } = await supabase
+    const { data: clinicRow } = await supabase
       .from("clinics")
-      .select(
-        "id, owner_id, name, slug, country, province, city, district"
-      )
+      .select("id, owner_id, name, slug, country, province, city, district")
       .eq("id", clinicId)
       .maybeSingle();
-
-    if (ownerErr) {
-      console.error("load clinic for notification error:", ownerErr);
-    }
 
     if (clinicRow?.owner_id) {
       await supabase.from("notifications").insert({
@@ -119,18 +100,14 @@ export async function approveClinic(formData: FormData) {
     console.warn("clinic_approved notification insert error:", e);
   }
 
-  // 4) помечаем драфт как published (если таблица/колонка существуют)
-  try {
-    await supabase
-      .from("clinic_profile_drafts")
-      .update({ status: "published" })
-      .eq("clinic_id", clinicId);
-  } catch (e) {
-    console.warn("clinic_profile_drafts publish update warning:", e);
-  }
+  // 5) драфт -> published
+  await supabase
+    .from("clinic_profile_drafts")
+    .update({ status: "published" })
+    .eq("clinic_id", clinicId);
 
-  // 5) перерисовать очередь модерации
   revalidatePath("/admin/moderation");
+  revalidatePath(`/admin/moderation/detail?id=${clinicId}`);
 }
 
 /**

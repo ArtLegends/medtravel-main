@@ -466,8 +466,24 @@ function KV({ k, v }: { k: string; v?: string | null }) {
   );
 }
 
-function TagRow({ label, values }: { label: string; values?: string[] }) {
-  const arr = Array.isArray(values) ? values : [];
+function toStringArray(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+
+  return values
+    .map((v) => {
+      if (typeof v === "string") return v.trim();
+      if (v && typeof v === "object" && "label" in v) {
+        const lbl = (v as any).label;
+        return typeof lbl === "string" ? lbl.trim() : "";
+      }
+      return "";
+    })
+    .filter((x) => x.length > 0);
+}
+
+function TagRow({ label, values }: { label: string; values?: unknown }) {
+  const arr = toStringArray(values);
+
   return (
     <div className="space-y-1">
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
