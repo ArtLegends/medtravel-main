@@ -236,9 +236,9 @@ export async function submitForReview() {
   if (!alreadyPublished) {
     clinicUpdate.moderation_status = "pending";
     clinicUpdate.is_published = false;
-    clinicUpdate.status = "draft";
-    clinicUpdate.verified_by_medtravel = true;
-    clinicUpdate.is_official_partner = true;
+    clinicUpdate.status = "pending"; // или "draft", но лучше "pending"
+    clinicUpdate.verified_by_medtravel = false;
+    clinicUpdate.is_official_partner = false;
   }
 
   const { error: uErr } = await admin
@@ -283,13 +283,13 @@ export async function getCategories() {
   return data ?? [];
 }
 
-export async function publishClinic(clinicId: string) {
-  const supabase = await createServerClient();
-  const { error } = await supabase.rpc("publish_clinic_from_draft", {
-    p_clinic_id: clinicId,
-  });
-  if (error) throw error;
-}
+// export async function publishClinic(clinicId: string) {
+//   const supabase = await createServerClient();
+//   const { error } = await supabase.rpc("publish_clinic_from_draft", {
+//     p_clinic_id: clinicId,
+//   });
+//   if (error) throw error;
+// }
 
 /* -------------------- Upload helpers -------------------- */
 

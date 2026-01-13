@@ -638,10 +638,10 @@ export default function ClinicProfilePage() {
                   : "Submitting..."
                 : submitButtonLabel}
             </button>
-            <p className="text-xs text-gray-500">
-              When filling out the clinic, first of all, save the data using the "Save as Draft" button to save the data and not lose it.
-            </p>
           </div>
+          <p className="text-xs text-gray-500">
+              When filling out the clinic, first of all, save the data using the "Save as Draft" button to save the data and not lose it.
+          </p>
         </Card>
       </div>
     </div>
