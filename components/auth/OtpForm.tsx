@@ -157,7 +157,7 @@ export default function OtpForm({
 
       <Button
         type="button"
-        variant="light"
+        variant="ghost"
         onClick={onBack || (() => window.history.back())}
       >
         Back

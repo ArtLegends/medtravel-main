@@ -338,8 +338,8 @@ export const Navbar = React.memo(() => {
                 />
             ) : (
                 <Button
-                  variant="light"
-                  color="default"
+                  variant="ghost"
+                  color="primary"
                   startContent={<Icon icon="solar:user-linear" width={18} />}
                   onPress={() => { setAuthRole(null); setAuthOpen(true); }}
                   className="hidden sm:flex"

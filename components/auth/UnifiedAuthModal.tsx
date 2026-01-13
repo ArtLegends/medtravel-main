@@ -186,16 +186,16 @@ export default function UnifiedAuthModal({
                   <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
                     <Button
                       className="flex-1"
-                      color={mode === "signin" ? "primary" : "default"}
-                      variant={mode === "signin" ? "solid" : "light"}
+                      color={mode === "signin" ? "primary" : "primary"}
+                      variant={mode === "signin" ? "solid" : "ghost"}
                       onPress={() => setMode("signin")}
                     >
                       Sign in
                     </Button>
                     <Button
                       className="flex-1"
-                      color={mode === "signup" ? "primary" : "default"}
-                      variant={mode === "signup" ? "solid" : "light"}
+                      color={mode === "signup" ? "primary" : "primary"}
+                      variant={mode === "signup" ? "solid" : "ghost"}
                       onPress={() => setMode("signup")}
                     >
                       Sign up
@@ -260,7 +260,7 @@ export default function UnifiedAuthModal({
 
             <ModalFooter className="flex items-center justify-between">
               <Button
-                variant="light"
+                variant="ghost"
                 onPress={() => {
                   if (step === "role") {
                     close();
@@ -275,7 +275,7 @@ export default function UnifiedAuthModal({
 
               {step !== "role" && !initialRole ? (
                 <Button
-                  variant="light"
+                  variant="ghost"
                   onPress={() => {
                     setRole(null);
                     setEmail("");
