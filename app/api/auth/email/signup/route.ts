@@ -69,12 +69,15 @@ export async function POST(req: Request) {
 
     // 2) гарантируем profiles.email_verified=false (опционально)
     // если у тебя автосоздание профиля через trigger — эта строка просто обновит
-    await supabase
-      .from("profiles")
-      .upsert(
-        { id: created.user.id, email_verified: false },
-        { onConflict: "id" },
-      );
+    await supabase.from("profiles").upsert(
+      { id: created.user.id, email, role: as.toLowerCase(), email_verified: false },
+      { onConflict: "id" }
+    );
+
+    await supabase.from("user_roles").upsert(
+      { user_id: created.user.id, role: as.toLowerCase() },
+      { onConflict: "user_id,role" } // если у тебя такой unique/PK
+    );
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

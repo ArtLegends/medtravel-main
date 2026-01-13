@@ -65,12 +65,16 @@ export async function POST(req: Request) {
     // валидно → удаляем OTP
     await supabase.from("email_otps").delete().eq("id", row.id);
 
-    // ✅ ВАЖНО: НЕ schema("auth"). Только Admin API.
-    const { data: userRes, error: userErr } = await supabase.auth.admin.getUserById(email);
-    if (userErr) return NextResponse.json({ error: userErr.message }, { status: 500 });
+    const { data: profile, error: profErr } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
 
-    const userId = userRes?.user?.id;
-    if (!userId) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
+    if (!profile?.id) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    const userId = profile.id;
 
     // подтверждаем email в Supabase Auth
     const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
     });
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
-    // ставим флаг в profiles (если есть такая колонка)
+    // ставим флаг в profiles
     await supabase.from("profiles").update({ email_verified: true }).eq("id", userId);
 
     return NextResponse.json({ ok: true });

@@ -93,6 +93,8 @@ export default function AuthLoginClient({ as, next }: Props) {
     });
   }, [supabase, role, safeNext]);
 
+  const [otpPassword, setOtpPassword] = useState("");
+
   return (
     <div className="min-h-[calc(100vh-64px)] w-full flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-[560px]">
@@ -192,8 +194,9 @@ export default function AuthLoginClient({ as, next }: Props) {
                     router.replace(safeNext);
                     router.refresh();
                   }}
-                  onOtpRequired={(e) => {
-                    setEmail(e);
+                  onOtpRequired={({ email, password }) => {
+                    setEmail(email);
+                    setOtpPassword(password);
                     setStep("otp");
                   }}
                 />
@@ -234,6 +237,7 @@ export default function AuthLoginClient({ as, next }: Props) {
               <div className="flex flex-col gap-4">
                 <OtpForm
                   email={email}
+                  password={otpPassword}
                   as={role}
                   next={safeNext}
                   onBack={() => setStep("auth")}

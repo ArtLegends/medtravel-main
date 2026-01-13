@@ -7,9 +7,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { InputOtp, Button, Link } from "@heroui/react";
 import { useRouter } from "next/navigation";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
 
 type Props = {
   email: string;
+  password?: string;
   as?: string; // CUSTOMER / PARTNER / PATIENT / ADMIN
   next?: string; // куда редиректить после успешного ввода
   onBack?: () => void;
@@ -24,11 +26,13 @@ type FormValues = z.infer<typeof schema>;
 
 export default function OtpForm({
   email,
+  password,
   as = "CUSTOMER",
   next = "/",
   onBack,
   onSuccess,
 }: Props) {
+  const { supabase } = useSupabase();
   const router = useRouter();
 
   const {
@@ -101,6 +105,15 @@ export default function OtpForm({
       if (!res.ok) {
         setErrorMsg(json?.error || "Invalid code");
         return;
+      }
+
+      // ✅ после подтверждения — логин
+      if (password) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          setErrorMsg(error.message);
+          return;
+        }
       }
 
       onSuccess?.();

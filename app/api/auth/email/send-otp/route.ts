@@ -79,13 +79,20 @@ export async function POST(req: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // ✅ ВАЖНО: НЕ schema("auth"). Только Admin API.
-    const { data: userRes, error: userErr } = await supabase.auth.admin.getUserById(email);
-    if (userErr) return NextResponse.json({ error: userErr.message }, { status: 500 });
+    const { data: profile, error: profErr } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
 
-    const user = userRes?.user;
-    if (!user) {
+    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
+
+    if (!profile?.id) {
+      // вариант 1 (как у тебя сейчас): честно говорим что нет юзера
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+      // вариант 2 (безопаснее): не палим существование email
+      // return NextResponse.json({ ok: true });
     }
 
     // 1) генерим OTP + hash (как у тебя в verify-otp)

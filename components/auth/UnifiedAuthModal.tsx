@@ -126,6 +126,8 @@ export default function UnifiedAuthModal({
     setStep("auth");
   };
 
+  const [otpPassword, setOtpPassword] = useState("");
+
   return (
     <Modal
       isOpen={open}
@@ -210,8 +212,9 @@ export default function UnifiedAuthModal({
                       router.replace(safeNext);
                       router.refresh();
                     }}
-                    onOtpRequired={(e) => {
-                      setEmail(e);
+                    onOtpRequired={({ email, password }) => {
+                      setEmail(email);
+                      setOtpPassword(password);
                       setStep("otp");
                     }}
                   />
@@ -244,13 +247,10 @@ export default function UnifiedAuthModal({
                 <div className="flex flex-col gap-4">
                   <OtpForm
                     email={email}
+                    password={otpPassword}
                     as={role}
                     next={safeNext}
                     onBack={() => setStep("auth")}
-                    onSuccess={() => {
-                      // закроем модалку сразу, UX чище
-                      onClose();
-                    }}
                   />
                 </div>
               ) : null}

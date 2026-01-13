@@ -16,7 +16,7 @@ type Props = {
   role: string; // PATIENT | PARTNER | CUSTOMER
   next: string;
 
-  onOtpRequired: (email: string) => void;
+  onOtpRequired: (payload: { email: string; password: string }) => void;
   onSignedIn?: () => void; // для модалки: закрыть
 };
 
@@ -117,7 +117,7 @@ export default function CredentialsForm({
         return;
       }
 
-      onOtpRequired(email);
+      onOtpRequired({ email, password });
     } catch (e: any) {
       setErrorMsg(e?.message || "Network error");
     }
