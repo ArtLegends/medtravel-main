@@ -38,7 +38,14 @@ export async function ensureClinicForOwner(): Promise<string> {
     .from("clinics")
     .insert({
       owner_id: user.id,
-      moderation_status: "pending",
+      is_published: false,
+
+      // до ревью: draft (а pending — только после submit)
+      moderation_status: "draft",
+
+      // “пользовательский” статус
+      status: "not_published",
+
       name: "Draft Clinic",
       slug: makeSlug("draft-clinic"),
     })
@@ -442,6 +449,15 @@ export async function saveDraftWhole(payload: {
     .from("clinic_profile_drafts")
     .upsert(nextRow, { onConflict: "clinic_id" });
   if (upErr) throw upErr;
+
+  // переводим клинику в Draft только если она не опубликована
+  const { error: sErr } = await client
+    .from("clinics")
+    .update({ status: "draft" })
+    .eq("id", clinicId)
+    .eq("is_published", false);
+
+  if (sErr) throw sErr;
 
   return { ok: true };
 }

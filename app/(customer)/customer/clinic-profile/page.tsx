@@ -346,19 +346,31 @@ export default function ClinicProfilePage() {
   );
 
   const statusLabel = useMemo(() => {
-    if (!clinicMeta) return "Draft";
+    if (!clinicMeta) return "Not published";
+
+    const moderation = (clinicMeta.moderation_status ?? "").toLowerCase();
+    const status = (clinicMeta.status ?? "").toLowerCase();
+
     if (clinicMeta.is_published) return "Published";
     if (clinicMeta.moderation_status === "pending") return "Pending review";
-    return "Draft";
+    if ((clinicMeta.status ?? "").toLowerCase() === "draft") return "Draft";
+
+    return "Not published";
   }, [clinicMeta]);
-  
-  const statusClass =
-    statusLabel === "Published"
-      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-      : statusLabel === "Pending review"
-      ? "bg-amber-50 text-amber-800 border border-amber-100"
-      : "bg-gray-100 text-gray-700 border border-gray-200";
-  
+
+  const statusClass = useMemo(() => {
+    switch (statusLabel) {
+      case "Published":
+        return "bg-emerald-50 text-emerald-700 border border-emerald-100";
+      case "Pending review":
+        return "bg-amber-50 text-amber-800 border border-amber-100";
+      case "Draft":
+        return "bg-gray-100 text-gray-700 border border-gray-200";
+      default:
+        return "bg-gray-100 text-gray-700 border border-gray-200";
+    }
+  }, [statusLabel]);
+      
   const isPublished = !!clinicMeta?.is_published;
 
   const clinicPublicHref = useMemo(() => {
@@ -474,9 +486,6 @@ export default function ClinicProfilePage() {
 
             <p className="text-xs text-gray-500">
               Complete all required sections to enable publishing or updating
-            </p>
-            <p className="text-xs text-gray-500">
-              Complete all sections to enable publishing
             </p>
           </Card>
 
@@ -629,6 +638,9 @@ export default function ClinicProfilePage() {
                   : "Submitting..."
                 : submitButtonLabel}
             </button>
+            <p className="text-xs text-gray-500">
+              When filling out the clinic, first of all, save the data using the "Save as Draft" button to save the data and not lose it.
+            </p>
           </div>
         </Card>
       </div>
