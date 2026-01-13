@@ -46,6 +46,8 @@ export default function OtpForm({
   const [seconds, setSeconds] = useState(60);
   const [resending, setResending] = useState(false);
 
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSeconds((s) => (s > 0 ? s - 1 : 0));
@@ -85,6 +87,7 @@ export default function OtpForm({
 
   const onSubmit = async (data: FormValues) => {
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     try {
       const res = await fetch("/api/auth/email/verify-otp", {
@@ -107,6 +110,8 @@ export default function OtpForm({
         return;
       }
 
+      setSuccessMsg("Email confirmed. Signing you in...");
+
       // ✅ после подтверждения — логин
       if (password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -115,6 +120,8 @@ export default function OtpForm({
           return;
         }
       }
+
+      await new Promise((r) => setTimeout(r, 500));
 
       onSuccess?.();
       router.replace(next || "/");
@@ -138,6 +145,8 @@ export default function OtpForm({
         <p className="text-danger text-small">{errors.token.message}</p>
       )}
       {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
+      {successMsg && <p className="text-success text-small">{successMsg}</p>}
 
       <p className="text-tiny text-default-500">
         Didn&apos;t receive code?{" "}

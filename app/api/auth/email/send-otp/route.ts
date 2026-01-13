@@ -89,10 +89,10 @@ export async function POST(req: NextRequest) {
 
     if (!profile?.id) {
       // вариант 1 (как у тебя сейчас): честно говорим что нет юзера
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      // return NextResponse.json({ error: "User not found" }, { status: 404 });
 
       // вариант 2 (безопаснее): не палим существование email
-      // return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true });
     }
 
     // 1) генерим OTP + hash (как у тебя в verify-otp)

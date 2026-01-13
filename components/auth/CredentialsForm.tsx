@@ -27,7 +27,7 @@ export default function CredentialsForm({
   onOtpRequired,
   onSignedIn,
 }: Props) {
-  const { supabase } = useSupabase();
+  const { supabase, refreshRoles, setActiveRole } = useSupabase();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPass, setShowPass] = useState(false);
 
@@ -70,14 +70,32 @@ export default function CredentialsForm({
 
     try {
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
           setErrorMsg(error.message);
           return;
+        }
+
+        const userId = data.user?.id;
+        if (userId) {
+          const roleSlug = role.toLowerCase();
+
+          await supabase.from("user_roles").upsert(
+            { user_id: userId, role: roleSlug },
+            { onConflict: "user_id,role" }
+          );
+
+          await supabase.from("profiles").upsert(
+            { id: userId, email, role: roleSlug },
+            { onConflict: "id" }
+          );
+
+          // ✅ обновить активную роль в UI
+          setActiveRole(role.toUpperCase() as any);
+
+          // ✅ принудительно перечитать роли (убирает гонку)
+          await refreshRoles();
         }
 
         // (необязательно, но полезно для контекста)

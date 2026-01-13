@@ -31,6 +31,7 @@ export interface SupabaseContextType {
   roles: UserRole[];      // все роли пользователя
   activeRole: UserRole;   // текущий портал/роль в UI
   setActiveRole: (role: UserRole) => void;
+  refreshRoles: () => Promise<void>;
 }
 
 const Ctx = createContext<SupabaseContextType | undefined>(undefined);
@@ -51,6 +52,12 @@ export function SupabaseProvider({
   const setActiveRole = (role: UserRole) => {
     _setActiveRole(role);
     writeActiveRole(role);
+  };
+
+  const refreshRoles = async () => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    await fetchRoles(uid);
   };
 
   const fetchRoles = async (uid: string) => {
@@ -86,7 +93,7 @@ export function SupabaseProvider({
 
     // activeRole: если текущая активная роль недоступна — ставим первую доступную
     const current = readActiveRole();
-    const ok = uniq.includes(current);
+    const ok = uniq.includes(activeRole);
     if (!ok) {
       const next = uniq[0] ?? "GUEST";
       setActiveRole(next);
@@ -119,7 +126,7 @@ export function SupabaseProvider({
   }, [supabase]);
 
   const value = useMemo(
-    () => ({ supabase, session, roles, activeRole, setActiveRole }),
+    () => ({ supabase, session, roles, activeRole, setActiveRole, refreshRoles }),
     [supabase, session, roles, activeRole],
   );
 

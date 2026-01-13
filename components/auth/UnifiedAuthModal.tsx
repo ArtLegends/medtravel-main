@@ -251,6 +251,10 @@ export default function UnifiedAuthModal({
                     as={role}
                     next={safeNext}
                     onBack={() => setStep("auth")}
+                    onSuccess={() => {
+                      close();   // закрывает ModalContent
+                      onClose(); // твой внешний флаг open=false
+                    }}
                   />
                 </div>
               ) : null}

@@ -100,6 +100,7 @@ function ProfileDropdownAuth({
   setActiveRole,
   supabase,
   t,
+  onAddRole,
 }: {
   session: any;
   roles: UserRole[];
@@ -107,6 +108,7 @@ function ProfileDropdownAuth({
   setActiveRole: (r: UserRole) => void;
   supabase: any;
   t: any;
+  onAddRole: () => void;
 }) {
   const router = useRouter();
 
@@ -218,6 +220,16 @@ function ProfileDropdownAuth({
               </DropdownItem>
             ))}
           </>
+        ) : null}
+
+        {!hasAdmin && roles.length < 3 ? (
+          <DropdownItem
+            key="add-role"
+            onPress={onAddRole}
+            startContent={<Icon icon="solar:add-circle-linear" width={16} />}
+          >
+            Sign in another panel
+          </DropdownItem>
         ) : null}
 
         <DropdownItem
@@ -335,6 +347,7 @@ export const Navbar = React.memo(() => {
                 setActiveRole={setActiveRole}
                 supabase={supabase}
                 t={t}
+                onAddRole={() => { setAuthRole(null); setAuthOpen(true); }}
                 />
             ) : (
                 <Button
