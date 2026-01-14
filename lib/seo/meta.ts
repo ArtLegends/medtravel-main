@@ -89,11 +89,11 @@ function tplCategoryDesc(lng: Locale, catLabel: string, loc?: string) {
 function tplTreatmentTitle(lng: Locale, treatment: string, loc: string) {
   switch (lng) {
     case 'ru':
-      return `${treatment} в ${loc} – Цены и лучшие клиники 2025`
+      return `${treatment} в ${loc} – Цены и лучшие клиники 2026`
     case 'pl':
-      return `${treatment} w ${loc} – Ceny i najlepsze kliniki 2025`
+      return `${treatment} w ${loc} – Ceny i najlepsze kliniki 2026`
     default:
-      return `${treatment} in ${loc} – Prices and Top Clinics 2025`
+      return `${treatment} in ${loc} – Prices and Top Clinics 2026`
   }
 }
 
@@ -105,54 +105,37 @@ function tplTreatmentDesc(
   max?: number | null,
   currency?: string | null
 ) {
-  const base =
-    lng === 'ru'
-      ? `${treatment} в ${loc}. `
-      : lng === 'pl'
-        ? `${treatment} w ${loc}. `
-        : `${treatment} in ${loc}. `
-
   const cur = formatCurrencySymbol(currency)
-  let pricePart = ''
 
-  if (min != null && max != null && Number(min) === Number(max)) {
-    pricePart =
-      lng === 'ru'
-        ? `Цены от ${min}${cur}. `
-        : lng === 'pl'
-          ? `Ceny od ${min}${cur}. `
-          : `Prices from ${min}${cur}. `
-  } else if (min != null && max != null) {
-    pricePart =
-      lng === 'ru'
-        ? `Цены от ${min}${cur} до ${max}${cur}. `
-        : lng === 'pl'
-          ? `Ceny od ${min}${cur} do ${max}${cur}. `
-          : `Prices from ${min}${cur} to ${max}${cur}. `
-  } else if (min != null) {
-    pricePart =
-      lng === 'ru'
-        ? `Цены от ${min}${cur}. `
-        : lng === 'pl'
-          ? `Ceny od ${min}${cur}. `
-          : `Prices from ${min}${cur}. `
-  } else if (max != null) {
-    pricePart =
-      lng === 'ru'
-        ? `Цены до ${max}${cur}. `
-        : lng === 'pl'
-          ? `Ceny do ${max}${cur}. `
-          : `Prices up to ${max}${cur}. `
-  }
+  // именно "costs from ... to ..."
+  const pricePart =
+    min != null && max != null
+      ? (lng === 'ru'
+          ? `стоит от ${min}${cur} до ${max}${cur}. `
+          : lng === 'pl'
+            ? `kosztuje od ${min}${cur} do ${max}${cur}. `
+            : `costs from ${min}${cur} to ${max}${cur}. `)
+      : (lng === 'ru'
+          ? `цены зависят от клиники. `
+          : lng === 'pl'
+            ? `ceny zależą od kliniki. `
+            : `costs vary by clinic. `)
+
+  const head =
+    lng === 'ru'
+      ? `${treatment} в ${loc} ${pricePart}`
+      : lng === 'pl'
+        ? `${treatment} w ${loc} ${pricePart}`
+        : `${treatment} in ${loc} ${pricePart}`
 
   const tail =
     lng === 'ru'
-      ? `Сравните клиники с высокими рейтингами и получите бесплатную консультацию ★ Проверенные отзывы реальных пациентов.`
+      ? `Сравните клиники с высокими рейтингами и получите бесплатный расчёт сегодня ★ Проверенные отзывы реальных пациентов.`
       : lng === 'pl'
-        ? `Porównaj najlepiej oceniane kliniki i uzyskaj darmową wycenę ★ Zweryfikowane opinie pacjentów.`
-        : `Compare top-rated clinics and get a free quote ★ Verified reviews from real patients.`
+        ? `Porównaj najlepiej oceniane kliniki i uzyskaj darmową wycenę już dziś ★ Zweryfikowane opinie pacjentów.`
+        : `Compare top-rated clinics and get a free quote today ★ Verified reviews from real patients.`
 
-  return base + pricePart + tail
+  return head + tail
 }
 
 // Карточка клиники (детальная)
