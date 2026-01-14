@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 
 function isValidEmail(email: unknown) {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normRefCode(v: unknown) {
+  const s = String(v ?? "").trim().toUpperCase();
+  return s.length >= 6 ? s : "";
 }
 
 export async function POST(req: Request) {
@@ -42,16 +48,25 @@ export async function POST(req: Request) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // ✅ refCode берём либо из body.ref (если ты когда-то начнёшь слать),
+    // ✅ либо из httpOnly cookie mt_ref_code, которую ставит /ref/[code]
+    const store = await cookies();
+    const refFromCookie = store.get("mt_ref_code")?.value;
+    const refCode = normRefCode(body?.ref || refFromCookie);
+
     // 1) создаём пользователя (НЕ шлём письма)
     const { data: created, error: createErr } =
       await supabase.auth.admin.createUser({
         email,
         password,
         email_confirm: false,
-        user_metadata: { requested_role: as },
+        user_metadata: {
+          requested_role: as,
+          // можно сохранить ref в метадате на будущее (не обязательно)
+          ...(refCode ? { ref_code: refCode } : {}),
+        },
       });
 
-    // если пользователь уже есть — сообщаем корректно
     if (createErr) {
       const msg = String(createErr.message || "");
       if (msg.toLowerCase().includes("already")) {
@@ -63,23 +78,53 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
-    if (!created?.user?.id) {
+    const userId = created?.user?.id;
+    if (!userId) {
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }
 
-    // 2) гарантируем profiles.email_verified=false (опционально)
-    // если у тебя автосоздание профиля через trigger — эта строка просто обновит
+    // 2) profiles + user_roles
     await supabase.from("profiles").upsert(
-      { id: created.user.id, email, role: as.toLowerCase(), email_verified: false },
+      { id: userId, email, role: as.toLowerCase(), email_verified: false },
       { onConflict: "id" }
     );
 
     await supabase.from("user_roles").upsert(
-      { user_id: created.user.id, role: as.toLowerCase() },
-      { onConflict: "user_id,role" } // если у тебя такой unique/PK
+      { user_id: userId, role: as.toLowerCase() },
+      { onConflict: "user_id,role" }
     );
 
-    return NextResponse.json({ ok: true });
+    // 3) ✅ если это PATIENT и есть refCode — пишем регистрацию в partner_referrals
+    if (as === "PATIENT" && refCode) {
+      const { data: rows, error: lookupErr } = await supabase.rpc(
+        "partner_referral_code_lookup",
+        { p_ref_code: refCode }
+      );
+
+      const owner = Array.isArray(rows) ? rows[0] : rows;
+      const partner_user_id = owner?.partner_user_id;
+      const program_key = owner?.program_key;
+
+      if (!lookupErr && partner_user_id && program_key) {
+        // вставляем (если у тебя есть unique constraint — лучше сделать upsert)
+        await supabase.from("partner_referrals").upsert(
+          {
+            ref_code: refCode,
+            partner_user_id,
+            program_key,
+            patient_user_id: userId,
+          } as any,
+          { onConflict: "patient_user_id" }
+        );
+      }
+    }
+
+    const res = NextResponse.json({ ok: true });
+
+    // (опционально) очищаем cookie, чтобы не засчитывать повторно
+    res.cookies.set("mt_ref_code", "", { path: "/", maxAge: 0 });
+
+    return res;
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
   }

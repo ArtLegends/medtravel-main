@@ -49,17 +49,20 @@ export async function POST(req: NextRequest) {
     return clearCookie(NextResponse.json({ ok: true, attached: false }));
   }
 
-  const owner = rows[0] as { partner_user_id: string; program_key: string };
+  const owner = Array.isArray(rows) ? rows[0] : rows;
 
-  const { error: insErr } = await supabase.from("partner_referrals").insert({
-    ref_code: refCode,
-    partner_user_id: owner.partner_user_id,
-    program_key: owner.program_key,
-    patient_user_id: user.id,
-  } as any);
+  const { error: insErr } = await supabase.from("partner_referrals").upsert(
+    {
+      ref_code: refCode,
+      partner_user_id: owner.partner_user_id,
+      program_key: owner.program_key,
+      patient_user_id: user.id,
+    } as any,
+    { onConflict: "patient_user_id" }
+  );
 
   // если уже был реферал — ок
-  if (insErr && !String(insErr.message || "").toLowerCase().includes("duplicate")) {
+  if (insErr) {
     return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
