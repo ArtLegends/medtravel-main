@@ -64,23 +64,33 @@ export async function generateMetadata({
       categorySlug: slug,
       segments,
     });
-  } catch {}
+  } catch (e) {
+  console.error("resolveCategoryRouteOnServer failed:", e);
+  }
 
-  // если в URL есть хвост, который не распарсили — noindex (SEO-чистота)
-  const consumedPath = "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/");
+  const consumedPath =
+    "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/");
   const hasExtra = Boolean(resolved.hasExtraSegments);
 
-  const base = resolved.treatmentLabel
+  const hasAnyFilter =
+    (resolved.locationSlugs?.length ?? 0) > 0 || (resolved.subcatSlugs?.length ?? 0) > 0;
+
+  // Если есть фильтры, но treatmentLabel не найден (например, только локация),
+  // используем имя категории как “subject”
+  const subjectLabel = resolved.treatmentLabel || (cat.name ?? cap(slug));
+
+  const base = hasAnyFilter
     ? buildTreatmentMetadata(consumedPath, {
-        treatmentLabel: resolved.treatmentLabel,
-        location: resolved.location,
-      })
+      treatmentLabel: subjectLabel,
+      location: resolved.location,
+      // minPrice/maxPrice/currency можно добавить позже
+    })
     : buildCategoryMetadata(consumedPath, {
-        categoryLabelEn: cat.name ?? cap(slug),
-        categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
-        categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
-        location: resolved.location,
-      });
+      categoryLabelEn: cat.name ?? cap(slug),
+      categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
+      categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
+      location: resolved.location,
+    });
 
   return {
     ...base,
