@@ -138,6 +138,15 @@ export async function generateMetadata({
     alternates: { canonical: consumedPath },
     robots: hasExtra ? { index: false, follow: true } : undefined,
     openGraph: { ...(base.openGraph as any), url: consumedPath },
+
+    // ✅ ДИАГНОСТИКА: временно
+    other: {
+      "x-mt-meta-source": hasAnyFilter ? "TREATMENT" : "CATEGORY",
+      "x-mt-meta-path": consumedPath,
+      "x-mt-meta-subject": subjectLabel,
+      "x-mt-meta-hasAnyFilter": String(hasAnyFilter),
+      "x-mt-meta-segments": segments.join("|"),
+    },
   };
 }
 
