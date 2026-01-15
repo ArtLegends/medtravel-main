@@ -44,16 +44,28 @@ export async function resolveCategoryRouteOnServer(
   const { categoryId, segments } = args;
 
   // 1) все location nodes
-  const { data: locRows } = await sb
+  const { data: locRows, error: locErr } = await sb
     .from("category_location_nodes")
     .select("id,parent_id,kind,name,slug")
     .eq("category_id", categoryId);
 
   // 2) все subcategory nodes
-  const { data: subRows } = await sb
+  const { data: subRows, error: subErr } = await sb
     .from("category_subcategory_nodes")
     .select("id,parent_id,name,slug")
     .eq("category_id", categoryId);
+
+  if (locErr) console.error("resolveCategoryRouteOnServer: loc nodes error:", locErr);
+  if (subErr) console.error("resolveCategoryRouteOnServer: sub nodes error:", subErr);
+
+  // полезный дебаг: покажет, что реально пришло на проде
+  // (можешь временно оставить, потом убрать)
+  console.log("resolveCategoryRouteOnServer debug:", {
+    categoryId,
+    segments,
+    locCount: (locRows ?? []).length,
+    subCount: (subRows ?? []).length,
+  });
 
   const locMap = mapByParent<LocNode>((locRows ?? []) as any);
   const subMap = mapByParent<SubNode>((subRows ?? []) as any);
@@ -74,7 +86,7 @@ export async function resolveCategoryRouteOnServer(
     if (!hit) break;
 
     locationSlugs.push(hit.slug);
-    // записываем имя в нужное поле по kind
+
     if (hit.kind === "country") location.country = hit.name;
     if (hit.kind === "province") location.province = hit.name;
     if (hit.kind === "city") location.city = hit.name;
@@ -105,7 +117,9 @@ export async function resolveCategoryRouteOnServer(
   let treatmentLabel: string | null = null;
   if (subcatSlugs.length) {
     const lastSlug = subcatSlugs[subcatSlugs.length - 1];
-    const lastNode = (subRows ?? []).find((n: any) => String(n.slug).toLowerCase() === String(lastSlug).toLowerCase());
+    const lastNode = (subRows ?? []).find(
+      (n: any) => String(n.slug).toLowerCase() === String(lastSlug).toLowerCase()
+    );
     treatmentLabel = lastNode?.name ?? null;
   }
 
@@ -114,9 +128,7 @@ export async function resolveCategoryRouteOnServer(
     treatmentLabel,
     locationSlugs,
     subcatSlugs,
-    matchedServiceSlugs: [], // если нужно — можно добавить позже
+    matchedServiceSlugs: [],
     hasExtraSegments,
-    // можно расширить:
-    // minPrice, maxPrice, currency
   };
 }

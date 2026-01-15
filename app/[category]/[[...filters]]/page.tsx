@@ -38,8 +38,10 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
 
+  // фактический URL как в браузере
   const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
 
+  // если категории нет — даём хоть какую-то мету
   if (!cat) {
     const base = buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
     return {
@@ -49,6 +51,7 @@ export async function generateMetadata({
     };
   }
 
+  // пытаемся распарсить сегменты в локацию/подкатегорию
   let resolved: any = {
     location: null,
     treatmentLabel: null,
@@ -65,32 +68,70 @@ export async function generateMetadata({
       segments,
     });
   } catch (e) {
-  console.error("resolveCategoryRouteOnServer failed:", e);
+    console.error("resolveCategoryRouteOnServer failed:", e);
   }
 
+  const resolvedLocLen = resolved?.locationSlugs?.length ?? 0;
+  const resolvedSubLen = resolved?.subcatSlugs?.length ?? 0;
+  const resolvedLen = resolvedLocLen + resolvedSubLen;
+
+  /**
+   * ВАЖНО:
+   * - если segments есть, но resolver ничего не распарсил,
+   *   НЕ схлопываем canonical в /{category}. Оставляем urlPath.
+   */
   const consumedPath =
-    "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/");
-  const hasExtra = Boolean(resolved.hasExtraSegments);
+    resolvedLen > 0
+      ? "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/")
+      : urlPath;
 
-  const hasAnyFilter =
-    (resolved.locationSlugs?.length ?? 0) > 0 || (resolved.subcatSlugs?.length ?? 0) > 0;
+  /**
+   * "Фильтровая страница" = наличие segments в URL.
+   * Не зависим от resolver, иначе снова будет category-шаблон.
+   */
+  const hasAnyFilter = segments.length > 0;
 
-  // Если есть фильтры, но treatmentLabel не найден (например, только локация),
-  // используем имя категории как “subject”
-  const subjectLabel = resolved.treatmentLabel || (cat.name ?? cap(slug));
+  /**
+   * extra сегменты:
+   * - либо resolver явно сказал hasExtraSegments
+   * - либо segments есть, но ничего не распарсили (мусорный URL)
+   */
+  const hasExtra = Boolean(resolved?.hasExtraSegments) || (segments.length > 0 && resolvedLen === 0);
+
+  // фолбэк для subject, если подкатегория не распознана
+  const fallbackFromLastSeg = segments.length
+    ? segments[segments.length - 1]
+        .split("-")
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+    : (cat.name ?? cap(slug));
+
+  /**
+   * subjectLabel:
+   * - если есть подкатегория: берём её name (treatmentLabel)
+   * - если только локация: subject = имя категории (Dentistry)
+   * - если вообще ничего не распарсили: subject = последний сегмент (All on 4)
+   */
+  const subjectLabel =
+    resolvedSubLen > 0
+      ? (resolved.treatmentLabel || fallbackFromLastSeg)
+      : resolvedLocLen > 0
+        ? (cat.name ?? cap(slug))
+        : fallbackFromLastSeg;
 
   const base = hasAnyFilter
     ? buildTreatmentMetadata(consumedPath, {
-      treatmentLabel: subjectLabel,
-      location: resolved.location,
-      // minPrice/maxPrice/currency можно добавить позже
-    })
+        treatmentLabel: subjectLabel,
+        location: resolved.location,
+        // minPrice/maxPrice/currency позже
+      })
     : buildCategoryMetadata(consumedPath, {
-      categoryLabelEn: cat.name ?? cap(slug),
-      categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
-      categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
-      location: resolved.location,
-    });
+        categoryLabelEn: cat.name ?? cap(slug),
+        categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
+        categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
+        location: resolved.location,
+      });
 
   return {
     ...base,
@@ -99,7 +140,6 @@ export async function generateMetadata({
     openGraph: { ...(base.openGraph as any), url: consumedPath },
   };
 }
-
 
 /* ---------------- PAGE ---------------- */
 
