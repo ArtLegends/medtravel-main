@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 import CategoryHero from "@/components/category/CategoryHero";
 import CategoryWhy from "@/components/category/CategoryWhy";
@@ -28,21 +27,24 @@ export async function generateMetadata({
   const { category, filters } = await params;
 
   const slug = decodeURIComponent(category).toLowerCase();
-  const segments = Array.isArray(filters) ? filters.map(decodeURIComponent) : [];
+
+  // ВАЖНО: сегменты приводим к lowerCase, чтобы матчи по slug были гарантированы
+  const segments = Array.isArray(filters)
+    ? filters.map((s) => decodeURIComponent(s).toLowerCase())
+    : [];
 
   const sb = await createServerClient();
 
-  const { data: cat } = await sb
+  const { data: cat, error: catErr } = await sb
     .from("categories")
     .select("id,name,name_ru,name_pl")
     .eq("slug", slug)
     .maybeSingle();
 
-  // фактический URL как в браузере
   const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
 
-  // если категории нет — даём хоть какую-то мету
-  if (!cat) {
+  // если категории нет — отдадим дефолт по slug
+  if (catErr || !cat) {
     const base = buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
     return {
       ...base,
@@ -51,11 +53,17 @@ export async function generateMetadata({
     };
   }
 
-  // пытаемся распарсить сегменты в локацию/подкатегорию
+  // ✅ ФАКТ наличия фильтров определяем НЕ через resolver,
+  // а напрямую по URL. Это “железно”.
+  const hasUrlFilters = segments.length > 0;
+
+  // по умолчанию считаем, что consumedPath = urlPath
+  let consumedPath = urlPath;
+
+  // resolved может упасть / вернуть пусто — не ломаем мету
   let resolved: any = {
     location: null,
     treatmentLabel: null,
-    matchedServiceSlugs: [],
     locationSlugs: [],
     subcatSlugs: [],
     hasExtraSegments: false,
@@ -67,70 +75,42 @@ export async function generateMetadata({
       categorySlug: slug,
       segments,
     });
+
+    // canonical строим из реально распарсенных частей
+    consumedPath =
+      "/" +
+      [
+        slug,
+        ...(resolved.locationSlugs ?? []),
+        ...(resolved.subcatSlugs ?? []),
+      ].filter(Boolean).join("/");
+
   } catch (e) {
-    console.error("resolveCategoryRouteOnServer failed:", e);
+    // даже если resolver упал — canonical оставляем исходный urlPath
+    consumedPath = urlPath;
   }
 
-  const resolvedLocLen = resolved?.locationSlugs?.length ?? 0;
-  const resolvedSubLen = resolved?.subcatSlugs?.length ?? 0;
-  const resolvedLen = resolvedLocLen + resolvedSubLen;
+  // если resolver нашёл “хвост” — noindex, но canonical всё равно на consumedPath/urlPath
+  const hasExtra = Boolean(resolved?.hasExtraSegments);
 
-  /**
-   * ВАЖНО:
-   * - если segments есть, но resolver ничего не распарсил,
-   *   НЕ схлопываем canonical в /{category}. Оставляем urlPath.
-   */
-  const consumedPath =
-    resolvedLen > 0
-      ? "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/")
-      : urlPath;
+  // subject:
+  // - если есть subcategory → treatmentLabel
+  // - если есть только location → используем имя категории как subject (как ты и хотел)
+  const subjectLabel = (resolved?.treatmentLabel || cat.name || cap(slug)) as string;
 
-  /**
-   * "Фильтровая страница" = наличие segments в URL.
-   * Не зависим от resolver, иначе снова будет category-шаблон.
-   */
-  const hasAnyFilter = segments.length > 0;
-
-  /**
-   * extra сегменты:
-   * - либо resolver явно сказал hasExtraSegments
-   * - либо segments есть, но ничего не распарсили (мусорный URL)
-   */
-  const hasExtra = Boolean(resolved?.hasExtraSegments) || (segments.length > 0 && resolvedLen === 0);
-
-  // фолбэк для subject, если подкатегория не распознана
-  const fallbackFromLastSeg = segments.length
-    ? segments[segments.length - 1]
-        .split("-")
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")
-    : (cat.name ?? cap(slug));
-
-  /**
-   * subjectLabel:
-   * - если есть подкатегория: берём её name (treatmentLabel)
-   * - если только локация: subject = имя категории (Dentistry)
-   * - если вообще ничего не распарсили: subject = последний сегмент (All on 4)
-   */
-  const subjectLabel =
-    resolvedSubLen > 0
-      ? (resolved.treatmentLabel || fallbackFromLastSeg)
-      : resolvedLocLen > 0
-        ? (cat.name ?? cap(slug))
-        : fallbackFromLastSeg;
-
-  const base = hasAnyFilter
+  // ✅ ГЛАВНОЕ ПРАВИЛО:
+  // Если URL содержит фильтры (segments.length>0) → всегда treatment-шаблон.
+  // Иначе → category-шаблон.
+  const base = hasUrlFilters
     ? buildTreatmentMetadata(consumedPath, {
         treatmentLabel: subjectLabel,
-        location: resolved.location,
-        // minPrice/maxPrice/currency позже
+        location: resolved?.location ?? null,
       })
     : buildCategoryMetadata(consumedPath, {
         categoryLabelEn: cat.name ?? cap(slug),
         categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
         categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
-        location: resolved.location,
+        location: resolved?.location ?? null,
       });
 
   return {
@@ -139,13 +119,11 @@ export async function generateMetadata({
     robots: hasExtra ? { index: false, follow: true } : undefined,
     openGraph: { ...(base.openGraph as any), url: consumedPath },
 
-    // ✅ ДИАГНОСТИКА: временно
+    // ✅ диагностический маркер (безопасный)
+    // (Если его снова нет в view-source — значит этот файл не используется)
     other: {
-      "x-mt-meta-source": hasAnyFilter ? "TREATMENT" : "CATEGORY",
+      "x-mt-meta-source": hasUrlFilters ? "TREATMENT" : "CATEGORY",
       "x-mt-meta-path": consumedPath,
-      "x-mt-meta-subject": subjectLabel,
-      "x-mt-meta-hasAnyFilter": String(hasAnyFilter),
-      "x-mt-meta-segments": segments.join("|"),
     },
   };
 }
