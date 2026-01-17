@@ -19,16 +19,115 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /* ---------------- METADATA ---------------- */
 
+export async function generateMetadata(
+  { params }: { params: Params }
+): Promise<Metadata> {
+  const slug = decodeURIComponent(params.category).toLowerCase();
 
+  // filters уже string[] | undefined
+  const segments = Array.isArray(params.filters)
+    ? params.filters.map((s) => decodeURIComponent(s).toLowerCase())
+    : [];
+
+  const sb = await createServerClient();
+
+  const { data: cat, error: catErr } = await sb
+    .from("categories")
+    .select("id,name,name_ru,name_pl")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
+
+  // если категории нет — отдаём дефолт по slug
+  if (catErr || !cat) {
+    const base = buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
+    return {
+      ...base,
+      alternates: { canonical: urlPath },
+      openGraph: { ...(base.openGraph as any), url: urlPath },
+      other: {
+        "x-mt-meta-source": "FALLBACK_NO_CATEGORY",
+        "x-mt-meta-path": urlPath,
+      },
+    };
+  }
+
+  // железно: есть ли фильтры в URL
+  const hasUrlFilters = segments.length > 0;
+
+  // canonical по умолчанию = текущий url
+  let consumedPath = urlPath;
+
+  // пытаемся распарсить сегменты в location/subcats
+  let resolved: any = {
+    location: null,
+    treatmentLabel: null,
+    locationSlugs: [],
+    subcatSlugs: [],
+    hasExtraSegments: false,
+  };
+
+  try {
+    resolved = await resolveCategoryRouteOnServer(sb, {
+      categoryId: cat.id,
+      categorySlug: slug,
+      segments,
+    });
+
+    consumedPath =
+      "/" +
+      [
+        slug,
+        ...(resolved.locationSlugs ?? []),
+        ...(resolved.subcatSlugs ?? []),
+      ]
+        .filter(Boolean)
+        .join("/");
+  } catch {
+    consumedPath = urlPath;
+  }
+
+  const hasExtra = Boolean(resolved?.hasExtraSegments);
+
+  // subject:
+  // - если subcategory найдена → её name
+  // - если только локация → имя категории
+  const subjectLabel = (resolved?.treatmentLabel || cat.name || cap(slug)) as string;
+
+  const base = hasUrlFilters
+    ? buildTreatmentMetadata(consumedPath, {
+        treatmentLabel: subjectLabel,
+        location: resolved?.location ?? null,
+        // minPrice/maxPrice/currency подключим позже, когда отдашь источник цен
+      })
+    : buildCategoryMetadata(consumedPath, {
+        categoryLabelEn: cat.name ?? cap(slug),
+        categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
+        categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
+        location: resolved?.location ?? null,
+      });
+
+  return {
+    ...base,
+    alternates: { canonical: consumedPath },
+    robots: hasExtra ? { index: false, follow: true } : undefined,
+    openGraph: { ...(base.openGraph as any), url: consumedPath },
+
+    // Диагностика: ДОЛЖНО появиться в view-source как meta name="x-mt-meta-source"
+    other: {
+      "x-mt-meta-source": hasUrlFilters ? "TREATMENT" : "CATEGORY",
+      "x-mt-meta-path": consumedPath,
+      "x-mt-meta-segments": segments.join("|"),
+      "x-mt-meta-has-extra": String(Boolean(hasExtra)),
+    },
+  };
+}
 
 /* ---------------- PAGE ---------------- */
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<Params>;
-}) {
-  const { category, filters } = await params;
+export default async function Page({ params }: { params: Params }) {
+  const { category, filters } = params;
 
   const slug = decodeURIComponent(category).toLowerCase();
   const initialPath = Array.isArray(filters) ? filters : [];
