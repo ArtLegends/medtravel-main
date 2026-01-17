@@ -45,16 +45,45 @@ export async function generateMetadata(
   const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
 
   // 0) если категорию не нашли — всё равно отдаём meta (и ДИАГНОСТИКУ)
+  // НО: если URL содержит сегменты — это treatment-страница, даже без категории.
   if (catErr || !cat) {
-    const base = buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
+    const hasUrlFilters = segments.length > 0;
+
+    // пробуем назвать treatment по последнему сегменту через services.slug
+    let fallbackTreatmentLabel = cap(slug);
+    const lastSeg = segments.length ? segments[segments.length - 1] : null;
+
+    if (lastSeg) {
+      const { data: svc } = await sb
+        .from("services")
+        .select("name")
+        .eq("slug", lastSeg)
+        .maybeSingle();
+
+      if (svc?.name) fallbackTreatmentLabel = String(svc.name);
+      else fallbackTreatmentLabel = cap(lastSeg); // хотя бы красивый fallback
+    }
+
+    const base = hasUrlFilters
+      ? buildTreatmentMetadata(urlPath, {
+        treatmentLabel: fallbackTreatmentLabel,
+        location: undefined, // НЕ null
+      })
+      : buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
+
     return {
       ...base,
       alternates: { canonical: urlPath },
       openGraph: { ...(base.openGraph as any), url: urlPath },
       other: {
-        "x-mt-meta-source": "FALLBACK_NO_CATEGORY",
+        "x-mt-meta-source": hasUrlFilters
+          ? "FALLBACK_TREATMENT_NO_CATEGORY"
+          : "FALLBACK_CATEGORY_NO_CATEGORY",
         "x-mt-meta-path": urlPath,
         "x-mt-meta-segments": segments.join("|"),
+        "x-mt-meta-lastseg": String(lastSeg ?? ""),
+        "x-mt-meta-treatment-label": String(fallbackTreatmentLabel),
+        "x-mt-meta-caterr": String(catErr ? JSON.stringify(catErr) : ""),
       },
     };
   }
