@@ -22,20 +22,20 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<Params>;
+  // ВАЖНО: filters может прийти как string (если 1 сегмент), либо как string[]
+  params: { category: string; filters?: string | string[] };
 }): Promise<Metadata> {
-  const { category, filters } = await params;
+  const { category, filters } = params;
 
   const slug = decodeURIComponent(category).toLowerCase();
 
-  // ВАЖНО: сегменты приводим к lowerCase, чтобы матчи по slug были гарантированы
-  const segments = Array.isArray(filters)
-    ? filters.map((s) => decodeURIComponent(s).toLowerCase())
-    : [];
+  // ✅ Нормализуем filters к массиву ВСЕГДА
+  const raw = filters == null ? [] : Array.isArray(filters) ? filters : [filters];
+  const segments = raw.map((s) => decodeURIComponent(s).toLowerCase());
 
   const sb = await createServerClient();
 
-  const { data: cat, error: catErr } = await sb
+  const { data: cat } = await sb
     .from("categories")
     .select("id,name,name_ru,name_pl")
     .eq("slug", slug)
@@ -43,8 +43,8 @@ export async function generateMetadata({
 
   const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
 
-  // если категории нет — отдадим дефолт по slug
-  if (catErr || !cat) {
+  // если категории нет — дефолт
+  if (!cat) {
     const base = buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
     return {
       ...base,
@@ -53,14 +53,10 @@ export async function generateMetadata({
     };
   }
 
-  // ✅ ФАКТ наличия фильтров определяем НЕ через resolver,
-  // а напрямую по URL. Это “железно”.
+  // ✅ Факт фильтров берём строго по URL (а не по resolver)
   const hasUrlFilters = segments.length > 0;
 
-  // по умолчанию считаем, что consumedPath = urlPath
-  let consumedPath = urlPath;
-
-  // resolved может упасть / вернуть пусто — не ломаем мету
+  // resolver — чтобы получить location + treatmentLabel + canonical без мусора
   let resolved: any = {
     location: null,
     treatmentLabel: null,
@@ -69,6 +65,8 @@ export async function generateMetadata({
     hasExtraSegments: false,
   };
 
+  let consumedPath = urlPath;
+
   try {
     resolved = await resolveCategoryRouteOnServer(sb, {
       categoryId: cat.id,
@@ -76,31 +74,23 @@ export async function generateMetadata({
       segments,
     });
 
-    // canonical строим из реально распарсенных частей
     consumedPath =
       "/" +
-      [
-        slug,
-        ...(resolved.locationSlugs ?? []),
-        ...(resolved.subcatSlugs ?? []),
-      ].filter(Boolean).join("/");
-
-  } catch (e) {
-    // даже если resolver упал — canonical оставляем исходный urlPath
+      [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])]
+        .filter(Boolean)
+        .join("/");
+  } catch {
+    // если resolver упал — не ломаем SEO, оставляем urlPath
     consumedPath = urlPath;
   }
 
-  // если resolver нашёл “хвост” — noindex, но canonical всё равно на consumedPath/urlPath
   const hasExtra = Boolean(resolved?.hasExtraSegments);
 
   // subject:
-  // - если есть subcategory → treatmentLabel
-  // - если есть только location → используем имя категории как subject (как ты и хотел)
+  // - если есть subcategory -> treatmentLabel
+  // - если есть только location -> используем cat.name
   const subjectLabel = (resolved?.treatmentLabel || cat.name || cap(slug)) as string;
 
-  // ✅ ГЛАВНОЕ ПРАВИЛО:
-  // Если URL содержит фильтры (segments.length>0) → всегда treatment-шаблон.
-  // Иначе → category-шаблон.
   const base = hasUrlFilters
     ? buildTreatmentMetadata(consumedPath, {
         treatmentLabel: subjectLabel,
@@ -118,13 +108,6 @@ export async function generateMetadata({
     alternates: { canonical: consumedPath },
     robots: hasExtra ? { index: false, follow: true } : undefined,
     openGraph: { ...(base.openGraph as any), url: consumedPath },
-
-    // ✅ диагностический маркер (безопасный)
-    // (Если его снова нет в view-source — значит этот файл не используется)
-    other: {
-      "x-mt-meta-source": hasUrlFilters ? "TREATMENT" : "CATEGORY",
-      "x-mt-meta-path": consumedPath,
-    },
   };
 }
 
