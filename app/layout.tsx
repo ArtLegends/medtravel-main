@@ -56,7 +56,6 @@ export const metadata: Metadata = {
     creator: "@medtravel",
   },
   metadataBase: new URL("https://medtravel.me"),
-  alternates: { canonical: "/", languages: { "en-US": "/en", "ru-RU": "/ru" } },
 };
 
 export const viewport: Viewport = {
