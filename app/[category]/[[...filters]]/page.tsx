@@ -4,7 +4,7 @@ import CategoryHero from "@/components/category/CategoryHero";
 import CategoryWhy from "@/components/category/CategoryWhy";
 import CategoryGrid from "@/components/category/CategoryGrid";
 import { createServerClient } from "@/lib/supabase/serverClient";
-import { buildCategoryMetadata, buildTreatmentMetadata } from "@/lib/seo/meta";
+import { buildCategoryMetadata, buildTreatmentMetadata, LocationParts } from "@/lib/seo/meta";
 import { resolveCategoryRouteOnServer } from "@/lib/category-route/resolve";
 
 export const dynamic = "force-dynamic";
@@ -15,29 +15,84 @@ type Params = {
   filters?: string[];
 };
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 function cleanSeg(v: string) {
   return decodeURIComponent(v).trim().toLowerCase();
 }
 
-/* ---------------- METADATA ---------------- */
-
-function humanizeSlug(s: string) {
+function capWords(s: string) {
   return s
-    .split("-")
+    .split(" ")
     .filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
-function locationFromSlugs(slugs: string[]) {
-  const loc: any = {};
-  if (slugs[0]) loc.country = humanizeSlug(slugs[0]);
-  if (slugs[1]) loc.province = humanizeSlug(slugs[1]);
-  if (slugs[2]) loc.city = humanizeSlug(slugs[2]);
-  if (slugs[3]) loc.district = humanizeSlug(slugs[3]);
+/** Опционально: маркетинговые имена категорий (чтобы Dentistry -> Dental Clinics) */
+function categorySeoLabel(slug: string, fallbackName: string) {
+  if (slug === "dentistry") return "Dental Clinics";
+  if (slug === "hair-transplant") return "Hair Transplant Clinics";
+  if (slug === "plastic-surgery") return "Plastic Surgery Clinics";
+  return fallbackName;
+}
+
+/** Строим LocationParts из найденных location nodes */
+function buildLocationPartsFromNodes(nodes: Array<{ kind: string; name: string }>): LocationParts | undefined {
+  if (!nodes.length) return undefined;
+  const loc: LocationParts = {};
+  for (const n of nodes) {
+    if (n.kind === "country") loc.country = n.name;
+    if (n.kind === "province") loc.province = n.name;
+    if (n.kind === "city") loc.city = n.name;
+    if (n.kind === "district") loc.district = n.name;
+  }
   return loc;
+}
+
+/**
+ * Создаём индекс по parent_id -> (slug -> node)
+ * parent_id может быть null => кладём в ключ "__root__"
+ */
+function indexByParent<T extends { parent_id: any; slug: string }>(rows: T[]) {
+  const rootKey = "__root__";
+  const m = new Map<string, Map<string, T>>();
+  for (const r of rows) {
+    const k = r.parent_id == null ? rootKey : String(r.parent_id);
+    if (!m.has(k)) m.set(k, new Map());
+    m.get(k)!.set(String(r.slug), r);
+  }
+  return { m, rootKey };
+}
+
+/**
+ * “Съедаем” цепочку сегментов по дереву: root -> child -> child...
+ * Возвращаем: consumedNodes, consumedSlugs, nextIndex
+ */
+function consumeChain<T extends { id: any; parent_id: any; slug: string }>(
+  segments: string[],
+  startIdx: number,
+  index: { m: Map<string, Map<string, T>>; rootKey: string }
+) {
+  const consumed: T[] = [];
+  const consumedSlugs: string[] = [];
+
+  let parentKey = index.rootKey;
+  let i = startIdx;
+
+  while (i < segments.length) {
+    const seg = segments[i];
+    const bucket = index.m.get(parentKey);
+    const node = bucket?.get(seg);
+
+    if (!node) break;
+
+    consumed.push(node);
+    consumedSlugs.push(seg);
+
+    parentKey = String((node as any).id);
+    i++;
+  }
+
+  return { consumed, consumedSlugs, nextIndex: i };
 }
 
 export async function generateMetadata(
@@ -47,126 +102,163 @@ export async function generateMetadata(
 
   const slug = cleanSeg(category);
   const segments = Array.isArray(filters) ? filters.map(cleanSeg).filter(Boolean) : [];
+  const urlPath = "/" + [slug, ...segments].join("/");
 
   const sb = await createServerClient();
 
-  // ✅ categories: только то, что реально существует
+  // 1) category
   const { data: cat, error: catErr } = await sb
     .from("categories")
-    .select("id,name")
+    .select("id,name,name_ru,name_pl,slug")
     .eq("slug", slug)
     .maybeSingle();
 
-  const urlPath = "/" + [slug, ...segments].join("/");
-
-  // --------- 1) определяем, какие сегменты являются service slug ----------
-  // Берём ВСЕ services, которые совпали по slug из segments
-  // (если у services есть category_id — добавь .eq("category_id", cat?.id))
-  const { data: svcRows } = await sb
-    .from("services")
-    .select("slug,name")
-    .in("slug", segments);
-
-  const svcMap = new Map<string, string>();
-  (svcRows ?? []).forEach(r => {
-    if (r?.slug) svcMap.set(String(r.slug), String((r as any).name ?? r.slug));
-  });
-
-  const firstServiceIdx = segments.findIndex(s => svcMap.has(s));
-
-  const locationSlugs =
-    firstServiceIdx === -1 ? segments : segments.slice(0, firstServiceIdx);
-
-  const serviceSlugs =
-    firstServiceIdx === -1 ? [] : segments.slice(firstServiceIdx);
-
-  const hasLocation = locationSlugs.length > 0;
-  const hasTreatment = serviceSlugs.length > 0;
-
-  const locationForMeta = hasLocation ? locationFromSlugs(locationSlugs) : undefined;
-
-  // --------- 2) если категории нет — всё равно делаем нормальную мету ----------
+  // fallback если категория не найдена
   if (catErr || !cat) {
-    const base = hasTreatment
-      ? buildTreatmentMetadata(urlPath, {
-          treatmentLabel: svcMap.get(serviceSlugs[serviceSlugs.length - 1]) ?? humanizeSlug(serviceSlugs[serviceSlugs.length - 1] ?? slug),
-          location: locationForMeta,
-        })
-      : buildCategoryMetadata(urlPath, {
-          categoryLabelEn: humanizeSlug(slug),
-          location: locationForMeta,
-        });
+    const base = buildCategoryMetadata(urlPath, {
+      categoryLabelEn: capWords(slug),
+    });
 
     return {
       ...base,
       alternates: { canonical: urlPath },
       other: {
-        "x-mt-meta-source": hasTreatment ? "FALLBACK_TREATMENT_NO_CATEGORY" : "FALLBACK_CATEGORY_NO_CATEGORY",
+        "x-mt-meta-source": "FALLBACK_CATEGORY_NO_CATEGORY",
         "x-mt-meta-path": urlPath,
-        "x-mt-meta-location-slugs": locationSlugs.join("|"),
-        "x-mt-meta-service-slugs": serviceSlugs.join("|"),
+        "x-mt-meta-segments": segments.join("|"),
+        "x-mt-meta-caterr": String(catErr ? JSON.stringify(catErr) : ""),
       },
     };
   }
 
-  // --------- 3) выбор режима: only-location => CATEGORY, иначе => TREATMENT ----------
-  const isOnlyLocation = hasLocation && !hasTreatment;
+  // 2) preload nodes (одним запросом на каждую таблицу)
+  const [locRes, subRes] = await Promise.all([
+    sb
+      .from("category_location_nodes")
+      .select("id,parent_id,kind,name,slug")
+      .eq("category_id", cat.id)
+      .in("slug", segments),
+    sb
+      .from("category_subcategory_nodes")
+      .select("id,parent_id,name,slug")
+      .eq("category_id", cat.id)
+      .in("slug", segments),
+  ]);
 
-  // treatment label — имя последнего service slug
-  const treatmentLabel =
-    hasTreatment
-      ? (svcMap.get(serviceSlugs[serviceSlugs.length - 1]) ?? humanizeSlug(serviceSlugs[serviceSlugs.length - 1]))
-      : null;
+  const locRows = (locRes.data ?? []) as Array<any>;
+  const subRows = (subRes.data ?? []) as Array<any>;
 
-  // --------- 4) цены: если treatment есть, считаем min/max ----------
+  const locIndex = indexByParent(locRows);
+  const subIndex = indexByParent(subRows);
+
+  // 3) consume location chain from start
+  const locConsumed = consumeChain(segments, 0, locIndex);
+  const locationNodes = locConsumed.consumed as Array<{ kind: string; name: string }>;
+  const locationSlugs = locConsumed.consumedSlugs;
+
+  // 4) consume subcategory chain from where location ended
+  const subConsumed = consumeChain(segments, locConsumed.nextIndex, subIndex);
+  const subcatNodes = subConsumed.consumed as Array<{ id: any; name: string; slug: string }>;
+  const subcatSlugs = subConsumed.consumedSlugs;
+
+  const consumedCount = locConsumed.nextIndex + (subConsumed.nextIndex - locConsumed.nextIndex);
+  const hasExtra = consumedCount < segments.length;
+
+  // canonical: только “съеденная” часть (без мусора)
+  const canonicalPath =
+    "/" + [slug, ...locationSlugs, ...subcatSlugs].filter(Boolean).join("/");
+
+  const locationForMeta = buildLocationPartsFromNodes(locationNodes);
+
+  const hasSubcategory = subcatNodes.length > 0;
+  const mode = hasSubcategory ? "TREATMENT" : "CATEGORY";
+
+  // treatmentLabel = имя последней подкатегории
+  const treatmentLabel = hasSubcategory
+    ? String(subcatNodes[subcatNodes.length - 1].name ?? subcatSlugs[subcatSlugs.length - 1])
+    : null;
+
+  // 5) цены: только для treatment, через связь subcategory -> services
   let minPrice: number | null = null;
   let maxPrice: number | null = null;
   let currency: string | null = null;
 
-  if (hasTreatment) {
-    const loc = locationForMeta;
-    const { data: pr } = await sb.rpc("seo_treatment_price_range_v2", {
-      p_service_slugs: serviceSlugs,
-      p_country: loc?.country ?? null,
-      p_province: loc?.province ?? null,
-      p_city: loc?.city ?? null,
-      p_district: loc?.district ?? null,
-    });
+  if (hasSubcategory) {
+    const nodeIds = subcatNodes.map(n => n.id);
 
-    // pr может быть объектом или массивом — подстрахуемся
-    const row = Array.isArray(pr) ? pr[0] : pr;
-    if (row?.min != null) minPrice = Number(row.min);
-    if (row?.max != null) maxPrice = Number(row.max);
-    if ((row as any)?.currency != null) currency = String((row as any).currency);
+    const { data: svcLinks } = await sb
+      .from("category_subcategory_node_services")
+      .select("service_id")
+      .in("node_id", nodeIds);
+
+    const serviceIds = Array.from(new Set((svcLinks ?? []).map(r => (r as any).service_id).filter(Boolean)));
+
+    let serviceSlugs: string[] = [];
+    if (serviceIds.length) {
+      const { data: svc } = await sb
+        .from("services")
+        .select("slug")
+        .in("id", serviceIds);
+
+      serviceSlugs = Array.from(new Set((svc ?? []).map(r => String((r as any).slug)).filter(Boolean)));
+    }
+
+    if (serviceSlugs.length) {
+      const { data: pr } = await sb.rpc("seo_treatment_price_range_v2", {
+        p_service_slugs: serviceSlugs,
+        // ВАЖНО: тут лучше передавать именно "name" из nodes (а не slug),
+        // потому что мета и UI у тебя на человекочитаемых названиях.
+        p_country: locationForMeta?.country ?? null,
+        p_province: locationForMeta?.province ?? null,
+        p_city: locationForMeta?.city ?? null,
+        p_district: locationForMeta?.district ?? null,
+      });
+
+      const row = Array.isArray(pr) ? pr[0] : pr;
+      if (row?.min != null) minPrice = Number(row.min);
+      if (row?.max != null) maxPrice = Number(row.max);
+      currency = (row as any)?.currency != null ? String((row as any).currency) : null;
+    }
   }
 
-  const base = isOnlyLocation
-    ? buildCategoryMetadata(urlPath, {
-        categoryLabelEn: cat.name ?? humanizeSlug(slug),
-        categoryLabelRu: cat.name ?? humanizeSlug(slug),
-        categoryLabelPl: cat.name ?? humanizeSlug(slug),
+  // 6) строим meta по твоим правилам
+  const catLabelEn = categorySeoLabel(slug, String(cat.name ?? capWords(slug)));
+
+  const base = mode === "CATEGORY"
+    ? buildCategoryMetadata(canonicalPath, {
+        categoryLabelEn: catLabelEn,
+        categoryLabelRu: (cat as any).name_ru ?? catLabelEn,
+        categoryLabelPl: (cat as any).name_pl ?? catLabelEn,
         location: locationForMeta,
       })
-    : buildTreatmentMetadata(urlPath, {
-        treatmentLabel: treatmentLabel ?? (cat.name ?? humanizeSlug(slug)),
-        location: locationForMeta,
+    : buildTreatmentMetadata(canonicalPath, {
+        treatmentLabel: String(treatmentLabel ?? catLabelEn),
+        location: locationForMeta, // если нет, meta.ts покажет "Popular Destinations"
         minPrice,
         maxPrice,
-        currency,
+        currency: currency ?? "USD", // можешь убрать, если не хочешь форсить
       });
 
   return {
     ...base,
-    alternates: { canonical: urlPath },
+    alternates: { canonical: canonicalPath },
+    // если есть мусорные сегменты — noindex,follow (чтобы не плодить дубли)
+    robots: hasExtra ? { index: false, follow: true } : undefined,
+    openGraph: { ...(base.openGraph as any), url: canonicalPath },
+
     other: {
-      "x-mt-meta-source": isOnlyLocation ? "CATEGORY_WITH_LOCATION" : "TREATMENT",
-      "x-mt-meta-path": urlPath,
+      "x-mt-meta-source": mode,
+      "x-mt-meta-path": canonicalPath,
+      "x-mt-meta-urlpath": urlPath,
+
       "x-mt-meta-location-slugs": locationSlugs.join("|"),
-      "x-mt-meta-service-slugs": serviceSlugs.join("|"),
-      "x-mt-meta-is-only-location": String(isOnlyLocation),
+      "x-mt-meta-subcat-slugs": subcatSlugs.join("|"),
+      "x-mt-meta-has-extra": String(hasExtra),
+
       "x-mt-meta-treatment-label": String(treatmentLabel ?? ""),
       "x-mt-meta-min": String(minPrice ?? ""),
       "x-mt-meta-max": String(maxPrice ?? ""),
+      "x-mt-meta-currency": String(currency ?? ""),
     },
   };
 }
@@ -221,3 +313,7 @@ export default async function Page(
     </>
   );
 }
+function cap(slug: string): any {
+  throw new Error("Function not implemented.");
+}
+
