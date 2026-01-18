@@ -5,7 +5,6 @@ import CategoryWhy from "@/components/category/CategoryWhy";
 import CategoryGrid from "@/components/category/CategoryGrid";
 import { createServerClient } from "@/lib/supabase/serverClient";
 import { buildCategoryMetadata, buildTreatmentMetadata, LocationParts } from "@/lib/seo/meta";
-import { resolveCategoryRouteOnServer } from "@/lib/category-route/resolve";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,6 +24,26 @@ function capWords(s: string) {
     .filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+function getCatLabelBase(cat: any, slug: string) {
+  const raw =
+    cat?.name ??
+    cat?.title ??
+    cat?.label ??
+    cat?.name_en ??
+    cat?.nameEn ??
+    null;
+
+  return String(raw ?? capWords(slug));
+}
+
+function getCatLabelRu(cat: any, base: string) {
+  return String(cat?.name_ru ?? cat?.ru_name ?? cat?.title_ru ?? base);
+}
+
+function getCatLabelPl(cat: any, base: string) {
+  return String(cat?.name_pl ?? cat?.pl_name ?? cat?.title_pl ?? base);
 }
 
 /** Опционально: маркетинговые имена категорий (чтобы Dentistry -> Dental Clinics) */
@@ -109,7 +128,7 @@ export async function generateMetadata(
   // 1) category
   const { data: cat, error: catErr } = await sb
     .from("categories")
-    .select("id,name,name_ru,name_pl,slug")
+    .select("*")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -222,17 +241,19 @@ export async function generateMetadata(
   }
 
   // 6) строим meta по твоим правилам
-  const catLabelEn = categorySeoLabel(slug, String(cat.name ?? capWords(slug)));
+  const catLabelBase = getCatLabelBase(cat, slug);
+  const catLabelRu = getCatLabelRu(cat, catLabelBase);
+  const catLabelPl = getCatLabelPl(cat, catLabelBase);
 
   const base = mode === "CATEGORY"
     ? buildCategoryMetadata(canonicalPath, {
-        categoryLabelEn: catLabelEn,
-        categoryLabelRu: (cat as any).name_ru ?? catLabelEn,
-        categoryLabelPl: (cat as any).name_pl ?? catLabelEn,
+        categoryLabelEn: catLabelBase,
+        categoryLabelRu: catLabelRu,
+        categoryLabelPl: catLabelPl,
         location: locationForMeta,
       })
     : buildTreatmentMetadata(canonicalPath, {
-        treatmentLabel: String(treatmentLabel ?? catLabelEn),
+        treatmentLabel: String(treatmentLabel ?? catLabelBase),
         location: locationForMeta, // если нет, meta.ts покажет "Popular Destinations"
         minPrice,
         maxPrice,
@@ -274,16 +295,16 @@ export default async function Page(
   const initialPath = Array.isArray(filters) ? filters : [];
 
   const sb = await createServerClient();
-  const { data: cat, error } = await sb
+  const { data: cat, error: catErr } = await sb
     .from("categories")
-    .select("id,name")
+    .select("*")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (error) {
+  if (catErr) {
     return (
       <pre style={{ padding: 16, whiteSpace: "pre-wrap" }}>
-        categories query error: {JSON.stringify(error, null, 2)}
+        categories query error: {JSON.stringify(catErr, null, 2)}
       </pre>
     );
   }
@@ -296,7 +317,7 @@ export default async function Page(
     );
   }
 
-  const titleName = cat.name || cap(slug);
+  const titleName = getCatLabelBase(cat, slug);
 
   return (
     <>
@@ -312,8 +333,5 @@ export default async function Page(
       />
     </>
   );
-}
-function cap(slug: string): any {
-  throw new Error("Function not implemented.");
 }
 

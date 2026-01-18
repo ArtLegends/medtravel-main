@@ -42,7 +42,7 @@ function formatCurrencySymbol(code?: string | null) {
 
 // Категории верхнего уровня (dentists / hair-transplant / plastic-surgery)
 function tplCategoryTitle(lng: Locale, catLabel: string, loc?: string) {
-  const hasLoc = !!loc && loc.trim().length > 0
+  const hasLoc = !!loc && loc.trim().length > 0;
 
   switch (lng) {
     case 'ru':
@@ -56,12 +56,12 @@ function tplCategoryTitle(lng: Locale, catLabel: string, loc?: string) {
     default:
       return hasLoc
         ? `Best ${catLabel} in ${loc} ▷ Affordable Care Abroad`
-        : `Best ${catLabel} with Medtravel ▷ Affordable Care Abroad`
+        : `Best ${catLabel} ▷ Affordable Care Abroad`;
   }
 }
 
 function tplCategoryDesc(lng: Locale, catLabel: string, loc?: string) {
-  const hasLoc = !!loc && loc.trim().length > 0
+  const hasLoc = !!loc && loc.trim().length > 0;
 
   if (hasLoc) {
     switch (lng) {
@@ -70,7 +70,9 @@ function tplCategoryDesc(lng: Locale, catLabel: string, loc?: string) {
       case 'pl':
         return `Odkryj najlepsze ${catLabel} w ${loc} z opiniami pacjentów. ✔️ Przejrzyste ceny, anglojęzyczni specjaliści i 100% darmowe konsultacje.`
       default:
-        return `Discover Best ${catLabel} in ${loc} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
+        return hasLoc
+        ? `Discover best ${catLabel.toLowerCase()} in ${loc} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
+        : `Discover best ${catLabel.toLowerCase()} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
     }
   }
 
@@ -81,7 +83,7 @@ function tplCategoryDesc(lng: Locale, catLabel: string, loc?: string) {
     case 'pl':
       return `Odkryj najlepsze ${catLabel} z Medtravel. ✔️ Przejrzyste ceny, anglojęzyczni specjaliści i darmowe konsultacje w popularnych destynacjach.`
     default:
-      return `Discover Best ${catLabel} with Medtravel. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations in popular destinations.`
+      return `Discover best ${catLabel.toLowerCase()} with verified patient ratings. ✔️ Transparent costs, English-speaking doctors, and 100% free consultations.`
   }
 }
 
