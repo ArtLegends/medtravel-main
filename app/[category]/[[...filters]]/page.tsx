@@ -23,158 +23,150 @@ function cleanSeg(v: string) {
 
 /* ---------------- METADATA ---------------- */
 
+function humanizeSlug(s: string) {
+  return s
+    .split("-")
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function locationFromSlugs(slugs: string[]) {
+  const loc: any = {};
+  if (slugs[0]) loc.country = humanizeSlug(slugs[0]);
+  if (slugs[1]) loc.province = humanizeSlug(slugs[1]);
+  if (slugs[2]) loc.city = humanizeSlug(slugs[2]);
+  if (slugs[3]) loc.district = humanizeSlug(slugs[3]);
+  return loc;
+}
+
 export async function generateMetadata(
   { params }: { params: Promise<Params> }
 ): Promise<Metadata> {
   const { category, filters } = await params;
 
   const slug = cleanSeg(category);
-
-  const segments = Array.isArray(filters)
-    ? filters.map(cleanSeg).filter(Boolean)
-    : [];
+  const segments = Array.isArray(filters) ? filters.map(cleanSeg).filter(Boolean) : [];
 
   const sb = await createServerClient();
 
+  // ✅ categories: только то, что реально существует
   const { data: cat, error: catErr } = await sb
     .from("categories")
-    .select("id,name,name_ru,name_pl")
+    .select("id,name")
     .eq("slug", slug)
     .maybeSingle();
 
-  const urlPath = "/" + [slug, ...segments].filter(Boolean).join("/");
+  const urlPath = "/" + [slug, ...segments].join("/");
 
-  // 0) если категорию не нашли — всё равно отдаём meta (и ДИАГНОСТИКУ)
-  // НО: если URL содержит сегменты — это treatment-страница, даже без категории.
+  // --------- 1) определяем, какие сегменты являются service slug ----------
+  // Берём ВСЕ services, которые совпали по slug из segments
+  // (если у services есть category_id — добавь .eq("category_id", cat?.id))
+  const { data: svcRows } = await sb
+    .from("services")
+    .select("slug,name")
+    .in("slug", segments);
+
+  const svcMap = new Map<string, string>();
+  (svcRows ?? []).forEach(r => {
+    if (r?.slug) svcMap.set(String(r.slug), String((r as any).name ?? r.slug));
+  });
+
+  const firstServiceIdx = segments.findIndex(s => svcMap.has(s));
+
+  const locationSlugs =
+    firstServiceIdx === -1 ? segments : segments.slice(0, firstServiceIdx);
+
+  const serviceSlugs =
+    firstServiceIdx === -1 ? [] : segments.slice(firstServiceIdx);
+
+  const hasLocation = locationSlugs.length > 0;
+  const hasTreatment = serviceSlugs.length > 0;
+
+  const locationForMeta = hasLocation ? locationFromSlugs(locationSlugs) : undefined;
+
+  // --------- 2) если категории нет — всё равно делаем нормальную мету ----------
   if (catErr || !cat) {
-    const hasUrlFilters = segments.length > 0;
-
-    // пробуем назвать treatment по последнему сегменту через services.slug
-    let fallbackTreatmentLabel = cap(slug);
-    const lastSeg = segments.length ? segments[segments.length - 1] : null;
-
-    if (lastSeg) {
-      const { data: svc } = await sb
-        .from("services")
-        .select("name")
-        .eq("slug", lastSeg)
-        .maybeSingle();
-
-      if (svc?.name) fallbackTreatmentLabel = String(svc.name);
-      else fallbackTreatmentLabel = cap(lastSeg); // хотя бы красивый fallback
-    }
-
-    const base = hasUrlFilters
+    const base = hasTreatment
       ? buildTreatmentMetadata(urlPath, {
-        treatmentLabel: fallbackTreatmentLabel,
-        location: undefined, // НЕ null
-      })
-      : buildCategoryMetadata(urlPath, { categoryLabelEn: cap(slug) });
+          treatmentLabel: svcMap.get(serviceSlugs[serviceSlugs.length - 1]) ?? humanizeSlug(serviceSlugs[serviceSlugs.length - 1] ?? slug),
+          location: locationForMeta,
+        })
+      : buildCategoryMetadata(urlPath, {
+          categoryLabelEn: humanizeSlug(slug),
+          location: locationForMeta,
+        });
 
     return {
       ...base,
       alternates: { canonical: urlPath },
-      openGraph: { ...(base.openGraph as any), url: urlPath },
       other: {
-        "x-mt-meta-source": hasUrlFilters
-          ? "FALLBACK_TREATMENT_NO_CATEGORY"
-          : "FALLBACK_CATEGORY_NO_CATEGORY",
+        "x-mt-meta-source": hasTreatment ? "FALLBACK_TREATMENT_NO_CATEGORY" : "FALLBACK_CATEGORY_NO_CATEGORY",
         "x-mt-meta-path": urlPath,
-        "x-mt-meta-segments": segments.join("|"),
-        "x-mt-meta-lastseg": String(lastSeg ?? ""),
-        "x-mt-meta-treatment-label": String(fallbackTreatmentLabel),
-        "x-mt-meta-caterr": String(catErr ? JSON.stringify(catErr) : ""),
+        "x-mt-meta-location-slugs": locationSlugs.join("|"),
+        "x-mt-meta-service-slugs": serviceSlugs.join("|"),
       },
     };
   }
 
-  // 1) Если в URL есть сегменты — это всегда “treatment-режим”
-  const hasUrlFilters = segments.length > 0;
+  // --------- 3) выбор режима: only-location => CATEGORY, иначе => TREATMENT ----------
+  const isOnlyLocation = hasLocation && !hasTreatment;
 
-  // 2) Пробуем распарсить сегменты в location/subcategory через твой resolver
-  let resolved: any = {
-    location: undefined,
-    treatmentLabel: null,
-    locationSlugs: [],
-    subcatSlugs: [],
-    hasExtraSegments: false,
-  };
+  // treatment label — имя последнего service slug
+  const treatmentLabel =
+    hasTreatment
+      ? (svcMap.get(serviceSlugs[serviceSlugs.length - 1]) ?? humanizeSlug(serviceSlugs[serviceSlugs.length - 1]))
+      : null;
 
-  try {
-    resolved = await resolveCategoryRouteOnServer(sb, {
-      categoryId: cat.id,
-      categorySlug: slug,
-      segments,
+  // --------- 4) цены: если treatment есть, считаем min/max ----------
+  let minPrice: number | null = null;
+  let maxPrice: number | null = null;
+  let currency: string | null = null;
+
+  if (hasTreatment) {
+    const loc = locationForMeta;
+    const { data: pr } = await sb.rpc("seo_treatment_price_range_v2", {
+      p_service_slugs: serviceSlugs,
+      p_country: loc?.country ?? null,
+      p_province: loc?.province ?? null,
+      p_city: loc?.city ?? null,
+      p_district: loc?.district ?? null,
     });
-  } catch (e) {
-    // resolver не должен валить мету
+
+    // pr может быть объектом или массивом — подстрахуемся
+    const row = Array.isArray(pr) ? pr[0] : pr;
+    if (row?.min != null) minPrice = Number(row.min);
+    if (row?.max != null) maxPrice = Number(row.max);
+    if ((row as any)?.currency != null) currency = String((row as any).currency);
   }
 
-  // 3) Каноникал:
-  // - если resolver что-то распознал → canonical по распознанным кускам
-  // - если resolver НИЧЕГО не распознал → canonical = исходный urlPath (чтобы не “уплывал”)
-  const hasAnyResolved =
-    (resolved?.locationSlugs?.length ?? 0) > 0 ||
-    (resolved?.subcatSlugs?.length ?? 0) > 0;
-
-  const consumedPath = hasAnyResolved
-    ? "/" + [slug, ...(resolved.locationSlugs ?? []), ...(resolved.subcatSlugs ?? [])].join("/")
-    : urlPath;
-
-  const hasExtra = Boolean(resolved?.hasExtraSegments);
-
-  // 4) treatmentLabel:
-  // - сначала из resolver
-  // - если пусто → пробуем взять по slug из services (это очень частый кейс all-on-4)
-  // - если всё равно пусто → fallback на имя категории
-  let treatmentLabel: string | null = resolved?.treatmentLabel ?? null;
-
-  const lastSeg = segments.length ? segments[segments.length - 1] : null;
-
-  if (!treatmentLabel && lastSeg) {
-    const { data: svc } = await sb
-      .from("services")
-      .select("name")
-      .eq("slug", lastSeg)
-      .maybeSingle();
-
-    if (svc?.name) treatmentLabel = String(svc.name);
-  }
-
-  if (!treatmentLabel) {
-    treatmentLabel = cat.name ?? cap(slug);
-  }
-
-  // location: в meta.ts ожидается LocationParts | undefined (НЕ null)
-  const locationForMeta = resolved?.location ?? undefined;
-
-  const base = hasUrlFilters
-    ? buildTreatmentMetadata(consumedPath, {
-        treatmentLabel: treatmentLabel ?? cat.name ?? cap(slug),  // строго string
-        location: locationForMeta,  // строго undefined или объект
-      })
-    : buildCategoryMetadata(consumedPath, {
-        categoryLabelEn: cat.name ?? cap(slug),
-        categoryLabelRu: (cat as any).name_ru ?? cat.name ?? cap(slug),
-        categoryLabelPl: (cat as any).name_pl ?? cat.name ?? cap(slug),
+  const base = isOnlyLocation
+    ? buildCategoryMetadata(urlPath, {
+        categoryLabelEn: cat.name ?? humanizeSlug(slug),
+        categoryLabelRu: cat.name ?? humanizeSlug(slug),
+        categoryLabelPl: cat.name ?? humanizeSlug(slug),
         location: locationForMeta,
+      })
+    : buildTreatmentMetadata(urlPath, {
+        treatmentLabel: treatmentLabel ?? (cat.name ?? humanizeSlug(slug)),
+        location: locationForMeta,
+        minPrice,
+        maxPrice,
+        currency,
       });
 
   return {
     ...base,
-    alternates: { canonical: consumedPath },
-    robots: hasExtra ? { index: false, follow: true } : undefined,
-    openGraph: { ...(base.openGraph as any), url: consumedPath },
-
-    // ✅ ДИАГНОСТИКА (ДОЛЖНА БЫТЬ В view-source)
+    alternates: { canonical: urlPath },
     other: {
-      "x-mt-meta-source": hasUrlFilters ? "TREATMENT" : "CATEGORY",
-      "x-mt-meta-path": consumedPath,
-      "x-mt-meta-urlpath": urlPath,
-      "x-mt-meta-segments": segments.join("|"),
-      "x-mt-meta-has-extra": String(hasExtra),
-      "x-mt-meta-treatment-label": String(treatmentLabel),
-      "x-mt-meta-location": locationForMeta ? "1" : "0",
+      "x-mt-meta-source": isOnlyLocation ? "CATEGORY_WITH_LOCATION" : "TREATMENT",
+      "x-mt-meta-path": urlPath,
+      "x-mt-meta-location-slugs": locationSlugs.join("|"),
+      "x-mt-meta-service-slugs": serviceSlugs.join("|"),
+      "x-mt-meta-is-only-location": String(isOnlyLocation),
+      "x-mt-meta-treatment-label": String(treatmentLabel ?? ""),
+      "x-mt-meta-min": String(minPrice ?? ""),
+      "x-mt-meta-max": String(maxPrice ?? ""),
     },
   };
 }
