@@ -10,7 +10,7 @@ type Row = {
   patient_name: string | null;
   phone: string | null;
   service_name: string | null;
-  status: "pending" | "confirmed" | "cancelled" | "completed";
+  status: "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
   pre_cost: number | null;
   currency: string | null;
   actual_cost: number | null;
@@ -248,7 +248,10 @@ export default function PatientsListClient() {
                   </td>
                 </tr>
               ) : (
-                items.map((r) => (
+                items.map((r) => {
+                  const isLocked = r.status === "cancelled_by_patient";
+
+                  return(
                   <tr key={r.booking_id} className="border-t">
                     <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
                       {r.patient_public_id ? `#${r.patient_public_id}` : "—"}
@@ -259,15 +262,19 @@ export default function PatientsListClient() {
 
                     <td className="px-4 py-3">
                       <select
-                        disabled={busy}
+                        disabled={busy || isLocked}
                         value={r.status}
                         onChange={(e) => updateStatus(r.booking_id, e.target.value as any)}
-                        className="border rounded-md px-2 py-1"
+                        className={
+                          "border rounded-md px-2 py-1 " +
+                          (isLocked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")
+                        }
                       >
                         <option value="pending">pending</option>
                         <option value="confirmed">confirmed</option>
                         <option value="cancelled">cancelled</option>
                         <option value="completed">completed</option>
+                        <option value="cancelled_by_patient">cancelled by patient</option>
                       </select>
                     </td>
 
@@ -284,7 +291,8 @@ export default function PatientsListClient() {
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

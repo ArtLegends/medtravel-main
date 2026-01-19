@@ -56,22 +56,29 @@ function formatVisitDate(preferred_date: string | null, preferred_time: string |
 }
 
 function StatusPill({ status }: { status: string | null }) {
-  const s = (status || "").toLowerCase();
+  const s0 = (status || "").toLowerCase();
+  const s = s0 === "cancelled_by_patient" ? "cancelled" : s0;
 
-  // тут по задаче будут только completed, но пусть будет безопасно
   const isCompleted = s === "completed";
+  const isCancelled = s === "cancelled";
+
+  const cls =
+    isCompleted
+      ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+      : isCancelled
+        ? "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200"
+        : "bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-200";
+
+  const dot =
+    isCompleted ? "bg-emerald-500" : isCancelled ? "bg-red-500" : "bg-gray-400";
+
+  const label =
+    s === "cancelled_by_patient" ? "cancelled" : (status || "—");
 
   return (
-    <span
-      className={
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium " +
-        (isCompleted
-          ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
-          : "bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-200")
-      }
-    >
-      <span className={"h-1.5 w-1.5 rounded-full " + (isCompleted ? "bg-emerald-500" : "bg-gray-400")} />
-      {status || "—"}
+    <span className={"inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium " + cls}>
+      <span className={"h-1.5 w-1.5 rounded-full " + dot} />
+      {s ? s : "—"}
     </span>
   );
 }
@@ -127,18 +134,16 @@ export default async function PatientVisitHistoryPage() {
   // 2) Completed визиты пациента
   const { data, error } = await supabase
     .from("patient_bookings")
-    .select(
-      `
-      id,
-      status,
-      preferred_date,
-      preferred_time,
-      clinic:clinics ( name, country, province, city, district ),
-      service:services ( name )
-    `
-    )
+    .select(`
+    id,
+    status,
+    preferred_date,
+    preferred_time,
+    clinic:clinics ( name, country, province, city, district ),
+    service:services ( name )
+  `)
     .eq("patient_id", user.id)
-    .eq("status", "completed")
+    .in("status", ["completed", "cancelled", "cancelled_by_patient"])
     .order("preferred_date", { ascending: false });
 
   if (error) {
