@@ -19,12 +19,15 @@ type ServiceMini = {
 };
 
 type BookingRow = {
-  id: string;
+  booking_id: string;
   status: string | null;
-  preferred_date: string | null; // date (YYYY-MM-DD)
-  preferred_time: string | null; // text (e.g. "10:00")
+  preferred_date: string | null;
+  preferred_time: string | null;
   clinic: ClinicMini | null;
   service: ServiceMini | null;
+  pre_cost: number | null;
+  currency: string | null;
+  actual_cost: number | null;
 };
 
 function buildLocation(c: ClinicMini | null) {
@@ -133,14 +136,17 @@ export default async function PatientVisitHistoryPage() {
 
   // 2) Completed визиты пациента
   const { data, error } = await supabase
-    .from("patient_bookings")
+    .from("v_customer_patients")
     .select(`
-    id,
+    booking_id,
     status,
     preferred_date,
     preferred_time,
-    clinic:clinics ( name, country, province, city, district ),
-    service:services ( name )
+    pre_cost,
+    currency,
+    actual_cost,
+    clinic:clinic_id ( name, country, province, city, district ),
+    service:service_id ( name )
   `)
     .eq("patient_id", user.id)
     .in("status", ["completed", "cancelled", "cancelled_by_patient"])
@@ -218,7 +224,7 @@ export default async function PatientVisitHistoryPage() {
 
               <tbody className="divide-y text-sm text-gray-800">
                 {visits.map((v) => (
-                  <tr key={v.id} className="hover:bg-gray-50/50">
+                  <tr key={v.booking_id} className="hover:bg-gray-50/50">
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {v.clinic?.name || "—"}
                     </td>

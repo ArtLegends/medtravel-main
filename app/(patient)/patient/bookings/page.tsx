@@ -61,8 +61,11 @@ async function cancelBooking(formData: FormData) {
 export default async function PatientBookingsPage({
   searchParams,
 }: {
-  searchParams?: { cancel_error?: string };
+  searchParams?: Promise<{ cancel_error?: string }>;
 }) {
+  const sp = (await searchParams) ?? {};
+  const cancelError = sp.cancel_error;
+
   const store = await cookies();
 
   const supabase = createServerClient(
@@ -116,9 +119,9 @@ export default async function PatientBookingsPage({
 
   return (
     <div className="space-y-6">
-      {searchParams?.cancel_error && (
+      {cancelError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          Cancel failed: {decodeURIComponent(searchParams.cancel_error)}
+          Cancel failed: {decodeURIComponent(cancelError)}
         </div>
       )}
 
