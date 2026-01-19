@@ -11,7 +11,7 @@ function badge(status: string) {
   if (s === "confirmed") return "bg-emerald-50 text-emerald-700";
   if (s === "cancelled" || s === "cancelled_by_patient") return "bg-red-50 text-red-700";
   if (s === "completed") return "bg-sky-50 text-sky-700";
-  return "bg-amber-50 text-amber-700"; // pending
+  return "bg-amber-50 text-amber-700";
 }
 
 function patientStatusLabel(status: string) {
@@ -46,20 +46,23 @@ async function cancelBooking(formData: FormData) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) redirect(`/login?as=PATIENT&next=${encodeURIComponent("/patient/bookings")}`);
 
-  const { error } = await supabase.rpc("patient_cancel_booking", {
-    p_booking_id: bookingId,
-  });
+  const { error } = await supabase.rpc("patient_cancel_booking", { p_booking_id: bookingId });
 
+  // ВАЖНО: не валим рендер 500 в проде без текста — лучше мягко.
   if (error) {
-    // можно сделать красиво, но минимум:
-    throw new Error(error.message);
+    // вариант 1: просто редирект с кодом (можно потом красиво вывести)
+    redirect(`/patient/bookings?cancel_error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/patient/bookings");
   revalidatePath("/patient/visits");
 }
 
-export default async function PatientBookingsPage() {
+export default async function PatientBookingsPage({
+  searchParams,
+}: {
+  searchParams?: { cancel_error?: string };
+}) {
   const store = await cookies();
 
   const supabase = createServerClient(
@@ -70,7 +73,7 @@ export default async function PatientBookingsPage() {
         getAll: () => store.getAll().map((c) => ({ name: c.name, value: c.value })),
         setAll: () => {},
       },
-    },
+    }
   );
 
   const { data: auth } = await supabase.auth.getUser();
@@ -79,28 +82,28 @@ export default async function PatientBookingsPage() {
     redirect(`/login?as=PATIENT&next=${encodeURIComponent("/patient/bookings")}`);
   }
 
-  // ВАЖНО: если в БД связи clinics/services не подхватятся (нет FK),
-  // тогда сделаем отдельный view и будем читать из него.
+  // читаем из VIEW, чтобы pre_cost/currency совпадали с customer panel
   const { data: rows, error } = await supabase
-    .from("patient_bookings")
-    .select(`
-    id,
-    status,
-    booking_method,
-    preferred_date,
-    preferred_time,
-    created_at,
-    pre_cost,
-    actual_cost,
-    currency,
-    clinics:clinic_id ( id, name, country, city ),
-    services:service_id ( id, name )
-  `)
+    .from("v_customer_patients")
+    .select(
+      `
+      booking_id,
+      status,
+      booking_method,
+      preferred_date,
+      preferred_time,
+      created_at,
+      pre_cost,
+      currency,
+      actual_cost,
+      clinics:clinic_id ( id, name, country, city ),
+      services:service_id ( id, name )
+    `
+    )
     .eq("patient_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
-    // чтобы сразу видеть проблему на UI (а не молча)
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
         Failed to load bookings: {error.message}
@@ -113,12 +116,16 @@ export default async function PatientBookingsPage() {
 
   return (
     <div className="space-y-6">
+      {searchParams?.cancel_error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Cancel failed: {decodeURIComponent(searchParams.cancel_error)}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">My Bookings</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your medical appointments and bookings
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Manage your medical appointments and bookings</p>
         </div>
 
         <Link
@@ -140,9 +147,7 @@ export default async function PatientBookingsPage() {
               <span className="text-xl">📅</span>
             </div>
             <div className="font-medium text-gray-700">You don’t have any bookings yet</div>
-            <p className="mt-1 max-w-sm text-xs text-gray-500">
-              When you book an appointment, it will appear here.
-            </p>
+            <p className="mt-1 max-w-sm text-xs text-gray-500">When you book an appointment, it will appear here.</p>
             <Link
               href="/patient/appointment"
               className="mt-4 inline-flex items-center rounded-lg border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
@@ -166,56 +171,56 @@ export default async function PatientBookingsPage() {
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
-                <tbody className="divide-y text-sm text-gray-700">
-                  {bookings.map((b: any) => {
-                    const s = (b.status || "").toLowerCase();
-                    const canCancel = s === "pending" || s === "confirmed";
 
-                    return (
-                      <tr key={b.id}>
-                        <td className="px-4 py-3 font-medium text-gray-900">{b.clinics?.name ?? "—"}</td>
-                        <td className="px-4 py-3">{b.services?.name ?? "—"}</td>
-                        <td className="px-4 py-3">
-                          {b.clinics?.city ? `${b.clinics.city}, ` : ""}
-                          {b.clinics?.country ?? "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          {b.preferred_date ?? "—"}
-                          {b.preferred_time ? `, ${b.preferred_time}` : ""}
-                        </td>
+              <tbody className="divide-y text-sm text-gray-700">
+                {bookings.map((b: any) => {
+                  const s = String(b.status || "").toLowerCase();
+                  const canCancel = s === "pending" || s === "confirmed";
 
-                        {/* STATUS — один раз */}
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${badge(b.status)}`}>
-                            {patientStatusLabel(b.status)}
-                          </span>
-                        </td>
+                  return (
+                    <tr key={b.booking_id}>
+                      <td className="px-4 py-3 font-medium text-gray-900">{b.clinics?.name ?? "—"}</td>
+                      <td className="px-4 py-3">{b.services?.name ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        {b.clinics?.city ? `${b.clinics.city}, ` : ""}
+                        {b.clinics?.country ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {b.preferred_date ?? "—"}
+                        {b.preferred_time ? `, ${b.preferred_time}` : ""}
+                      </td>
 
-                        <td className="px-4 py-3">{fmtMoney(b.pre_cost, b.currency)}</td>
-                        <td className="px-4 py-3">{fmtMoney(b.actual_cost, b.currency)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${badge(b.status)}`}>
+                          {patientStatusLabel(b.status)}
+                        </span>
+                      </td>
 
-                        <td className="px-4 py-3">
-                          <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold text-gray-700">
-                            {b.booking_method === "manual" ? "Manual" : "Automatic"}
-                          </span>
-                        </td>
+                      <td className="px-4 py-3">{fmtMoney(b.pre_cost, b.currency)}</td>
+                      <td className="px-4 py-3">{fmtMoney(b.actual_cost, b.currency)}</td>
 
-                        <td className="px-4 py-3">
-                          {canCancel ? (
-                            <form action={cancelBooking}>
-                              <input type="hidden" name="booking_id" value={b.id} />
-                              <button type="submit" className="text-xs font-semibold text-red-600 hover:underline">
-                                Cancel
-                              </button>
-                            </form>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold text-gray-700">
+                          {b.booking_method === "manual" ? "Manual" : "Automatic"}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {canCancel ? (
+                          <form action={cancelBooking}>
+                            <input type="hidden" name="booking_id" value={b.booking_id} />
+                            <button type="submit" className="text-xs font-semibold text-red-600 hover:underline">
+                              Cancel
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
           </div>
         )}

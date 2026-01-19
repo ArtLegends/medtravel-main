@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 
+type Status = "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
+
 type Row = {
   booking_id: string;
   patient_id: string;
@@ -10,7 +12,7 @@ type Row = {
   patient_name: string | null;
   phone: string | null;
   service_name: string | null;
-  status: "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
+  status: Status;
   pre_cost: number | null;
   currency: string | null;
   actual_cost: number | null;
@@ -31,7 +33,7 @@ export default function PatientsListClient() {
   const [total, setTotal] = useState(0);
 
   const [status, setStatus] = useState<
-    "all" | "pending" | "confirmed" | "cancelled" | "completed"
+    "all" | "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient"
   >("all");
 
   const [startDate, setStartDate] = useState<string>("");
@@ -50,7 +52,6 @@ export default function PatientsListClient() {
       const j = await res.json().catch(() => null);
       return j?.error ? String(j.error) : JSON.stringify(j);
     }
-    // если это HTML (404/500 от Next), вернём коротко
     return `${res.status} ${res.statusText}`;
   }
 
@@ -93,17 +94,12 @@ export default function PatientsListClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, startDate, endDate]);
 
-  // Realtime: patient_bookings
   useEffect(() => {
     const channel = supabase
       .channel("customer-patients-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "patient_bookings" },
-        () => {
-          setTimeout(() => load(1), 150);
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_bookings" }, () => {
+        setTimeout(() => load(1), 150);
+      })
       .subscribe();
 
     return () => {
@@ -112,7 +108,7 @@ export default function PatientsListClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, status, startDate, endDate]);
 
-  async function updateStatus(bookingId: string, next: Row["status"]) {
+  async function updateStatus(bookingId: string, next: Status) {
     setBusy(true);
     setErr(null);
     try {
@@ -202,21 +198,11 @@ export default function PatientsListClient() {
             <option value="confirmed">Confirmed</option>
             <option value="cancelled">Cancelled</option>
             <option value="completed">Completed</option>
+            <option value="cancelled_by_patient">Cancelled by patient</option>
           </select>
 
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md"
-          />
-
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md"
-          />
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
         </div>
       </div>
 
@@ -251,46 +237,43 @@ export default function PatientsListClient() {
                 items.map((r) => {
                   const isLocked = r.status === "cancelled_by_patient";
 
-                  return(
-                  <tr key={r.booking_id} className="border-t">
-                    <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
-                      {r.patient_public_id ? `#${r.patient_public_id}` : "—"}
-                    </td>
-                    <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
-                    <td className="px-4 py-3">{r.phone ?? "—"}</td>
-                    <td className="px-4 py-3">{r.service_name ?? "—"}</td>
+                  return (
+                    <tr key={r.booking_id} className="border-t">
+                      <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
+                        {r.patient_public_id ? `#${r.patient_public_id}` : "—"}
+                      </td>
+                      <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
+                      <td className="px-4 py-3">{r.phone ?? "—"}</td>
+                      <td className="px-4 py-3">{r.service_name ?? "—"}</td>
 
-                    <td className="px-4 py-3">
-                      <select
-                        disabled={busy || isLocked}
-                        value={r.status}
-                        onChange={(e) => updateStatus(r.booking_id, e.target.value as any)}
-                        className={
-                          "border rounded-md px-2 py-1 " +
-                          (isLocked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")
-                        }
-                      >
-                        <option value="pending">pending</option>
-                        <option value="confirmed">confirmed</option>
-                        <option value="cancelled">cancelled</option>
-                        <option value="completed">completed</option>
-                        <option value="cancelled_by_patient">cancelled by patient</option>
-                      </select>
-                    </td>
+                      <td className="px-4 py-3">
+                        <select
+                          disabled={busy || isLocked}
+                          value={r.status}
+                          onChange={(e) => updateStatus(r.booking_id, e.target.value as any)}
+                          className={"border rounded-md px-2 py-1 " + (isLocked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")}
+                        >
+                          <option value="pending">pending</option>
+                          <option value="confirmed">confirmed</option>
+                          <option value="cancelled">cancelled</option>
+                          <option value="completed">completed</option>
+                          <option value="cancelled_by_patient">cancelled by patient</option>
+                        </select>
+                      </td>
 
-                    <td className="px-4 py-3">{fmtMoney(r.pre_cost, r.currency)}</td>
-                    <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
+                      <td className="px-4 py-3">{fmtMoney(r.pre_cost, r.currency)}</td>
+                      <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
 
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => deleteOne(r.booking_id)}
-                        disabled={busy}
-                        className="text-rose-600 hover:underline disabled:opacity-60"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => deleteOne(r.booking_id)}
+                          disabled={busy}
+                          className="text-rose-600 hover:underline disabled:opacity-60"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
                   );
                 })
               )}
@@ -303,18 +286,10 @@ export default function PatientsListClient() {
             Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
           </div>
           <div className="flex gap-2">
-            <button
-              disabled={busy || page <= 1}
-              onClick={() => load(page - 1)}
-              className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60"
-            >
+            <button disabled={busy || page <= 1} onClick={() => load(page - 1)} className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60">
               Prev
             </button>
-            <button
-              disabled={busy || page >= totalPages}
-              onClick={() => load(page + 1)}
-              className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60"
-            >
+            <button disabled={busy || page >= totalPages} onClick={() => load(page + 1)} className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60">
               Next
             </button>
           </div>
