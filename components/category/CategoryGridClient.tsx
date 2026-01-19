@@ -685,8 +685,33 @@ export default function CategoryGridClient({
   };
 
   const hrefSelectSub = (node: SubNode) => {
-    const nextSub = [...currentSubSlugs, node.slug];
-    return joinCategoryPath(categorySlug, [...currentLocSlugs, ...nextSub]);
+    const last = activeSub[activeSub.length - 1] ?? null;
+
+    // 0) клик по уже выбранному — ничего не меняем (не плодим /x/x)
+    if (last?.slug === node.slug) {
+      return joinCategoryPath(categorySlug, [...currentLocSlugs, ...currentSubSlugs]);
+    }
+
+    // 1) если ничего не выбрано — просто выбираем top-level
+    if (!last) {
+      return joinCategoryPath(categorySlug, [...currentLocSlugs, node.slug]);
+    }
+
+    // 2) если это РЕБЕНОК текущего last (углубление) — добавляем
+    if (node.parent_id === last.id) {
+      return joinCategoryPath(categorySlug, [...currentLocSlugs, ...currentSubSlugs, node.slug]);
+    }
+
+    // 3) если это SIBLING текущего last (тот же parent_id) — ЗАМЕНЯЕМ последний
+    if (node.parent_id === last.parent_id) {
+      const nextSub = [...currentSubSlugs];
+      nextSub[nextSub.length - 1] = node.slug;
+      return joinCategoryPath(categorySlug, [...currentLocSlugs, ...nextSub]);
+    }
+
+    // 4) если вдруг прилетел узел из другого уровня — безопасный fallback:
+    // сбрасываем subcat-цепочку и начинаем с выбранного узла
+    return joinCategoryPath(categorySlug, [...currentLocSlugs, node.slug]);
   };
 
   // go back one level
