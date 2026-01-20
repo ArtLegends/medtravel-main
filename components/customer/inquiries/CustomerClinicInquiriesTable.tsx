@@ -176,8 +176,6 @@ export default function CustomerClinicInquiriesTable(props: Props) {
             <tr key={r.id} className="border-t">
               <td className="px-4 py-2">{new Date(r.created_at).toLocaleString()}</td>
 
-              <td className="px-4 py-2">{r.clinic_name}</td>
-
               <td className="px-4 py-2">{r.name ?? "—"}</td>
 
               <td className="px-4 py-2">

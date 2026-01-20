@@ -1,6 +1,8 @@
 // app/(customer)/customer/inquiries/page.tsx
 import CustomerClinicInquiriesTable, { type Row } from "@/components/customer/inquiries/CustomerClinicInquiriesTable";
-import { supabaseServer } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,22 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   const endISO = sp.end || "";
   const status = sp.status || "all";
 
-  const sb = supabaseServer;
+  const store = await cookies();
+
+  const sb = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => store.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: () => {},
+      },
+    }
+  );
+
+  // железобетонно проверяем, что есть user (иначе auth.uid() будет null)
+  const { data: auth } = await sb.auth.getUser();
+  if (!auth?.user) redirect(`/login?as=CUSTOMER&next=${encodeURIComponent("/customer/inquiries")}`);
 
   let sel = sb
     .from("v_customer_clinic_inquiries" as any)
