@@ -19,6 +19,7 @@ import {
 const MENU = [
   { title: "Dashboard",      href: "/customer",                 icon: LayoutDashboard },
   { title: "Bookings",       href: "/customer/bookings",        icon: Calendar },
+  { title: "Inquiries",       href: "/customer/inquiries",        icon: Users },
   { title: "Patients",       href: "/customer/patients",        icon: Users },
   { title: "Reviews",       href: "/customer/reviews",        icon: Users },
   { title: "Clinic Profile", href: "/customer/clinic-profile",  icon: FileText },
