@@ -163,7 +163,6 @@ export default function CustomerClinicInquiriesTable(props: Props) {
         <thead className="bg-slate-50 text-left">
           <tr>
             <th className="px-4 py-3">Date</th>
-            <th className="px-4 py-3">Clinic</th>
             <th className="px-4 py-3">Name</th>
             <th className="px-4 py-3">Contact</th>
             <th className="px-4 py-3">Message</th>
