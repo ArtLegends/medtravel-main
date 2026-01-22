@@ -19,5 +19,7 @@ export default async function Page({ searchParams }: Props) {
   const as = pick(sp, "as");       // PATIENT / PARTNER / CUSTOMER
   const next = pick(sp, "next");   // куда после логина
 
-  return <AuthLoginClient as={as} next={next} />;
+  const pending = pick(sp, "pending");
+
+  return <AuthLoginClient as={as} next={next} pending={pending} />;
 }

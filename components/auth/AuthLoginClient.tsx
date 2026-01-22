@@ -16,10 +16,7 @@ import OtpForm from "@/components/auth/OtpForm";
 type Step = "role" | "auth" | "otp";
 type Mode = "signin" | "signup";
 
-type Props = {
-  as?: string;
-  next?: string;
-};
+type Props = { as?: string; next?: string; pending?: string; };
 
 const ROLE_META: Record<
   Exclude<UserRole, "GUEST">,
@@ -55,7 +52,7 @@ function normalizeRole(v?: string): LoginRole | null {
   return null;
 }
 
-export default function AuthLoginClient({ as, next }: Props) {
+export default function AuthLoginClient({ as, next, pending }: Props) {
   const router = useRouter();
   const { supabase } = useSupabase();
 
@@ -133,6 +130,12 @@ export default function AuthLoginClient({ as, next }: Props) {
             </div>
 
             <Divider />
+
+            {pending === "1" && role === "CUSTOMER" ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Ваш email подтвержден. Заявка на доступ к customer-панели отправлена. Ожидайте письмо об одобрении.
+              </div>
+            ) : null}
 
             {/* STEP: role */}
             {step === "role" ? (

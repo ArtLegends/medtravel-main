@@ -44,6 +44,18 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
 
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
+  // ✅ CUSTOMER: НЕ выдаём роль, профиль ставим guest, создаём заявку
+  if (finalRole === "CUSTOMER") {
+    await supabase
+      .from("profiles")
+      .upsert({ id: userId, email, role: "guest" }, { onConflict: "id" });
+
+    await createCustomerRequestIfNeeded(userId, email);
+
+    return { finalRole, customerPending: true };
+  }
+
+  // ✅ остальные роли — как раньше
   await supabase
     .from("profiles")
     .upsert({ id: userId, email, role: finalRole.toLowerCase() }, { onConflict: "id" });
@@ -51,8 +63,25 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
   if (finalRole !== "GUEST") {
     await supabase
       .from("user_roles")
-      .upsert({ user_id: userId, role: finalRole } as any, { onConflict: "user_id,role" } as any);
+      .upsert(
+        { user_id: userId, role: finalRole.toLowerCase() } as any,
+        { onConflict: "user_id,role" } as any
+      );
   }
+
+  return { finalRole, customerPending: false };
+}
+
+async function createCustomerRequestIfNeeded(userId: string, email: string | null) {
+  if (!email) return;
+  const sb = createServiceClient();
+
+  await sb
+    .from("customer_registration_requests")
+    .upsert(
+      { user_id: userId, email, status: "pending" },
+      { onConflict: "user_id" }
+    );
 }
 
 /**
@@ -155,16 +184,22 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-  if (error) {
-    const eurl = new URL("/auth/login", req.url);
-    eurl.searchParams.set("error", "oauth");
-    eurl.searchParams.set("message", error.message);
-    return NextResponse.redirect(eurl);
+  const result = await ensureProfileAndRole(supabase, asParam);
+
+  // CUSTOMER pending: разлогинить и показать сообщение
+  if (result?.customerPending) {
+    // очистит cookies через твою setAll()
+    await supabase.auth.signOut();
+
+    const pendingUrl = new URL("/auth/login", req.url);
+    pendingUrl.searchParams.set("as", "CUSTOMER");
+    pendingUrl.searchParams.set("pending", "1");
+    pendingUrl.searchParams.set("next", "/customer"); // на будущее
+    return NextResponse.redirect(pendingUrl);
   }
 
   await ensureProfileAndRole(supabase, asParam);
 
   await attachReferralIfAny(res, asParam, store, data?.user?.id ?? null);
-
   return res;
 }

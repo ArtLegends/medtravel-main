@@ -83,16 +83,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }
 
-    // 2) profiles + user_roles
-    await supabase.from("profiles").upsert(
-      { id: userId, email, role: as.toLowerCase(), email_verified: false },
-      { onConflict: "id" }
-    );
+    // 2) profiles (+ user_roles для НЕ customer)
+    if (as === "CUSTOMER") {
+      // customer: НЕ выдаём роль сразу
+      await supabase.from("profiles").upsert(
+        { id: userId, email, role: "guest", email_verified: false },
+        { onConflict: "id" }
+      );
 
-    await supabase.from("user_roles").upsert(
-      { user_id: userId, role: as.toLowerCase() },
-      { onConflict: "user_id,role" }
-    );
+      // ❌ НЕ вставляем user_roles customer здесь
+    } else {
+      await supabase.from("profiles").upsert(
+        { id: userId, email, role: as.toLowerCase(), email_verified: false },
+        { onConflict: "id" }
+      );
+
+      await supabase.from("user_roles").upsert(
+        { user_id: userId, role: as.toLowerCase() },
+        { onConflict: "user_id,role" }
+      );
+    }
 
     // 3) ✅ если это PATIENT и есть refCode — пишем регистрацию в partner_referrals
     if (as === "PATIENT" && refCode) {

@@ -70,38 +70,77 @@ export default function CredentialsForm({
 
     try {
       if (mode === "signin") {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
+        const { data: signData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           setErrorMsg(error.message);
           return;
         }
 
-        const userId = data.user?.id;
-        if (userId) {
-          const roleSlug = role.toLowerCase();
-
-          await supabase.from("user_roles").upsert(
-            { user_id: userId, role: roleSlug },
-            { onConflict: "user_id,role" }
-          );
-
-          await supabase.from("profiles").upsert(
-            { id: userId, email, role: roleSlug },
-            { onConflict: "id" }
-          );
-
-          // ✅ обновить активную роль в UI
-          setActiveRole(role.toUpperCase() as any);
-
-          // ✅ принудительно перечитать роли (убирает гонку)
-          await refreshRoles();
+        const userId = signData.user?.id;
+        if (!userId) {
+          setErrorMsg("No user");
+          return;
         }
 
-        // (необязательно, но полезно для контекста)
-        await supabase.auth.updateUser({
-          data: { requested_role: role },
-        });
+        const roleUpper = role.toUpperCase();
+
+        if (roleUpper === "CUSTOMER") {
+          // подтянуть роли (должна появиться только после одобрения админом)
+          await refreshRoles();
+
+          // проверим, есть ли CUSTOMER в user_roles
+          const { data: ur } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId)
+            .eq("role", "customer")
+            .maybeSingle();
+
+          if (!ur) {
+            // читаем статус заявки (разрешено политикой "customer can read own request")
+            const { data: reqRow } = await supabase
+              .from("customer_registration_requests")
+              .select("status")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            const st = String(reqRow?.status ?? "pending");
+
+            await supabase.auth.signOut();
+
+            if (st === "rejected") {
+              setErrorMsg("Ваша заявка на доступ к customer-панели отклонена. Свяжитесь с поддержкой.");
+            } else {
+              setErrorMsg("Ваша заявка на доступ к customer-панели ещё рассматривается. Дождитесь письма об одобрении.");
+            }
+            return;
+          }
+
+          // роль есть — всё ок
+          setActiveRole("CUSTOMER" as any);
+          await refreshRoles();
+
+          onSignedIn?.();
+          return;
+        }
+
+        // ✅ для PATIENT/PARTNER оставляем как было (можно слегка почистить, но пусть)
+        const roleSlug = role.toLowerCase();
+
+        await supabase.from("user_roles").upsert(
+          { user_id: userId, role: roleSlug },
+          { onConflict: "user_id,role" }
+        );
+
+        await supabase.from("profiles").upsert(
+          { id: userId, email, role: roleSlug },
+          { onConflict: "id" }
+        );
+
+        setActiveRole(roleUpper as any);
+        await refreshRoles();
+
+        await supabase.auth.updateUser({ data: { requested_role: role } });
 
         onSignedIn?.();
         return;

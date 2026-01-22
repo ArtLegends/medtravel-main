@@ -110,9 +110,33 @@ export default function OtpForm({
         return;
       }
 
+      // успех verify otp
+      if (String(as).toUpperCase() === "CUSTOMER") {
+        // создаём заявку
+        const r2 = await fetch("/api/customer/registration/request", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email }),
+          cache: "no-store",
+        });
+        const j2 = await r2.json().catch(() => ({}));
+        if (!r2.ok) {
+          setErrorMsg(j2?.error || "Failed to submit request");
+          return;
+        }
+
+        setSuccessMsg(
+          "Ваш email подтвержден. Заявка на доступ к customer-панели отправлена. Ожидайте одобрения — на email придет письмо после завершения регистрации."
+        );
+
+        // НЕ логиним, НЕ редиректим
+        onSuccess?.();
+        return;
+      }
+
+      // ✅ остальные роли — как раньше
       setSuccessMsg("Email confirmed. Signing you in...");
 
-      // ✅ после подтверждения — логин
       if (password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
