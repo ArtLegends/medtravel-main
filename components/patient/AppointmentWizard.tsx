@@ -16,6 +16,8 @@ type ClinicServiceRow = { service_id: string; service_name: string };
 
 type BookingMethod = "manual" | "automatic";
 
+type WhenOption = "Right now" | "In the coming weeks" | "Within six months" | "Unknown";
+
 function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
   const items = [1, 2, 3, 4] as const;
 
@@ -51,6 +53,15 @@ async function apiGet<T>(url: string): Promise<T> {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+function getAutoQuestion(cat: Category | null) {
+  const key = (cat?.slug || cat?.name || "").toLowerCase();
+  if (key.includes("dent")) return "Do you have a panoramic dental X-ray?";
+  if (key.includes("plastic")) return "Do you have a photo of the area you plan to improve with the procedure?";
+  if (key.includes("hair")) return "Do you have a photo of the area you want to improve?";
+  return null;
+}
+
 
 export default function AppointmentWizard() {
   const router = useRouter();
@@ -90,6 +101,16 @@ export default function AppointmentWizard() {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [autoHasXray, setAutoHasXray] = useState<null | boolean>(null);
+  const [autoHasPhoto, setAutoHasPhoto] = useState<null | boolean>(null);
+  const [autoWhen, setAutoWhen] = useState<WhenOption | null>(null);
+
+  const [autoMatched, setAutoMatched] = useState(false);
+  const [autoPhase, setAutoPhase] = useState<0 | 1 | 2 | 3 | 4>(0); // для прогресса на шаге 3
+
+  const autoQuestion = getAutoQuestion(selectedCategory);
+  const autoNeedsYesNo = Boolean(autoQuestion);
+
   // Load categories
   useEffect(() => {
     apiGet<{ categories: Category[] }>("/api/patient/appointment/categories")
@@ -113,13 +134,89 @@ export default function AppointmentWizard() {
     setClinicQ("");
     setClinicOffset(0);
     setClinicTotal(0);
+
+    setAutoHasXray(null);
+    setAutoHasPhoto(null);
+    setAutoWhen(null);
+    setAutoMatched(false);
+    setAutoPhase(0);
   }
 
+  useEffect(() => {
+  if (step !== 3 || method !== "automatic") return;
+  if (autoMatched) return;
+  if (!selectedCategory || !selectedSubcat || !selectedCountry || !selectedCity) return;
+
+  // ✅ фиксируем значения (TS будет доволен)
+  const cat = selectedCategory;
+  const sub = selectedSubcat;
+  const country = selectedCountry;
+  const city = selectedCity;
+
+  let alive = true;
+
+  async function run() {
+    setBusy(true);
+    setErrorMsg(null);
+    setAutoPhase(1);
+
+    const tick = (p: 1 | 2 | 3 | 4, ms: number) =>
+      new Promise<void>((res) =>
+        setTimeout(() => {
+          if (alive) setAutoPhase(p);
+          res();
+        }, ms)
+      );
+
+    try {
+      await tick(1, 500);
+      await tick(2, 900);
+      await tick(3, 900);
+
+      const r = await apiGet<{ item: any }>(
+        `/api/patient/appointment/auto-match?` +
+          `categoryId=${encodeURIComponent(String(cat.id))}` +
+          `&subcategoryNodeId=${encodeURIComponent(String(sub.id))}` +
+          `&country=${encodeURIComponent(country.country)}` +
+          `&city=${encodeURIComponent(city.city)}`
+      );
+
+      if (!alive) return;
+
+      const it = r.item;
+
+      setSelectedClinic({
+        clinic_id: String(it.clinic_id),
+        clinic_name: it.clinic_name ?? "",
+        country: it.country ?? "",
+        city: it.city ?? "",
+      });
+
+      setSelectedService({
+        service_id: String(it.service_id),
+        service_name: it.service_name ?? "",
+      });
+
+      await tick(4, 400);
+
+      setAutoMatched(true);
+    } catch (e: any) {
+      setErrorMsg(String(e?.message ?? e));
+    } finally {
+      if (alive) setBusy(false);
+    }
+  }
+
+  run();
+  return () => {
+    alive = false;
+  };
+}, [step, method, autoMatched, selectedCategory, selectedSubcat, selectedCountry, selectedCity]);
 
   async function pickCategory(cat: Category) {
     setErrorMsg(null);
-    setSelectedCategory(cat);
     resetStep3Down();
+    setSelectedCategory(cat);
     setBusy(true);
 
     try {
@@ -362,21 +459,21 @@ export default function AppointmentWizard() {
               </button>
             </div>
 
-            {/* Automatic (disabled) */}
-            <div className="rounded-2xl border p-5 opacity-70">
+            <div className="rounded-2xl border p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-2xl">⏱️</div>
-              <div className="mt-3 flex items-center gap-2 text-lg font-semibold">
-                Automatic booking
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                  Coming soon
-                </span>
-              </div>
+              <div className="mt-3 text-lg font-semibold">Automatic booking</div>
               <p className="mt-1 text-sm text-gray-500">
                 We’ll help you find and schedule appointments automatically.
               </p>
+
               <button
-                className="mt-4 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-500"
-                disabled
+                className="mt-4 w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                disabled={busy}
+                onClick={() => {
+                  resetStep3Down();
+                  setMethod("automatic");
+                  setStep(2);
+                }}
               >
                 Choose automatic booking
               </button>
@@ -386,7 +483,7 @@ export default function AppointmentWizard() {
       )}
 
       {/* Step 2 */}
-      {step === 2 && (
+      {step === 2 && method === "manual" && (
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -417,8 +514,229 @@ export default function AppointmentWizard() {
         </section>
       )}
 
+      {step === 2 && method === "automatic" && (
+        <section className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Automatic booking</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Choose category, answer a few questions, and we’ll find the best clinic for you
+              </p>
+            </div>
+            <button className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setStep(1)}>
+              ← Back
+            </button>
+          </div>
+
+          {/* Category */}
+          <div>
+            <div className="text-sm font-semibold text-gray-900">Choose category</div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              {categories.map((cat) => {
+                const active = selectedCategory?.id === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    disabled={busy}
+                    onClick={async () => {
+                      setSelectedCategory(cat);
+                      resetStep3Down();
+                      setBusy(true);
+                      try {
+                        const r = await apiGet<{ items: SubcategoryNode[] }>(
+                          `/api/patient/appointment/subcategories?categoryId=${encodeURIComponent(String(cat.id))}`
+                        );
+                        setSubcats(r.items ?? []);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    className={[
+                      "rounded-xl border px-4 py-4 text-left",
+                      active ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-gray-50",
+                    ].join(" ")}
+                  >
+                    <div className="text-sm font-semibold">{cat.name}</div>
+                    <div className={["mt-1 text-xs", active ? "text-white/80" : "text-gray-500"].join(" ")}>
+                      Tap to select
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Question (conditional) */}
+          {selectedCategory && autoQuestion && (
+            <div className="rounded-xl border p-4">
+              <div className="text-sm font-semibold text-gray-900">{autoQuestion}</div>
+              <div className="mt-3 flex gap-6 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="auto_yesno"
+                    checked={(selectedCategory?.slug || selectedCategory?.name || "").toLowerCase().includes("dent") ? autoHasXray === true : autoHasPhoto === true}
+                    onChange={() => {
+                      const key = (selectedCategory?.slug || selectedCategory?.name || "").toLowerCase();
+                      if (key.includes("dent")) setAutoHasXray(true);
+                      else setAutoHasPhoto(true);
+                    }}
+                  />
+                  Yes
+                </label>
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="auto_yesno"
+                    checked={(selectedCategory?.slug || selectedCategory?.name || "").toLowerCase().includes("dent") ? autoHasXray === false : autoHasPhoto === false}
+                    onChange={() => {
+                      const key = (selectedCategory?.slug || selectedCategory?.name || "").toLowerCase();
+                      if (key.includes("dent")) setAutoHasXray(false);
+                      else setAutoHasPhoto(false);
+                    }}
+                  />
+                  No
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Subcategories */}
+          {selectedCategory && subcats.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Choose subcategory</div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {subcats.map((n) => {
+                  const active = selectedSubcat?.id === n.id;
+                  return (
+                    <button
+                      key={n.id}
+                      disabled={busy}
+                      onClick={() => pickSubcat(n)}
+                      className={[
+                        "rounded-xl border px-4 py-4 text-left",
+                        active ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-gray-50",
+                      ].join(" ")}
+                    >
+                      <div className="text-sm font-semibold">{n.name}</div>
+                      <div className={["mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"].join(" ")}>
+                        {n.clinics_count} clinics
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Countries */}
+          {selectedSubcat && (
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Available countries</div>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {countries.map((c) => {
+                  const active = selectedCountry?.country === c.country;
+                  return (
+                    <button
+                      key={c.country}
+                      disabled={busy}
+                      onClick={() => pickCountry(c)}
+                      className={[
+                        "rounded-xl border px-4 py-4 text-left",
+                        active ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-gray-50",
+                      ].join(" ")}
+                    >
+                      <div className="text-sm font-semibold">{c.country}</div>
+                      <div className={["mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"].join(" ")}>
+                        {c.clinics_count} clinics
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Cities */}
+          {selectedCountry && (
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Available cities</div>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {cities.map((c) => {
+                  const active = selectedCity?.id === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      disabled={busy}
+                      onClick={() => {
+                        // В automatic не грузим список клиник! просто выбрать город
+                        setSelectedCity(c);
+                      }}
+                      className={[
+                        "rounded-xl border px-4 py-4 text-left",
+                        active ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-gray-50",
+                      ].join(" ")}
+                    >
+                      <div className="text-sm font-semibold">{c.city}</div>
+                      <div className={["mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"].join(" ")}>
+                        {c.clinics_count} clinics
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* When */}
+          {selectedCity && (
+            <div className="rounded-xl border p-4">
+              <div className="text-sm font-semibold text-gray-900">
+                When approximately would you like to undergo the procedure?
+              </div>
+              <div className="mt-3 grid gap-2 text-sm">
+                {(["Right now", "In the coming weeks", "Within six months", "Unknown"] as WhenOption[]).map((opt) => (
+                  <label key={opt} className="flex items-center gap-2">
+                    <input type="radio" name="auto_when" checked={autoWhen === opt} onChange={() => setAutoWhen(opt)} />
+                    {opt}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-4">
+            <button className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setStep(1)}>
+              Previous
+            </button>
+
+            <button
+              disabled={
+                busy ||
+                !selectedCategory ||
+                !selectedSubcat ||
+                !selectedCountry ||
+                !selectedCity ||
+                !autoWhen ||
+                (autoNeedsYesNo && ((selectedCategory?.slug || selectedCategory?.name || "").toLowerCase().includes("dent") ? autoHasXray === null : autoHasPhoto === null))
+              }
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              onClick={() => {
+                setAutoMatched(false);
+                setSelectedClinic(null);
+                setSelectedService(null);
+                setStep(3);
+              }}
+            >
+              Next →
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Step 3 */}
-      {step === 3 && (
+      {step === 3 && method === "manual" && (
         <section className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -638,6 +956,90 @@ export default function AppointmentWizard() {
         </section>
       )}
 
+      {step === 3 && method === "automatic" && (
+        <section className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Finding the best clinic for you</h2>
+              <p className="mt-1 text-sm text-gray-500">We analyze your answers and match you with a verified clinic</p>
+            </div>
+            <button className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setStep(2)}>
+              ← Back
+            </button>
+          </div>
+
+          {!autoMatched && (
+            <div className="rounded-2xl border p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-emerald-600" />
+                <div className="text-sm font-semibold text-gray-900">Searching…</div>
+              </div>
+
+              <div className="text-sm text-gray-700 space-y-2">
+                <div className={autoPhase >= 1 ? "text-emerald-700 font-semibold" : ""}>1. Analyze all your data</div>
+                <div className={autoPhase >= 2 ? "text-emerald-700 font-semibold" : ""}>2. We find the right clinic for you</div>
+                <div className={autoPhase >= 3 ? "text-emerald-700 font-semibold" : ""}>3. Switch you to the right specialist</div>
+                <div className={autoPhase >= 4 ? "text-emerald-700 font-semibold" : ""}>4. Done!</div>
+              </div>
+            </div>
+          )}
+
+          {autoMatched && selectedClinic && selectedService && (
+            <div className="space-y-4">
+              <div className="text-sm font-semibold text-gray-900">
+                We have chosen a clinic verified by our service
+              </div>
+
+              {/* Карточка клиники (простая, но аккуратная) */}
+              <div className="rounded-2xl border p-5">
+                <div className="text-base font-semibold">{selectedClinic.clinic_name}</div>
+                <div className="mt-1 text-sm text-gray-500">
+                  {selectedClinic.city}, {selectedClinic.country}
+                </div>
+                <div className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  {selectedService.service_name}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <button
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  onClick={() => setStep(4)}
+                >
+                  Take advantage of the offer
+                </button>
+
+                <button
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => {
+                    // “повторить поиск” → в начало авто-записи
+                    resetStep3Down();
+                    setMethod("automatic");
+                    setSelectedCategory(null);
+                    setStep(1);
+                  }}
+                >
+                  Make a new request
+                </button>
+
+                <button
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => {
+                    // перейти на manual
+                    resetStep3Down();
+                    setMethod("manual");
+                    setSelectedCategory(null);
+                    setStep(2);
+                  }}
+                >
+                  Find a clinic manually
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Step 4 */}
       {step === 4 && selectedClinic && selectedService && (
         <section className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
@@ -661,7 +1063,7 @@ export default function AppointmentWizard() {
               <div>🏥 <span className="font-semibold">{selectedClinic.clinic_name}</span></div>
               <div>📍 {selectedClinic.city}, {selectedClinic.country}</div>
               <div>🩺 {selectedService.service_name}</div>
-              <div>🗓️ Manual booking</div>
+              <div>🗓️ {method === "automatic" ? "Automatic booking" : "Manual booking"}</div>
             </div>
           </div>
 
