@@ -22,7 +22,7 @@ function fmt(dt?: string | null) {
 }
 
 export default function CustomerSignupRequestsClient() {
-  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("all");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);

@@ -44,8 +44,35 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
 
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
-  // ✅ CUSTOMER: НЕ выдаём роль, профиль ставим guest, создаём заявку
+  // ✅ CUSTOMER: выдаём доступ ТОЛЬКО если заявка approved
   if (finalRole === "CUSTOMER") {
+    const sb = createServiceClient();
+
+    const { data: reqRow, error: reqErr } = await sb
+      .from("customer_registration_requests")
+      .select("status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const st = String(reqRow?.status ?? "").toLowerCase();
+
+    if (!reqErr && st === "approved") {
+      // ✅ уже одобрен — даём роль customer и пускаем
+      await supabase
+        .from("profiles")
+        .upsert({ id: userId, email, role: "customer" }, { onConflict: "id" });
+
+      await supabase
+        .from("user_roles")
+        .upsert(
+          { user_id: userId, role: "customer" } as any,
+          { onConflict: "user_id,role" } as any
+        );
+
+      return { finalRole, customerPending: false };
+    }
+
+    // ❗ не одобрен — держим как guest и создаём/обновляем pending
     await supabase
       .from("profiles")
       .upsert({ id: userId, email, role: "guest" }, { onConflict: "id" });
@@ -197,8 +224,6 @@ export async function GET(req: NextRequest) {
     pendingUrl.searchParams.set("next", "/customer"); // на будущее
     return NextResponse.redirect(pendingUrl);
   }
-
-  await ensureProfileAndRole(supabase, asParam);
 
   await attachReferralIfAny(res, asParam, store, data?.user?.id ?? null);
   return res;
