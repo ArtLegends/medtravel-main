@@ -111,6 +111,16 @@ export default function AppointmentWizard() {
   const autoQuestion = getAutoQuestion(selectedCategory);
   const autoNeedsYesNo = Boolean(autoQuestion);
 
+  const XRAY_MAX = 15 * 1024 * 1024;
+
+  const [xrayFile, setXrayFile] = useState<File | null>(null);
+  const [xrayErr, setXrayErr] = useState<string | null>(null);
+
+  const isDentistry = (selectedCategory?.slug || selectedCategory?.name || "").toLowerCase().includes("dent");
+  const needsXrayUpload = method === "automatic" && isDentistry && autoHasXray === true;
+
+  const preferredDateRequired = !(method === "automatic" && autoWhen === "Unknown");
+
   // Load categories
   useEffect(() => {
     apiGet<{ categories: Category[] }>("/api/patient/appointment/categories")
@@ -393,24 +403,50 @@ export default function AppointmentWizard() {
 
     setErrorMsg(null);
     setBusy(true);
+
     try {
+      const payload = {
+        clinicId: selectedClinic.clinic_id,
+        categoryId: selectedCategory.id,
+        serviceId: selectedService.service_id,
+        bookingMethod: method ?? "manual",
+
+        preferredDate: preferredDateRequired ? preferredDate : (preferredDate || null),
+        preferredTime: preferredTime || null,
+
+        fullName,
+        phone,
+        notes,
+
+        autoWhen: method === "automatic" ? autoWhen : null,
+        autoHasXray: method === "automatic" && isDentistry ? autoHasXray : null,
+      };
+
       const res = await fetch("/api/patient/appointment/book", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          clinicId: selectedClinic.clinic_id,
-          categoryId: selectedCategory.id,
-          serviceId: selectedService.service_id,
-          bookingMethod: method ?? "manual",
-          preferredDate,
-          preferredTime,
-          fullName,
-          phone,
-          notes,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || "Failed to create booking");
+
+      const bookingId = String(j.bookingId || "");
+      if (!bookingId) throw new Error("No bookingId returned");
+
+      if (needsXrayUpload && xrayFile) {
+        const fd = new FormData();
+        fd.append("bookingId", bookingId);
+        fd.append("file", xrayFile);
+
+        const up = await fetch("/api/patient/appointment/upload-xray", {
+          method: "POST",
+          body: fd,
+        });
+
+        const uj = await up.json().catch(() => ({}));
+        if (!up.ok) throw new Error(uj?.error || "X-ray upload failed");
+      }
 
       router.push("/patient/bookings?created=1");
       router.refresh();
@@ -1079,6 +1115,7 @@ export default function AppointmentWizard() {
                   type="date"
                   value={preferredDate}
                   onChange={(e) => setPreferredDate(e.target.value)}
+                  required={preferredDateRequired}
                   className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 />
               </div>
@@ -1089,6 +1126,7 @@ export default function AppointmentWizard() {
                   type="time"
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
+                  required={preferredDateRequired}
                   className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 />
               </div>
@@ -1123,6 +1161,37 @@ export default function AppointmentWizard() {
                   rows={4}
                 />
               </div>
+
+              {needsXrayUpload && (
+                <div className="md:col-span-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Upload panoramic dental X-ray (max 15MB)
+                  </label>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    onChange={(e) => {
+                      setXrayErr(null);
+                      const f = e.target.files?.[0] ?? null;
+                      if (!f) {
+                        setXrayFile(null);
+                        return;
+                      }
+                      if (f.size > XRAY_MAX) {
+                        setXrayFile(null);
+                        setXrayErr("File is too large. Max size is 15MB.");
+                        return;
+                      }
+                      setXrayFile(f);
+                    }}
+                  />
+
+                  {xrayErr && <div className="mt-2 text-sm text-red-600">{xrayErr}</div>}
+                  {xrayFile && <div className="mt-2 text-sm text-slate-600">Selected: {xrayFile.name}</div>}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex items-center justify-between gap-4">
@@ -1134,7 +1203,14 @@ export default function AppointmentWizard() {
               </button>
 
               <button
-                disabled={busy || !preferredDate || !fullName || !phone}
+                disabled={
+                  busy ||
+                  !fullName ||
+                  !phone ||
+                  (preferredDateRequired && !preferredDate) ||
+                  (needsXrayUpload && !xrayFile) ||
+                  !!xrayErr
+                }
                 className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 onClick={submitBooking}
               >
