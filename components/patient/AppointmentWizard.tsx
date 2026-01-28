@@ -113,6 +113,10 @@ export default function AppointmentWizard() {
 
   const XRAY_MAX = 15 * 1024 * 1024;
 
+  const PHOTO_MAX = 15 * 1024 * 1024;
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoErr, setPhotoErr] = useState<string | null>(null);
+
   const [xrayFile, setXrayFile] = useState<File | null>(null);
   const [xrayErr, setXrayErr] = useState<string | null>(null);
 
@@ -120,6 +124,12 @@ export default function AppointmentWizard() {
   const needsXrayUpload = method === "automatic" && isDentistry && autoHasXray === true;
 
   const preferredDateRequired = !(method === "automatic" && autoWhen === "Unknown");
+
+  const catKey = (selectedCategory?.slug || selectedCategory?.name || "").toLowerCase();
+  const isHair = catKey.includes("hair");
+  const isPlastic = catKey.includes("plastic");
+
+  const needsPhotoUpload = method === "automatic" && (isHair || isPlastic) && autoHasPhoto === true;
 
   // Load categories
   useEffect(() => {
@@ -448,6 +458,20 @@ export default function AppointmentWizard() {
         if (!up.ok) throw new Error(uj?.error || "X-ray upload failed");
       }
 
+      if (needsPhotoUpload && photoFile) {
+        const fd = new FormData();
+        fd.append("bookingId", bookingId);
+        fd.append("file", photoFile);
+
+        const up = await fetch("/api/patient/appointment/upload-photo", {
+          method: "POST",
+          body: fd,
+        });
+
+        const uj = await up.json().catch(() => ({}));
+        if (!up.ok) throw new Error(uj?.error || "Photo upload failed");
+      }
+
       router.push("/patient/bookings?created=1");
       router.refresh();
     } catch (e: any) {
@@ -734,7 +758,13 @@ export default function AppointmentWizard() {
               <div className="mt-3 grid gap-2 text-sm">
                 {(["Right now", "In the coming weeks", "Within six months", "Unknown"] as WhenOption[]).map((opt) => (
                   <label key={opt} className="flex items-center gap-2">
-                    <input type="radio" name="auto_when" checked={autoWhen === opt} onChange={() => setAutoWhen(opt)} />
+                    <input type="radio" name="auto_when" checked={autoWhen === opt} onChange={() => {
+                      setAutoWhen(opt);
+                      if (opt === "Unknown") {
+                        setPreferredDate("");
+                        setPreferredTime("");
+                      }
+                    }} />
                     {opt}
                   </label>
                 ))}
@@ -1192,6 +1222,33 @@ export default function AppointmentWizard() {
                   {xrayFile && <div className="mt-2 text-sm text-slate-600">Selected: {xrayFile.name}</div>}
                 </div>
               )}
+
+              {needsPhotoUpload && (
+                <div className="md:col-span-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Upload photo (max 15MB)
+                  </label>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    onChange={(e) => {
+                      setPhotoErr(null);
+                      const f = e.target.files?.[0] ?? null;
+                      if (!f) return setPhotoFile(null);
+                      if (f.size > PHOTO_MAX) {
+                        setPhotoFile(null);
+                        return setPhotoErr("File is too large. Max size is 15MB.");
+                      }
+                      setPhotoFile(f);
+                    }}
+                  />
+
+                  {photoErr && <div className="mt-2 text-sm text-red-600">{photoErr}</div>}
+                  {photoFile && <div className="mt-2 text-sm text-slate-600">Selected: {photoFile.name}</div>}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex items-center justify-between gap-4">
@@ -1209,7 +1266,9 @@ export default function AppointmentWizard() {
                   !phone ||
                   (preferredDateRequired && !preferredDate) ||
                   (needsXrayUpload && !xrayFile) ||
-                  !!xrayErr
+                  !!xrayErr ||
+                  (needsPhotoUpload && !photoFile) ||
+                  !!photoErr
                 }
                 className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 onClick={submitBooking}

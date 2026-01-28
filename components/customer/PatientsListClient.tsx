@@ -18,6 +18,8 @@ type Row = {
   actual_cost: number | null;
   created_at: string;
   clinic_name: string | null;
+  xray_path: string | null;
+  photo_path: string | null;
 };
 
 const PAGE_SIZE = 15;
@@ -53,6 +55,40 @@ export default function PatientsListClient() {
       return j?.error ? String(j.error) : JSON.stringify(j);
     }
     return `${res.status} ${res.statusText}`;
+  }
+
+  async function openAttachment(r: Row) {
+    setBusy(true);
+    setErr(null);
+
+    try {
+      let endpoint: string | null = null;
+
+      if (r.xray_path) endpoint = `/api/customer/patients/${encodeURIComponent(r.booking_id)}/xray-url`;
+      else if (r.photo_path) endpoint = `/api/customer/patients/${encodeURIComponent(r.booking_id)}/photo-url`;
+
+      if (!endpoint) {
+        setErr("No attachment for this booking.");
+        return;
+      }
+
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) throw new Error(await readError(res));
+
+      const j = await res.json().catch(() => ({}));
+      const url = j?.url ?? null;
+
+      if (!url) {
+        setErr("Attachment not found or not available.");
+        return;
+      }
+
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function load(p = page) {
@@ -198,7 +234,6 @@ export default function PatientsListClient() {
             <option value="confirmed">Confirmed</option>
             <option value="cancelled">Cancelled</option>
             <option value="completed">Completed</option>
-            <option value="cancelled_by_patient">Cancelled by patient</option>
           </select>
 
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
@@ -265,6 +300,14 @@ export default function PatientsListClient() {
                       <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
 
                       <td className="px-4 py-3">
+                        <button
+                          onClick={() => openAttachment(r)}
+                          disabled={busy || (!r.xray_path && !r.photo_path)}
+                          className="text-emerald-700 hover:underline disabled:opacity-60"
+                        >
+                          View attachment
+                        </button>
+                        
                         <button
                           onClick={() => deleteOne(r.booking_id)}
                           disabled={busy}
