@@ -27,21 +27,40 @@ type Row = {
 
 const PAGE_SIZE = 15;
 
-function fmtMoney(v: number | null, cur: string | null) {
-  if (v == null) return "—";
-  return `${v} ${cur ?? "USD"}`;
-}
+const RU_DT = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function fmtPreferred(d: string | null, t: string | null) {
   if (!d) return "—";
-  return t ? `${d}, ${t}` : d;
+
+  // d приходит как "YYYY-MM-DD"
+  const [yyyy, mm, dd] = d.split("-");
+  const date = `${dd}.${mm}.${yyyy}`;
+
+  if (!t) return date;
+
+  // t может быть "10:00" или "10:00:00" — режем до HH:MM
+  const time = t.slice(0, 5);
+  return `${date}, ${time}`;
 }
 
 function fmtScheduled(ts: string | null) {
   if (!ts) return "—";
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return ts;
-  return d.toLocaleString();
+
+  // будет "02.02.2026, 14:00"
+  return RU_DT.format(d);
+}
+
+function fmtMoney(v: number | null, cur: string | null) {
+  if (v == null) return "—";
+  return `${v} ${cur ?? "USD"}`;
 }
 
 function normalizeTime(t: string | null) {
@@ -355,6 +374,10 @@ export default function PatientsListClient() {
             <option value="confirmed">Confirmed</option>
             <option value="cancelled">Cancelled</option>
             <option value="completed">Completed</option>
+
+            <option value="cancelled_by_patient" disabled>
+              Cancelled by Patient
+            </option>
           </select>
 
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />

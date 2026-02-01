@@ -6,6 +6,30 @@ import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
+const RU_DT = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function fmtPreferred(d: any, t: any) {
+  if (!d) return "—";
+  const s = String(d);
+  const [yyyy, mm, dd] = s.split("-");
+  const date = `${dd}.${mm}.${yyyy}`;
+  const time = t ? String(t).slice(0, 5) : "";
+  return time ? `${date}, ${time}` : date;
+}
+
+function fmtScheduled(ts: any) {
+  if (!ts) return "—";
+  const d = new Date(String(ts));
+  if (Number.isNaN(d.getTime())) return String(ts);
+  return RU_DT.format(d);
+}
+
 function badge(status: string) {
   const s = (status || "").toLowerCase();
   if (s === "confirmed") return "bg-emerald-50 text-emerald-700";
@@ -193,21 +217,16 @@ export default async function PatientBookingsPage({
                         {b.scheduled_at ? (
                           <div className="space-y-0.5">
                             <div className="font-medium text-gray-900">
-                              {new Date(b.scheduled_at).toLocaleString()}
+                              {fmtScheduled(b.scheduled_at)}
                             </div>
                             <div className="text-xs text-gray-500">
-                              Scheduled by clinic
+                              Scheduled by clinic (your local time)
                             </div>
                           </div>
                         ) : (
                           <div className="space-y-0.5">
-                            <div>
-                              {b.preferred_date ?? "—"}
-                              {b.preferred_time ? `, ${b.preferred_time}` : ""}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Preferred time
-                            </div>
+                            <div>{fmtPreferred(b.preferred_date, b.preferred_time)}</div>
+                            <div className="text-xs text-gray-500">Preferred time</div>
                           </div>
                         )}
                       </td>
