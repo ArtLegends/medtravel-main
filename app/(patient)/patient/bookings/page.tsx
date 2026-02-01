@@ -38,7 +38,7 @@ async function cancelBooking(formData: FormData) {
     {
       cookies: {
         getAll: () => store.getAll().map((c) => ({ name: c.name, value: c.value })),
-        setAll: () => {},
+        setAll: () => { },
       },
     }
   );
@@ -74,7 +74,7 @@ export default async function PatientBookingsPage({
     {
       cookies: {
         getAll: () => store.getAll().map((c) => ({ name: c.name, value: c.value })),
-        setAll: () => {},
+        setAll: () => { },
       },
     }
   );
@@ -95,6 +95,7 @@ export default async function PatientBookingsPage({
       booking_method,
       preferred_date,
       preferred_time,
+      scheduled_at,
       created_at,
       pre_cost,
       currency,
@@ -189,8 +190,26 @@ export default async function PatientBookingsPage({
                         {b.clinics?.country ?? "—"}
                       </td>
                       <td className="px-4 py-3">
-                        {b.preferred_date ?? "—"}
-                        {b.preferred_time ? `, ${b.preferred_time}` : ""}
+                        {b.scheduled_at ? (
+                          <div className="space-y-0.5">
+                            <div className="font-medium text-gray-900">
+                              {new Date(b.scheduled_at).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Scheduled by clinic
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div>
+                              {b.preferred_date ?? "—"}
+                              {b.preferred_time ? `, ${b.preferred_time}` : ""}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Preferred time
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       <td className="px-4 py-3">

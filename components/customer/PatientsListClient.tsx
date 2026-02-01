@@ -20,6 +20,9 @@ type Row = {
   clinic_name: string | null;
   xray_path: string | null;
   photo_path: string | null;
+  preferred_date: string | null;
+  preferred_time: string | null;
+  scheduled_at: string | null;
 };
 
 const PAGE_SIZE = 15;
@@ -27,6 +30,25 @@ const PAGE_SIZE = 15;
 function fmtMoney(v: number | null, cur: string | null) {
   if (v == null) return "—";
   return `${v} ${cur ?? "USD"}`;
+}
+
+function fmtPreferred(d: string | null, t: string | null) {
+  if (!d) return "—";
+  return t ? `${d}, ${t}` : d;
+}
+
+function fmtScheduled(ts: string | null) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts;
+  return d.toLocaleString();
+}
+
+function normalizeTime(t: string | null) {
+  if (!t) return "";
+  // "10:00:00" -> "10:00"
+  const m = t.match(/^(\d{2}:\d{2})/);
+  return m ? m[1] : t;
 }
 
 export default function PatientsListClient() {
@@ -53,6 +75,76 @@ export default function PatientsListClient() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const abortRef = useRef<AbortController | null>(null);
 
+  const [schedOpen, setSchedOpen] = useState(false);
+  const [schedBookingId, setSchedBookingId] = useState<string | null>(null);
+  const [schedDate, setSchedDate] = useState<string>(""); // yyyy-mm-dd
+  const [schedTime, setSchedTime] = useState<string>(""); // HH:MM
+  const [schedTitle, setSchedTitle] = useState<string>("Schedule appointment");
+
+  function openSchedule(r: Row) {
+    setSchedBookingId(r.booking_id);
+    setSchedTitle(`Schedule for ${r.patient_name ?? "patient"}`);
+    setSchedTime(normalizeTime(r.preferred_time));
+
+    // prefill: scheduled_at -> date/time, иначе preferred_date/time
+    if (r.scheduled_at) {
+      const d = new Date(r.scheduled_at);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      setSchedDate(`${yyyy}-${mm}-${dd}`);
+      setSchedTime(`${hh}:${mi}`);
+    } else {
+      setSchedDate(r.preferred_date ?? "");
+      setSchedTime(r.preferred_time ?? "");
+    }
+
+    setSchedOpen(true);
+  }
+
+  async function saveSchedule() {
+    if (!schedBookingId) return;
+
+    // можно разрешить сохранить только дату без времени — тогда ставим 00:00
+    const date = schedDate.trim();
+    if (!date) {
+      setErr("Please select a date.");
+      return;
+    }
+
+    const time = (schedTime || "00:00").trim();
+    const local = new Date(`${date}T${time}:00`);
+    if (Number.isNaN(local.getTime())) {
+      setErr("Invalid date/time.");
+      return;
+    }
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(schedBookingId)}/schedule`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scheduled_at: local.toISOString() }),
+      });
+      if (!res.ok) throw new Error(await readError(res));
+
+      // оптимистично обновим локально (чтобы не ждать realtime)
+      setItems((prev) =>
+        prev.map((r) => (r.booking_id === schedBookingId ? { ...r, scheduled_at: local.toISOString() } : r))
+      );
+
+      setSchedOpen(false);
+      setSchedBookingId(null);
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function readError(res: Response) {
     const ct = res.headers.get("content-type") ?? "";
     if (ct.includes("application/json")) {
@@ -62,7 +154,7 @@ export default function PatientsListClient() {
     return `${res.status} ${res.statusText}`;
   }
 
-    async function openAttachment(r: Row) {
+  async function openAttachment(r: Row) {
     setBusy(true);
     setErr(null);
 
@@ -153,7 +245,7 @@ export default function PatientsListClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, status, startDate, endDate]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!attachOpen) return;
 
     const onKey = (e: KeyboardEvent) => {
@@ -283,6 +375,8 @@ export default function PatientsListClient() {
                 <th className="px-4 py-3 text-left">Patient Name</th>
                 <th className="px-4 py-3 text-left">Phone</th>
                 <th className="px-4 py-3 text-left">Treatment</th>
+                <th className="px-4 py-3 text-left">Preferred</th>
+                <th className="px-4 py-3 text-left">Scheduled</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Pre-cost</th>
                 <th className="px-4 py-3 text-left">Actual</th>
@@ -293,7 +387,7 @@ export default function PatientsListClient() {
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
                     No patients added yet
                   </td>
                 </tr>
@@ -309,6 +403,8 @@ export default function PatientsListClient() {
                       <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
                       <td className="px-4 py-3">{r.phone ?? "—"}</td>
                       <td className="px-4 py-3">{r.service_name ?? "—"}</td>
+                      <td className="px-4 py-3">{fmtPreferred(r.preferred_date, r.preferred_time)}</td>
+                      <td className="px-4 py-3">{fmtScheduled(r.scheduled_at)}</td>
 
                       <td className="px-4 py-3">
                         <select
@@ -329,6 +425,15 @@ export default function PatientsListClient() {
 
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openSchedule(r)}
+                            disabled={busy || r.status === "cancelled_by_patient" || r.status === "cancelled" || r.status === "completed"}
+                            className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-60"
+                          >
+                            Schedule
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => openAttachment(r)}
@@ -372,7 +477,7 @@ export default function PatientsListClient() {
         </div>
       </div>
 
-        {attachOpen && (
+      {attachOpen && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
           onMouseDown={() => {
@@ -414,6 +519,80 @@ export default function PatientsListClient() {
               ) : (
                 <div className="text-sm text-gray-600">No attachment.</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {schedOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={() => {
+            setSchedOpen(false);
+            setSchedBookingId(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="text-sm font-semibold text-gray-900">{schedTitle}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSchedOpen(false);
+                  setSchedBookingId(null);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="mb-1 text-xs font-medium text-gray-600">Date</div>
+                  <input
+                    type="date"
+                    value={schedDate}
+                    onChange={(e) => setSchedDate(e.target.value)}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-gray-600">Time (optional)</div>
+                  <input
+                    type="time"
+                    value={schedTime}
+                    onChange={(e) => setSchedTime(e.target.value)}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSchedOpen(false);
+                    setSchedBookingId(null);
+                  }}
+                  className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveSchedule}
+                  disabled={busy}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Save schedule
+                </button>
+              </div>
             </div>
           </div>
         </div>

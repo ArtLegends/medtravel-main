@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 // лучше под твой enum/логику:
-const ALLOWED_STATUSES = new Set(["new", "pending", "confirmed", "cancelled", "completed"]);
+const ALLOWED_STATUSES = new Set(["pending", "confirmed", "cancelled", "completed"]);
 
 async function handleUpdate(req: NextRequest, id: string) {
   const body = await req.json().catch(() => ({}));
