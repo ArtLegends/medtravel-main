@@ -299,24 +299,27 @@ export default function PatientsListClient() {
                       <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
 
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
+                            type="button"
                             onClick={() => openAttachment(r)}
                             disabled={busy || (!r.xray_path && !r.photo_path)}
-                            className="text-emerald-700 hover:underline disabled:opacity-60"
+                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 disabled:pointer-events-none"
                           >
                             View attachment
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => deleteOne(r.booking_id)}
                             disabled={busy}
-                            className="text-rose-600 hover:underline disabled:opacity-60"
+                            className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
                           >
                             Delete
                           </button>
                         </div>
                       </td>
+
                     </tr>
                   );
                 })

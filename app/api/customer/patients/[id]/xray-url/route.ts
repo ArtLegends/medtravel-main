@@ -11,13 +11,6 @@ function adminClient() {
   return createClient(url, service, { auth: { persistSession: false } });
 }
 
-async function isCustomer(supabase: any, userId: string) {
-  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-  if (error) return false;
-  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
-  return roles.includes("customer");
-}
-
 export async function GET(_req: Request, ctx: any) {
   const bookingId = String(ctx?.params?.id ?? "");
   if (!bookingId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -27,18 +20,13 @@ export async function GET(_req: Request, ctx: any) {
   const user = au?.user;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // 1) проверяем роль customer
-  const okRole = await isCustomer(supa, user.id);
-  if (!okRole) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
-  // 2) получаем clinic_id текущего customer (под обычной сессией, НЕ service role)
+  // ✅ главный гейт: должен быть привязан clinic_id
   const { data: clinicId, error: eClinic } = await supa.rpc("customer_current_clinic_id");
   if (eClinic) return NextResponse.json({ error: eClinic.message }, { status: 500 });
-  if (!clinicId) return NextResponse.json({ error: "No clinic bound to this customer" }, { status: 403 });
+  if (!clinicId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const admin = adminClient();
 
-  // 3) читаем booking через admin и проверяем принадлежность клинике customer
   const { data: row, error: e0 } = await admin
     .from("patient_bookings")
     .select("id, clinic_id, xray_path")
@@ -54,7 +42,6 @@ export async function GET(_req: Request, ctx: any) {
 
   if (!row.xray_path) return NextResponse.json({ url: null });
 
-  // 4) выдаём signed url
   const { data: signed, error: e1 } = await admin.storage
     .from("patient-files")
     .createSignedUrl(row.xray_path, 60 * 10);
