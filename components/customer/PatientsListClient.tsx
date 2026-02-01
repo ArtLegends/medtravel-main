@@ -45,6 +45,11 @@ export default function PatientsListClient() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachUrl, setAttachUrl] = useState<string | null>(null);
+  const [attachTitle, setAttachTitle] = useState<string>("Attachment");
+
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const abortRef = useRef<AbortController | null>(null);
 
@@ -57,7 +62,7 @@ export default function PatientsListClient() {
     return `${res.status} ${res.statusText}`;
   }
 
-  async function openAttachment(r: Row) {
+    async function openAttachment(r: Row) {
     setBusy(true);
     setErr(null);
 
@@ -83,13 +88,17 @@ export default function PatientsListClient() {
         return;
       }
 
-      window.open(url, "_blank", "noopener,noreferrer");
+      // ✅ вместо редиректа
+      setAttachTitle(r.xray_path ? "X-ray attachment" : "Photo attachment");
+      setAttachUrl(url);
+      setAttachOpen(true);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     } finally {
       setBusy(false);
     }
   }
+
 
   async function load(p = page) {
     abortRef.current?.abort();
@@ -143,6 +152,26 @@ export default function PatientsListClient() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, status, startDate, endDate]);
+
+    useEffect(() => {
+    if (!attachOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setAttachOpen(false);
+        setAttachUrl(null);
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [attachOpen]);
 
   async function updateStatus(bookingId: string, next: Status) {
     setBusy(true);
@@ -342,6 +371,54 @@ export default function PatientsListClient() {
           </div>
         </div>
       </div>
+
+        {attachOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={() => {
+            setAttachOpen(false);
+            setAttachUrl(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl"
+            onMouseDown={(e) => e.stopPropagation()} // ✅ клики внутри не закрывают
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="text-sm font-semibold text-gray-900">{attachTitle}</div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAttachOpen(false);
+                  setAttachUrl(null);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="bg-gray-50 p-4">
+              {attachUrl ? (
+                <div className="flex justify-center">
+                  <img
+                    src={attachUrl}
+                    alt={attachTitle}
+                    className="max-h-[75vh] w-auto max-w-full rounded-xl border bg-white object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="text-sm text-gray-600">No attachment.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
