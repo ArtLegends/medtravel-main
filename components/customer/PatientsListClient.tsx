@@ -292,7 +292,6 @@ export default function PatientsListClient() {
                           <option value="confirmed">confirmed</option>
                           <option value="cancelled">cancelled</option>
                           <option value="completed">completed</option>
-                          <option value="cancelled_by_patient">cancelled by patient</option>
                         </select>
                       </td>
 
@@ -300,21 +299,23 @@ export default function PatientsListClient() {
                       <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
 
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => openAttachment(r)}
-                          disabled={busy || (!r.xray_path && !r.photo_path)}
-                          className="text-emerald-700 hover:underline disabled:opacity-60"
-                        >
-                          View attachment
-                        </button>
-                        
-                        <button
-                          onClick={() => deleteOne(r.booking_id)}
-                          disabled={busy}
-                          className="text-rose-600 hover:underline disabled:opacity-60"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => openAttachment(r)}
+                            disabled={busy || (!r.xray_path && !r.photo_path)}
+                            className="text-emerald-700 hover:underline disabled:opacity-60"
+                          >
+                            View attachment
+                          </button>
+
+                          <button
+                            onClick={() => deleteOne(r.booking_id)}
+                            disabled={busy}
+                            className="text-rose-600 hover:underline disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
