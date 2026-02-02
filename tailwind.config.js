@@ -2,7 +2,7 @@ import { heroui } from "@heroui/react";
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: "class",
+  darkMode: ["class", "class"],
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,76 +10,146 @@ module.exports = {
     "./node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: { "2xl": "1400px" },
-    },
-    extend: {
-      /* === Маппинг цветов на CSS-переменные с альфой === */
-      colors: {
-        background: "rgb(var(--background) / <alpha-value>)",
-        foreground: "rgb(var(--foreground) / <alpha-value>)",
-        "muted-foreground": "rgb(var(--muted) / <alpha-value>)",
-        content1: "rgb(var(--content1) / <alpha-value>)",
-        divider: "rgb(var(--divider) / <alpha-value>)",
-
-        /* твои брендовые/утилитарные — оставил без изменений */
-        medblue: { light: "#4A90E2", DEFAULT: "#0066CC", dark: "#004C99" },
-        medteal: "#20B2AA",
-        primary: "hsl(210, 100%, 40%)",
-        secondary: "hsl(210, 40%, 96.1%)",
-        muted: "hsl(210, 40%, 96.1%)",
-        border: "hsl(214.3, 31.8%, 91.4%)",
-        gray: {
-          100: "#f5f5f5",
-          500: "#9ca3af",
-          600: "#6b7280",
-        },
-      },
-      borderColor: {
-        divider: "rgb(var(--divider) / <alpha-value>)",
-      },
-
-      /* типографика/шрифты */
-      fontFamily: {
-        sans: ["var(--font-roboto)", "Inter", "ui-sans-serif", "system-ui"],
-        heading: ['"Open Sans"', "sans-serif"],
-      },
-
-      /* размеры/радиусы и т.п. */
-      spacing: {
-        4: "1rem",
-        6: "1.5rem",
-        8: "2rem",
-        20: "5rem",
-        32: "8rem",
-      },
-      maxWidth: {
-        "4xl": "56rem",
-      },
-      borderRadius: {
-        sm: "4px",
-        md: "6px",
-        lg: "8px",
-      },
-      transitionDuration: {
-        300: "300ms",
-      },
-
-      /* анимации */
-      keyframes: {
-        fadeIn: { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
-        slideUp: {
-          "0%": { transform: "translateY(10px)", opacity: "0" },
-          "100%": { transform: "translateY(0)", opacity: "1" },
-        },
-      },
-      animation: {
-        "fade-in": "fadeIn 0.5s ease-in-out",
-        "slide-up": "slideUp 0.3s ease-out",
-      },
-    },
+  	container: {
+  		center: true,
+  		padding: '2rem',
+  		screens: {
+  			'2xl': '1400px'
+  		}
+  	},
+  	extend: {
+  		colors: {
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			'muted-foreground': 'rgb(var(--muted) / <alpha-value>)',
+  			content1: 'rgb(var(--content1) / <alpha-value>)',
+  			divider: 'rgb(var(--divider) / <alpha-value>)',
+  			medblue: {
+  				light: '#4A90E2',
+  				DEFAULT: '#0066CC',
+  				dark: '#004C99'
+  			},
+  			medteal: '#20B2AA',
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			border: 'hsl(var(--border))',
+  			gray: {
+  				'100': '#f5f5f5',
+  				'500': '#9ca3af',
+  				'600': '#6b7280'
+  			},
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			}
+  		},
+  		borderColor: {
+  			divider: 'rgb(var(--divider) / <alpha-value>)'
+  		},
+  		fontFamily: {
+  			sans: [
+  				'var(--font-roboto)',
+  				'Inter',
+  				'ui-sans-serif',
+  				'system-ui'
+  			],
+  			heading: [
+  				'Open Sans"',
+  				'sans-serif'
+  			]
+  		},
+  		spacing: {
+  			'4': '1rem',
+  			'6': '1.5rem',
+  			'8': '2rem',
+  			'20': '5rem',
+  			'32': '8rem'
+  		},
+  		maxWidth: {
+  			'4xl': '56rem'
+  		},
+  		borderRadius: {
+  			sm: 'calc(var(--radius) - 4px)',
+  			md: 'calc(var(--radius) - 2px)',
+  			lg: 'var(--radius)'
+  		},
+  		transitionDuration: {
+  			'300': '300ms'
+  		},
+  		keyframes: {
+  			fadeIn: {
+  				'0%': {
+  					opacity: '0'
+  				},
+  				'100%': {
+  					opacity: '1'
+  				}
+  			},
+  			slideUp: {
+  				'0%': {
+  					transform: 'translateY(10px)',
+  					opacity: '0'
+  				},
+  				'100%': {
+  					transform: 'translateY(0)',
+  					opacity: '1'
+  				}
+  			},
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			}
+  		},
+  		animation: {
+  			'fade-in': 'fadeIn 0.5s ease-in-out',
+  			'slide-up': 'slideUp 0.3s ease-out',
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
+  		}
+  	}
   },
 
   plugins: [
@@ -320,7 +390,8 @@ module.exports = {
         },
       },
     }),
-  ],
+      require("tailwindcss-animate")
+],
 
   future: {
     removeDeprecatedGapUtilities: true,
