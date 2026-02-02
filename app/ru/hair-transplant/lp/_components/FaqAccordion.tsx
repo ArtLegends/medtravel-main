@@ -5,10 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 export default function FaqAccordion({
   items,
 }: {
-  items: ReadonlyArray<{
-    readonly q: string;
-    readonly a: string;
-  }>;
+  items: readonly { q: string; a: string }[];
 }) {
   return (
     <Accordion type="single" collapsible className="space-y-3">
