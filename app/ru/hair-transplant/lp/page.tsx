@@ -4,6 +4,8 @@ import LeadDialog from "./_components/LeadDialog";
 import ResultsCarousel from "./_components/ResultsCarousel";
 import FaqAccordion from "./_components/FaqAccordion";
 import { BadgeCheck, CalendarDays, ShieldCheck, Star, PhoneCall, Plane, Hotel, Stethoscope, Scissors, PackageOpen, MessageCircle } from "lucide-react";
+import LeadInlineForm from "./_components/LeadInlineForm";
+import LeadModalCta from "./_components/LeadModalCta";
 
 const siteUrl = "https://medtravel.me";
 const path = "/ru/hair-transplant/lp";
@@ -84,7 +86,7 @@ const steps = [
   },
   {
     title: "12 месяцев с вами",
-    text: "Личный менеджер на связи в WhatsApp: контрольные фото, корректировка ухода, онлайн-осмотр врачом при необходимости",
+    text: "Личный менеджер на связи в Telegram: контрольные фото, корректировка ухода, онлайн-осмотр врачом при необходимости",
     icon: ShieldCheck,
   },
 ] as const;
@@ -222,8 +224,7 @@ export default function HairTransplantLP() {
 
               {/* right card */}
               <div className="lg:justify-self-end">
-                <LeadDialog
-                  variant="hero"
+                <LeadInlineForm
                   title="Запишитесь на бесплатную консультацию и расчёт стоимости"
                   primaryCta="Получить консультацию"
                 />
@@ -287,13 +288,14 @@ export default function HairTransplantLP() {
             <div className="mt-8">
               <ResultsCarousel
                 images={[
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-16.45.17_0438bd0d.jpg",
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.00.07_73d33486.jpg",
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.04.23_0da4bdf3.jpg",
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.07.43_691e03a6.jpg",
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.06.41_d56da3ec.jpg",
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/10/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-15.36.06_d9fc87b7.jpg",
-                  "https://esteinturkey.com/ru/wp-content/uploads/2025/10/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.18.25_f812032b.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/09/hair-transplant-before-after.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/09/hair-transplant-before-after-2.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/04/3-5.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/04/4-3.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/04/28.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/09/hair-transplant-before-after-1.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/04/77.jpg",
+                  "https://esteinturkey.com/wp-content/uploads/2023/04/78.jpg",
                 ]}
               />
             </div>
@@ -418,7 +420,7 @@ export default function HairTransplantLP() {
             <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
               <div className="aspect-[16/9] bg-slate-100">
                 <img
-                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/WhatsApp-Image-2025-09-30-at-13.11.22.jpeg"
+                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/Telegram-Image-2025-09-30-at-13.11.22.jpeg"
                   alt="Международный сертификат медицинского туризма"
                   className="h-full w-full object-cover"
                   loading="lazy"
@@ -524,7 +526,7 @@ export default function HairTransplantLP() {
                   Начните путь к густым волосам прямо сейчас
                 </h2>
                 <p className="mt-3 max-w-2xl text-slate-600">
-                  Пришлите 3 фото (спереди, сверху, сбоку) — получите расчёт стоимости и план операции в WhatsApp за 15 минут
+                  Пришлите 3 фото (спереди, сверху, сбоку) — получите расчёт стоимости и план операции в Telegram за 15 минут
                 </p>
               </div>
 
@@ -533,7 +535,7 @@ export default function HairTransplantLP() {
                   variant="final"
                   title="Запишитесь на бесплатную консультацию и расчёт стоимости"
                   primaryCta="Получить консультацию"
-                  secondaryCta="Получить расчёт в WhatsApp"
+                  secondaryCta="Получить расчёт в Telegram"
                 />
               </div>
             </div>
