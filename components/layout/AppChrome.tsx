@@ -10,14 +10,20 @@ type Props = { children: React.ReactNode };
 export default function AppChrome({ children }: Props) {
   const pathname = usePathname() || '/';
 
+  // лендинг без Navbar/Footer
+  const isLanding =
+    pathname === '/ru/hair-transplant/lp' ||
+    pathname.startsWith('/ru/hair-transplant/lp/');
+
   // где скрываем публичные Navbar/Footer
   const hideChrome =
+    isLanding ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/login');
 
   if (hideChrome) {
-    // админка и auth — без шапки/подвала
+    // админка, auth и лендинг — без шапки/подвала
     return <>{children}</>;
   }
 

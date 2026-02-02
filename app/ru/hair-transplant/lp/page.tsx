@@ -164,9 +164,7 @@ export default function HairTransplantLP() {
 
                 <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
                   Густые волосы как у голливудских звёзд за 4-6 месяцев{" "}
-                  <span className="bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
-                    с ГАРАНТИЕЙ результата
-                  </span>
+                    с гарантией результата
                 </h1>
 
                 <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
@@ -289,12 +287,13 @@ export default function HairTransplantLP() {
             <div className="mt-8">
               <ResultsCarousel
                 images={[
-                  // позже просто заменишь на реальные URL
-                  "https://images.unsplash.com/photo-1580281657527-47f249e8f1df?auto=format&fit=crop&w=1400&q=80",
-                  "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&w=1400&q=80",
-                  "https://images.unsplash.com/photo-1526256262350-7da7584cf5eb?auto=format&fit=crop&w=1400&q=80",
-                  "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1400&q=80",
-                  "https://images.unsplash.com/photo-1520975693416-35a0fce8d5c2?auto=format&fit=crop&w=1400&q=80",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-16.45.17_0438bd0d.jpg",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.00.07_73d33486.jpg",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.04.23_0da4bdf3.jpg",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.07.43_691e03a6.jpg",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/09/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.06.41_d56da3ec.jpg",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/10/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-15.36.06_d9fc87b7.jpg",
+                  "https://esteinturkey.com/ru/wp-content/uploads/2025/10/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5-WhatsApp-2025-08-13-%D0%B2-17.18.25_f812032b.jpg",
                 ]}
               />
             </div>
@@ -419,7 +418,7 @@ export default function HairTransplantLP() {
             <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
               <div className="aspect-[16/9] bg-slate-100">
                 <img
-                  src="https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1600&q=80"
+                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/WhatsApp-Image-2025-09-30-at-13.11.22.jpeg"
                   alt="Международный сертификат медицинского туризма"
                   className="h-full w-full object-cover"
                   loading="lazy"
@@ -433,7 +432,7 @@ export default function HairTransplantLP() {
             <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
               <div className="aspect-[16/9] bg-slate-100">
                 <img
-                  src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1600&q=80"
+                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/Golden-Elegant-Certificate-of-Appreciation.png"
                   alt="Сертификат гарантии результата"
                   className="h-full w-full object-cover"
                   loading="lazy"

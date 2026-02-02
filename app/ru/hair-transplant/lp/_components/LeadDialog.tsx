@@ -41,11 +41,11 @@ export default function LeadDialog({ title, primaryCta, secondaryCta, variant = 
             <Button
               type="button"
               variant="secondary"
-              className="w-full rounded-xl"
-              onClick={() => {
-                // пока просто UX-кнопка без логики
-                setOpen(true);
-              }}
+              className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700"
+            //   onClick={() => {
+            //     // пока просто UX-кнопка без логики
+            //     setOpen(true);
+            //   }}
             >
               {secondaryCta}
             </Button>
@@ -80,7 +80,7 @@ export default function LeadDialog({ title, primaryCta, secondaryCta, variant = 
               </Button>
 
               <div className="text-center text-[11px] text-slate-500">
-                Мы свяжемся с вами и уточним детали. Спам не отправляем.
+                Мы свяжемся с вами и уточним детали.
               </div>
             </form>
           </DialogContent>
