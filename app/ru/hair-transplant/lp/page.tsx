@@ -357,7 +357,7 @@ export default function HairTransplantLP() {
 
           {/* CTA внутри секции (через одну) */}
           <div className="mt-8 flex justify-center">
-            <div className="w-full max-w-3xl rounded-3xl border bg-white p-5 text-center shadow-sm sm:p-6">
+            <div className="w-full max-w-3xl rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
               <div className="text-sm font-semibold text-slate-900 sm:text-base">
                 Рассчитать цену и количество графтов
               </div>
@@ -571,25 +571,6 @@ export default function HairTransplantLP() {
 
           <div className="mx-auto mt-8 max-w-3xl">
             <FaqAccordion items={faq} />
-          </div>
-
-          {/* CTA внутри секции (через одну) */}
-          <div className="mx-auto mt-8 flex max-w-3xl justify-center">
-            <div className="w-full rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
-              <div className="text-sm font-semibold text-slate-900 sm:text-base">
-                Остались вопросы? Ответим лично
-              </div>
-              <div className="mt-1 text-sm text-slate-600">
-                Оставьте заявку — и мы подберём оптимальный метод FUE/DHI под ваш случай.
-              </div>
-
-              <div className="mt-4 flex justify-center">
-                <LeadModalCta
-                  buttonText="Получить консультацию"
-                  className="w-full sm:w-auto"
-                />
-              </div>
-            </div>
           </div>
 
         </section>
