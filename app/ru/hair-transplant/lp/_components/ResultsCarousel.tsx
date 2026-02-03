@@ -29,18 +29,23 @@ export default function ResultsCarousel({ images }: { images: string[] }) {
           <div
             key={src + i}
             data-slide
-            className="min-w-[85%] sm:min-w-[60%] lg:min-w-[42%]"
+            className="shrink-0"
             style={{ scrollSnapAlign: "center" as any }}
           >
-            <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
-              <div className="aspect-[16/9] bg-slate-100">
-                <img
-                  src={src}
-                  alt={`Результат пациента ${i + 1}`}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </div>
+            <div
+              className="
+                overflow-hidden rounded-3xl border bg-white shadow-sm
+                w-[240px] h-[240px]
+                sm:w-[280px] sm:h-[280px]
+                lg:w-[345px] lg:h-[345px]
+              "
+            >
+              <img
+                src={src}
+                alt={`Результат пациента ${i + 1}`}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             </div>
           </div>
         ))}

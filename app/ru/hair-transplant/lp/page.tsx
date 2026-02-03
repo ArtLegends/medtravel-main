@@ -268,6 +268,26 @@ export default function HairTransplantLP() {
               );
             })}
           </div>
+
+          {/* CTA внутри секции (через одну) */}
+          <div className="mt-8 flex justify-center">
+            <div className="w-full max-w-3xl rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
+              <div className="text-sm font-semibold text-slate-900 sm:text-base">
+                Хотите узнать точную стоимость под ваш случай?
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Оставьте контакты — консультация бесплатно.
+              </div>
+
+              <div className="mt-4 flex justify-center">
+                <LeadModalCta
+                  buttonText="Получить бесплатную консультацию"
+                  className="w-full sm:w-auto"
+                />
+              </div>
+            </div>
+          </div>
+
         </section>
 
         {/* RESULTS */}
@@ -334,6 +354,27 @@ export default function HairTransplantLP() {
               </div>
             </div>
           </div>
+
+          {/* CTA внутри секции (через одну) */}
+          <div className="mt-8 flex justify-center">
+            <div className="w-full max-w-3xl rounded-3xl border bg-white p-5 text-center shadow-sm sm:p-6">
+              <div className="text-sm font-semibold text-slate-900 sm:text-base">
+                Рассчитать цену и количество графтов
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Пришлите 3 фото — расчёт обычно занимает до 15 минут.
+              </div>
+
+              <div className="mt-4 flex justify-center">
+                <LeadModalCta
+                  buttonText="Получить расчёт бесплатно"
+                  className="w-full sm:w-auto"
+                  buttonVariant="default"
+                />
+              </div>
+            </div>
+          </div>
+
         </section>
 
         {/* OFFICIAL */}
@@ -420,7 +461,7 @@ export default function HairTransplantLP() {
             <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
               <div className="aspect-[16/9] bg-slate-100">
                 <img
-                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/Telegram-Image-2025-09-30-at-13.11.22.jpeg"
+                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/WhatsApp-Image-2025-09-30-at-13.11.22.jpeg"
                   alt="Международный сертификат медицинского туризма"
                   className="h-full w-full object-cover"
                   loading="lazy"
@@ -445,6 +486,26 @@ export default function HairTransplantLP() {
               </div>
             </div>
           </div>
+
+          {/* CTA внутри секции (через одну) */}
+          <div className="mt-8 flex justify-center">
+            <div className="w-full max-w-3xl rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
+              <div className="text-sm font-semibold text-slate-900 sm:text-base">
+                Хотите пройти всё официально и безопасно?
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Мы подскажем по документам, этапам и подготовке.
+              </div>
+
+              <div className="mt-4 flex justify-center">
+                <LeadModalCta
+                  buttonText="Записаться на консультацию"
+                  className="w-full sm:w-auto"
+                />
+              </div>
+            </div>
+          </div>
+
         </section>
 
         {/* WHY TURKEY */}
@@ -511,6 +572,26 @@ export default function HairTransplantLP() {
           <div className="mx-auto mt-8 max-w-3xl">
             <FaqAccordion items={faq} />
           </div>
+
+          {/* CTA внутри секции (через одну) */}
+          <div className="mx-auto mt-8 flex max-w-3xl justify-center">
+            <div className="w-full rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
+              <div className="text-sm font-semibold text-slate-900 sm:text-base">
+                Остались вопросы? Ответим лично
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Оставьте заявку — и мы подберём оптимальный метод FUE/DHI под ваш случай.
+              </div>
+
+              <div className="mt-4 flex justify-center">
+                <LeadModalCta
+                  buttonText="Получить консультацию"
+                  className="w-full sm:w-auto"
+                />
+              </div>
+            </div>
+          </div>
+
         </section>
 
         {/* FINAL CTA */}

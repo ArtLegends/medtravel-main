@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import LeadForm from './LeadForm';
 
 type Props = {
   buttonText: string;
@@ -19,8 +20,10 @@ export default function LeadModalCta({
   className,
   buttonVariant = 'default',
 }: Props) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={buttonVariant} size="lg" className={className}>
           {buttonText}
@@ -33,26 +36,11 @@ export default function LeadModalCta({
           <p className="mt-1 text-center text-sm text-slate-600">{subtitle}</p>
         </DialogHeader>
 
-        <form
+        <LeadForm
           className="mt-4 space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            // логика пока не нужна
-          }}
-        >
-          <Input placeholder="ФИО*" />
-          <Input placeholder="Телефон*" />
-          <Input placeholder="Email" type="email" />
-          <Input placeholder="Возраст" inputMode="numeric" />
-
-          <Button type="submit" className="w-full" size="lg">
-            Отправить
-          </Button>
-
-          <p className="text-center text-xs text-slate-500">
-            Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
-          </p>
-        </form>
+          submitText="Отправить"
+          onSubmitted={() => setOpen(false)} // сейчас просто закрываем, логики нет
+        />
       </DialogContent>
     </Dialog>
   );

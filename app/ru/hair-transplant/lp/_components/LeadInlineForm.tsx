@@ -1,7 +1,6 @@
 'use client';
 
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import LeadForm from './LeadForm';
 
 type Props = {
   title: string;
@@ -19,26 +18,7 @@ export default function LeadInlineForm({
           {title}
         </h3>
 
-        <form
-          className="mt-5 space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            // логика пока не нужна
-          }}
-        >
-          <Input placeholder="ФИО*" />
-          <Input placeholder="Телефон*" />
-          <Input placeholder="Email" type="email" />
-          <Input placeholder="Возраст" inputMode="numeric" />
-
-          <Button className="w-full" size="lg" type="submit">
-            {primaryCta}
-          </Button>
-
-          <p className="mt-2 text-center text-xs text-slate-500">
-            Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
-          </p>
-        </form>
+        <LeadForm className="mt-5 space-y-3" submitText={primaryCta} />
       </div>
     </div>
   );
