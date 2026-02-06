@@ -9,7 +9,6 @@ import { detectLocale } from "@/lib/i18n-server";
 import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
 import ThemeRoot from "@/components/ThemeRoot";
 import AppChrome from "@/components/layout/AppChrome";
-import Script from "next/script";
 
 // Font
 const roboto = Roboto({
@@ -96,49 +95,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link href="//api.supabase.co" rel="dns-prefetch" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <style>{`:root{--site-header-h:64px}`}</style>
-        
-        {/* Яндекс.Метрика - загрузка скрипта */}
-        <Script
-          id="yandex-metrika-script"
-          strategy="afterInteractive"
-          src="https://mc.yandex.ru/metrika/tag.js"
-        />
       </head>
       <body suppressHydrationWarning className={`${roboto.className} bg-background text-foreground antialiased`}>
-        {/* Яндекс.Метрика инициализация */}
-        <Script
-          id="yandex-metrika-init"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function(m,e,t,r,i,k,a){
-                  m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-                  m[i].l=1*new Date();
-                  for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-                  k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-              })(window, document,'script','https://mc.yandex.ru/metrika/tag.js','ym');
-
-              ym(106694543, 'init', {
-                  ssr:true,
-                  webvisor:true,
-                  clickmap:true,
-                  ecommerce:"dataLayer",
-                  accurateTrackBounce:true,
-                  trackLinks:true
-              });
-            `,
-          }}
-        />
-        <noscript>
-          <div>
-            <img
-              src="https://mc.yandex.ru/watch/106694543"
-              style={{ position: "absolute", left: "-9999px" }}
-              alt=""
-            />
-          </div>
-        </noscript>
-        
         <SupabaseProvider initialSession={data.session}>
           <ThemeRoot>
             <div id="app-root" className="relative z-0 flex min-h-screen flex-col">

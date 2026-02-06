@@ -68,7 +68,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net; connect-src 'self' https://mc.yandex.ru; img-src 'self' data: https:; style-src 'self' 'unsafe-inline';",
+            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
           },
         ],
       },
