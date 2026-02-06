@@ -66,9 +66,20 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
+          // {
+          //   key: 'Content-Security-Policy',
+          //   value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
+          // },
           {
-            key: 'Content-Security-Policy',
-            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'self'; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://mc.yandex.ru; " +
+              "img-src 'self' data: https://mc.yandex.ru; " +
+              "connect-src 'self' https://mc.yandex.ru; " +
+              "style-src 'self' 'unsafe-inline'; " +
+              "font-src 'self' data:; " +
+              "frame-src 'self';",
           },
         ],
       },
