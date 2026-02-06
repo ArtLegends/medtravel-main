@@ -96,31 +96,36 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link href="//api.supabase.co" rel="dns-prefetch" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <style>{`:root{--site-header-h:64px}`}</style>
+        
+        {/* Яндекс.Метрика - загрузка скрипта */}
+        <Script
+          id="yandex-metrika-script"
+          strategy="afterInteractive"
+          src="https://mc.yandex.ru/metrika/tag.js"
+        />
       </head>
       <body suppressHydrationWarning className={`${roboto.className} bg-background text-foreground antialiased`}>
-        {/* Yandex.Metrika counter */}
+        {/* Яндекс.Метрика инициализация */}
         <Script
-          id="yandex-metrika"
-          strategy="beforeInteractive"
+          id="yandex-metrika-init"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-(function(m,e,t,r,i,k,a){
-  m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-  m[i].l=1*new Date();
-  for (var j=0; j<document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
-  k=e.createElement(t), a=e.getElementsByTagName(t)[0], k.async=1, k.src=r, a.parentNode.insertBefore(k,a);
-})(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=106694543', 'ym');
+              (function(m,e,t,r,i,k,a){
+                  m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+                  m[i].l=1*new Date();
+                  for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+                  k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+              })(window, document,'script','https://mc.yandex.ru/metrika/tag.js','ym');
 
-ym(106694543, 'init', {
-  ssr:true,
-  webvisor:true,
-  clickmap:true,
-  ecommerce:"dataLayer",
-  referrer: document.referrer,
-  url: location.href,
-  accurateTrackBounce:true,
-  trackLinks:true
-});
+              ym(106694543, 'init', {
+                  ssr:true,
+                  webvisor:true,
+                  clickmap:true,
+                  ecommerce:"dataLayer",
+                  accurateTrackBounce:true,
+                  trackLinks:true
+              });
             `,
           }}
         />
@@ -133,7 +138,7 @@ ym(106694543, 'init', {
             />
           </div>
         </noscript>
-        {/* /Yandex.Metrika counter */}
+        
         <SupabaseProvider initialSession={data.session}>
           <ThemeRoot>
             <div id="app-root" className="relative z-0 flex min-h-screen flex-col">
