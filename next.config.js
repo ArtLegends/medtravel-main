@@ -68,8 +68,17 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
           {
             key: 'Content-Security-Policy',
-            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
-          },
+            value:
+              "default-src 'self'; " +
+              "base-uri 'self'; " +
+              "object-src 'none'; " +
+              "frame-ancestors 'none'; " +
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://mc.yandex.ru; " +
+              "connect-src 'self' https://mc.yandex.ru https://*.supabase.co https://*.supabase.in; " +
+              "img-src 'self' data: blob: https://mc.yandex.ru https://*.supabase.co https://*.supabase.in; " +
+              "style-src 'self' 'unsafe-inline'; " +
+              "font-src 'self' data: https://fonts.gstatic.com;",
+          }
         ],
       },
       {
