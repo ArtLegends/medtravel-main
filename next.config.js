@@ -66,10 +66,10 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
-          // {
-          //   key: 'Content-Security-Policy',
-          //   value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
-          // },
+          {
+            key: 'Content-Security-Policy',
+            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none';",
+          },
           {
             key: "Content-Security-Policy",
             value:
