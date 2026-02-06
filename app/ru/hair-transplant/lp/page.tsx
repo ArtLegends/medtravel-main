@@ -471,20 +471,6 @@ export default function HairTransplantLP() {
                 Международный сертификат медицинского туризма
               </div>
             </div>
-
-            <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
-              <div className="aspect-[16/9] bg-slate-100">
-                <img
-                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/Golden-Elegant-Certificate-of-Appreciation.png"
-                  alt="Сертификат гарантии результата"
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-              <div className="p-4 text-center text-sm text-slate-600">
-                Сертификат гарантии результата
-              </div>
-            </div>
           </div>
 
           {/* CTA внутри секции (через одну) */}
