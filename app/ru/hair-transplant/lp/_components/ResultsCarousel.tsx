@@ -71,11 +71,11 @@ export default function ResultsCarousel({ images }: { images: string[] }) {
       </div>
 
       {/* controls */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 hidden items-center justify-between sm:flex">
+      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex items-center justify-between">
         <button
           type="button"
           onClick={() => go(idx - 1)}
-          className="pointer-events-auto ml-2 inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white/90 shadow-sm hover:bg-white"
+          className="pointer-events-auto ml-2 inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white shadow-sm backdrop-blur hover:bg-white sm:h-10 sm:w-10"
           aria-label="Previous"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -84,7 +84,7 @@ export default function ResultsCarousel({ images }: { images: string[] }) {
         <button
           type="button"
           onClick={() => go(idx + 1)}
-          className="pointer-events-auto mr-2 inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white/90 shadow-sm hover:bg-white"
+          className="pointer-events-auto mr-2 inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white shadow-sm backdrop-blur hover:bg-white sm:h-10 sm:w-10"
           aria-label="Next"
         >
           <ChevronRight className="h-5 w-5" />

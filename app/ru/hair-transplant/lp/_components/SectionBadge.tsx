@@ -26,7 +26,7 @@ export default function SectionBadge({ children, dot = false, className, tone = 
       className={[
         "inline-flex items-center gap-2 rounded-full",
         "px-3.5 py-1.5 sm:px-4 sm:py-2",
-        "text-[13px] sm:text-[14px] font-semibold tracking-tight text-white",
+        "text-[13px] sm:text-[20px] font-semibold tracking-tight text-white",
         "border border-white/15",
         "backdrop-blur",
         toneClasses.wrap,

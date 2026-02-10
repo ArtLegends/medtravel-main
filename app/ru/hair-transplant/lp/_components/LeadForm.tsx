@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import LeadImageUpload from "./LeadImageUpload";
 
 type Props = {
   submitText?: string;
@@ -35,6 +36,9 @@ export default function LeadForm({
       <Input placeholder="Телефон*" />
       <Input placeholder="Email" type="email" />
       <Input placeholder="Возраст" inputMode="numeric" />
+      <div className="mt-4">
+        <LeadImageUpload />
+      </div>
 
       <Button type="submit" className={buttonClassName ?? 'w-full'} size="lg">
         {submitText}

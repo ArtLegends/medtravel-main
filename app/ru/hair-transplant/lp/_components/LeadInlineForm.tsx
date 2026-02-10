@@ -1,6 +1,7 @@
 'use client';
 
 import LeadForm from './LeadForm';
+import LeadImageUpload from './LeadImageUpload';
 
 type Props = {
   title: string;
@@ -19,6 +20,7 @@ export default function LeadInlineForm({
         </h3>
 
         <LeadForm className="mt-5 space-y-3" submitText={primaryCta} />
+
       </div>
     </div>
   );

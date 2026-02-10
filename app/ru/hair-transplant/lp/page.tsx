@@ -173,7 +173,7 @@ export default function HairTransplantLP() {
                     Густые волосы как у голливудских звёзд{" "}
                     <span className="whitespace-nowrap">за 4–6 месяцев</span>
                     <br className="hidden sm:block" />
-                    <span className="text-slate-900">с гарантией результата</span>
+                    <span className="text-slate-900"> с гарантией результата</span>
                   </h1>
                 </Reveal>
 
@@ -184,7 +184,7 @@ export default function HairTransplantLP() {
                   </p>
                 </Reveal>
 
-                <Stagger className="mt-6 grid items-stretch gap-4 sm:grid-cols-2" start={180} step={90}>
+                <Stagger className="mt-6 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3" start={180} step={90}>
                   <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
 transition-all duration-300 ease-out
 hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
@@ -215,7 +215,7 @@ hover:border-teal-200/70 hover:ring-teal-100">
                     </div>
                   </div>
 
-                  <div className="h-full min-h-[132px] sm:col-span-2 group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
 transition-all duration-300 ease-out
 hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
 hover:border-teal-200/70 hover:ring-teal-100">
@@ -409,17 +409,18 @@ hover:border-teal-200/70 hover:ring-teal-100">
                     {economyRows.map((r, idx) => (
                       <Reveal key={r.name} delay={240 + idx * 90}>
                         <div
-                          className="group flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/5
-                  transition-all duration-300 ease-out
-                  hover:-translate-y-0.5 hover:shadow-md hover:shadow-slate-900/10
-                  hover:border-teal-200/70 hover:ring-teal-100"
+                          className="group flex flex-col items-start gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/5
+                          sm:flex-row sm:items-center sm:justify-between sm:gap-4
+                          transition-all duration-300 ease-out
+                          hover:-translate-y-0.5 hover:shadow-md hover:shadow-slate-900/10
+                          hover:border-teal-200/70 hover:ring-teal-100"
                         >
                           <div className="flex items-center gap-3">
                             <span className="h-2.5 w-2.5 rounded-full bg-teal-500 shadow-[0_0_0_4px_rgba(20,184,166,0.10)]" />
                             <div className="text-sm font-medium text-slate-800">{r.name}</div>
                           </div>
 
-                          <div className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-black/5">
+                          <div className="shrink-0 self-end whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-black/5 sm:self-auto sm:text-sm">
                             {r.value}
                           </div>
                         </div>
@@ -627,7 +628,7 @@ hover:border-teal-200/70 hover:ring-teal-100">
                   />
                 </div>
 
-                <div className="flex flex-col gap-2 border-t bg-white px-4 py-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+                <div className="flex flex-col items-center gap-2 border-t bg-white px-4 py-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
                   <div>
                     <div className="text-sm font-semibold text-slate-900">Международный сертификат медицинского туризма</div>
                   </div>
