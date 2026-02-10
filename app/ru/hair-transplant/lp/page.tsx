@@ -6,6 +6,10 @@ import FaqAccordion from "./_components/FaqAccordion";
 import { BadgeCheck, CalendarDays, ShieldCheck, Star, PhoneCall, Plane, Hotel, Stethoscope, Scissors, PackageOpen, MessageCircle } from "lucide-react";
 import LeadInlineForm from "./_components/LeadInlineForm";
 import LeadModalCta from "./_components/LeadModalCta";
+import SectionBadge from "./_components/SectionBadge";
+import Reveal from "./_components/motion/Reveal";
+import Stagger from "./_components/motion/Stagger";
+import SectionCta from "./_components/SectionCta";
 
 const siteUrl = "https://medtravel.me";
 const path = "/ru/hair-transplant/lp";
@@ -152,82 +156,104 @@ export default function HairTransplantLP() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
 
-      <main className="bg-white text-slate-900">
+      <main className="relative text-slate-900">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(1400px_circle_at_12%_8%,rgba(20,184,166,0.16),transparent_55%),radial-gradient(1400px_circle_at_88%_10%,rgba(59,130,246,0.14),transparent_55%),radial-gradient(1200px_circle_at_50%_65%,rgba(99,102,241,0.06),transparent_60%),linear-gradient(to_bottom,rgba(248,250,252,1),rgba(255,255,255,1))]" />
         {/* HERO */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(1100px_circle_at_20%_10%,rgba(20,184,166,0.18),transparent_50%),radial-gradient(1000px_circle_at_85%_15%,rgba(59,130,246,0.16),transparent_55%),linear-gradient(to_bottom,rgba(248,250,252,1),rgba(255,255,255,1))]" />
           <div className="relative mx-auto max-w-7xl px-4 py-10 sm:py-14 lg:py-16">
             <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border bg-white/70 px-3 py-1 text-xs text-slate-700 shadow-sm backdrop-blur">
-                  <span className="h-2 w-2 rounded-full bg-teal-500" />
-                  Пересадка волос в Стамбуле
-                </div>
+                <Reveal>
+                  <SectionBadge dot>Пересадка волос в Стамбуле</SectionBadge>
+                </Reveal>
 
-                <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
-                  Густые волосы как у голливудских звёзд за 4-6 месяцев{" "}
-                    с гарантией результата
-                </h1>
+                <Reveal delay={80}>
+                  <h1 className="mt-4 max-w-2xl text-[26px] font-semibold leading-[1.08] tracking-tight sm:text-5xl sm:leading-[1.05] lg:text-l">
+                    Густые волосы как у голливудских звёзд{" "}
+                    <span className="whitespace-nowrap">за 4–6 месяцев</span>
+                    <br className="hidden sm:block" />
+                    <span className="text-slate-900">с гарантией результата</span>
+                  </h1>
+                </Reveal>
 
-                <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-                  Пересадка волос методом FUE/DHI в Стамбуле от{" "}
-                  <span className="font-semibold text-slate-900">€1800</span> под ключ
-                </p>
+                <Reveal delay={140}>
+                  <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-slate-600 sm:text-lg">
+                    Пересадка волос методом <span className="font-medium text-slate-900">FUE/DHI</span> в Стамбуле от{" "}
+                    <span className="font-semibold text-slate-900">€1800</span> под ключ
+                  </p>
+                </Reveal>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur">
+                <Stagger className="mt-6 grid items-stretch gap-4 sm:grid-cols-2" start={180} step={90}>
+                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+transition-all duration-300 ease-out
+hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+hover:border-teal-200/70 hover:ring-teal-100">
                     <div className="flex items-start gap-3">
-                      <BadgeCheck className="mt-0.5 h-5 w-5 text-teal-600" />
+                      <BadgeCheck className="mt-0.5 h-6 w-6 shrink-0 text-teal-700" />
                       <div>
-                        <div className="font-medium">Пожизненная гарантия</div>
-                        <div className="text-sm text-slate-600">
+                        <div className="font-semibold">Пожизненная гарантия</div>
+                        <div className="mt-1 text-sm leading-relaxed text-slate-600">
                           На пересаженные волосы — официальный подход и контроль результата
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur">
+                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+transition-all duration-300 ease-out
+hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+hover:border-teal-200/70 hover:ring-teal-100">
                     <div className="flex items-start gap-3">
-                      <MessageCircle className="mt-0.5 h-5 w-5 text-teal-600" />
+                      <MessageCircle className="mt-0.5 h-6 w-6 shrink-0 text-teal-700" />
                       <div>
-                        <div className="font-medium">Куратор 24/7 на русском</div>
-                        <div className="text-sm text-slate-600">
+                        <div className="font-semibold">Куратор 24/7 на русском</div>
+                        <div className="mt-1 text-sm leading-relaxed text-slate-600">
                           Поддержка по всем вопросам — до, во время и после поездки
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur sm:col-span-2">
+                  <div className="h-full min-h-[132px] sm:col-span-2 group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+transition-all duration-300 ease-out
+hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+hover:border-teal-200/70 hover:ring-teal-100">
                     <div className="flex items-start gap-3">
-                      <Star className="mt-0.5 h-5 w-5 text-teal-600" />
+                      <Star className="mt-0.5 h-6 w-6 shrink-0 text-teal-700" />
                       <div className="flex-1">
-                        <div className="font-medium">До 6 000 графтов за 1 процедуру</div>
-                        <div className="text-sm text-slate-600">
+                        <div className="font-semibold">До 6 000 графтов за 1 процедуру</div>
+                        <div className="mt-1 text-sm leading-relaxed text-slate-600">
                           Подбираем методику под ваш кейс — FUE или DHI
                         </div>
                       </div>
-                      <div className="hidden sm:flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                        <span className="font-semibold text-slate-900">4,8/5</span>
-                        <span className="text-slate-600">по отзывам пациентов</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm sm:hidden">
-                      <span className="font-semibold text-slate-900">4,8/5</span>
-                      <span className="text-slate-600">по отзывам пациентов</span>
                     </div>
                   </div>
-                </div>
+                </Stagger>
+
+                {/* рейтинг как отдельный акцентный бейдж под карточками */}
+                <Reveal delay={480}>
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200/70 bg-white/80 px-4 py-2 text-sm shadow-[0_10px_24px_-18px_rgba(15,23,42,0.35)] ring-1 ring-black/5 backdrop-blur">
+                    <div className="flex items-center gap-0.5 text-amber-400">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} className="h-4 w-4" fill="currentColor" />
+                      ))}
+                    </div>
+
+                    <span className="font-semibold text-slate-900">4,8/5</span>
+                    <span className="text-slate-600">по отзывам пациентов</span>
+                  </div>
+                </Reveal>
               </div>
 
               {/* right card */}
               <div className="lg:justify-self-end">
-                <LeadInlineForm
-                  title="Запишитесь на бесплатную консультацию и расчёт стоимости"
-                  primaryCta="Получить консультацию"
-                />
+                <Reveal delay={200} className="lg:justify-self-end">
+                  <LeadInlineForm
+                    title="Запишитесь на бесплатную консультацию и расчёт стоимости"
+                    primaryCta="Получить консультацию"
+                  />
+                </Reveal>
               </div>
             </div>
           </div>
@@ -236,361 +262,530 @@ export default function HairTransplantLP() {
         {/* STEPS */}
         <section className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs text-slate-700">
-              9 шагов к результату
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Ваш путь к новым волосам — от первого касания до идеального результата
-            </h2>
-            <p className="mt-3 text-slate-600">
-              Каждый этап продуман до мелочей: от первого звонка до новой прически
-            </p>
+            <Reveal>
+              <SectionBadge>9 шагов к результату</SectionBadge>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Ваш путь к новым волосам — от первого касания до идеального результата
+              </h2>
+            </Reveal>
+
+            <Reveal delay={140}>
+              <p className="mt-3 text-slate-600">
+                Каждый этап продуман до мелочей: от первого звонка до новой прически
+              </p>
+            </Reveal>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {steps.map((x) => {
+          {/* карточки “лестницей” по строкам */}
+          <Stagger className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" start={180} step={90}>
+            {steps.map((x, idx) => {
               const Icon = x.icon;
+
+              // пауза между строками (по 3 карточки в строке на lg)
+              const rowPause = Math.floor(idx / 3) * 140;
+
               return (
-                <div
-                  key={x.title}
-                  className="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100">
-                      <Icon className="h-5 w-5 text-teal-700" />
-                    </div>
-                    <div>
-                      <div className="font-semibold">{x.title}</div>
-                      <div className="mt-1 text-sm leading-relaxed text-slate-600">{x.text}</div>
+                <Reveal key={x.title} delay={180 + idx * 90 + rowPause} className="h-full">
+                  <div
+                    className="group h-full rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+            transition-all duration-300 ease-out
+            hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+            hover:border-teal-200/70 hover:ring-teal-100"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100
+                transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                      >
+                        <Icon className="h-5 w-5 text-teal-700" />
+                      </div>
+
+                      <div>
+                        <div className="font-semibold text-slate-900">{x.title}</div>
+                        <div className="mt-1 text-sm leading-relaxed text-slate-600">{x.text}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Reveal>
               );
             })}
-          </div>
+          </Stagger>
 
           {/* CTA внутри секции (через одну) */}
-          <div className="mt-8 flex justify-center">
-            <div className="w-full max-w-3xl rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
-              <div className="text-sm font-semibold text-slate-900 sm:text-base">
-                Хотите узнать точную стоимость под ваш случай?
-              </div>
-              <div className="mt-1 text-sm text-slate-600">
-                Оставьте контакты — консультация бесплатно.
-              </div>
-
-              <div className="mt-4 flex justify-center">
-                <LeadModalCta
-                  buttonText="Получить бесплатную консультацию"
-                  className="w-full sm:w-auto"
-                />
-              </div>
-            </div>
-          </div>
-
+          <Reveal delay={240} className="mt-8 flex justify-center">
+            <SectionCta
+              title="Хотите узнать точную стоимость под ваш случай?"
+              subtitle="Оставьте контакты — консультация бесплатно."
+              buttonText="Получить бесплатную консультацию"
+            />
+          </Reveal>
         </section>
 
         {/* RESULTS */}
-        <section className="bg-slate-50/60">
+        <section className="relative overflow-hidden bg-slate-50/60">
+          {/* мягкая подсветка фона как в других секциях */}
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(900px_circle_at_20%_20%,rgba(20,184,166,0.12),transparent_55%),radial-gradient(900px_circle_at_85%_30%,rgba(59,130,246,0.10),transparent_55%)]" />
+
           <div className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
             <div className="mx-auto max-w-3xl text-center">
-              <div className="inline-flex rounded-full border bg-white px-3 py-1 text-xs text-slate-700">
-                Реальные результаты
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                Посмотрите, чего достигли наши пациенты
-              </h2>
-              <p className="mt-3 text-slate-600">
-                Сотни пациентов уже вернули себе здоровье
-              </p>
+              <Reveal>
+                <SectionBadge>Реальные результаты</SectionBadge>
+              </Reveal>
+
+              <Reveal delay={80}>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Посмотрите, чего достигли наши пациенты
+                </h2>
+              </Reveal>
+
+              <Reveal delay={140}>
+                <p className="mt-3 text-slate-600">
+                  До/после — реальные фото пациентов. Результаты индивидуальны и зависят от исходных данных.
+                </p>
+              </Reveal>
             </div>
 
-            <div className="mt-8">
-              <ResultsCarousel
-                images={[
-                  "https://esteinturkey.com/wp-content/uploads/2023/09/hair-transplant-before-after.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/09/hair-transplant-before-after-2.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/04/3-5.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/04/4-3.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/04/28.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/09/hair-transplant-before-after-1.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/04/77.jpg",
-                  "https://esteinturkey.com/wp-content/uploads/2023/04/78.jpg",
-                ]}
-              />
-            </div>
+            <Reveal delay={200} className="mt-8">
+              {/* “дорогой” контейнер под карусель */}
+              <div className="group relative overflow-hidden rounded-3xl border bg-white/70 p-3 shadow-[0_22px_70px_-45px_rgba(15,23,42,0.55)] ring-1 ring-black/5 backdrop-blur">
+                {/* внутренняя подсветка */}
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100 bg-[radial-gradient(700px_circle_at_30%_20%,rgba(20,184,166,0.14),transparent_55%),radial-gradient(700px_circle_at_85%_35%,rgba(59,130,246,0.12),transparent_55%)]" />
+
+                <div className="relative">
+                  <ResultsCarousel
+                    images={[
+                      "/lp/hair-transplant/results/01.jpg",
+                      "/lp/hair-transplant/results/02.jpg",
+                      "/lp/hair-transplant/results/03.jpg",
+                      "/lp/hair-transplant/results/04.jpg",
+                      "/lp/hair-transplant/results/05.jpg",
+                      "/lp/hair-transplant/results/07.jpg",
+                      "/lp/hair-transplant/results/08.jpg",
+                    ]}
+                  />
+                </div>
+              </div>
+            </Reveal>
+
+            {/* маленький нейтральный дисклеймер под каруселью */}
+            <Reveal delay={260}>
+              <div className="mx-auto mt-4 max-w-3xl text-center text-xs text-slate-500">
+                *Фото предоставлены пациентами. Использование материалов без согласия запрещено.
+              </div>
+            </Reveal>
           </div>
         </section>
 
         {/* ECONOMY */}
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
+        <section className="relative mx-auto max-w-7xl px-4 py-12 sm:py-14">
+
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs text-slate-700">
-              Выгодное предложение
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Экономия 180 000₽ vs пересадка в Москве
-            </h2>
-            <p className="mt-3 text-slate-600">
-              Всё включено в пакет — не надо искать и оплачивать отдельно:
-            </p>
+            <Reveal>
+              <SectionBadge>Выгодное предложение</SectionBadge>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Экономия 180 000₽ vs пересадка в Москве
+              </h2>
+            </Reveal>
+
+            <Reveal delay={140}>
+              <p className="mt-3 text-slate-600">
+                Всё включено в пакет — не надо искать и оплачивать отдельно:
+              </p>
+            </Reveal>
           </div>
 
-          <div className="mt-8 overflow-hidden rounded-3xl border bg-white shadow-sm">
-            <div className="p-6 sm:p-8">
-              <div className="grid gap-3">
-                {economyRows.map((r) => (
-                  <div key={r.name} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-                    <div className="text-sm font-medium text-slate-800">{r.name}</div>
-                    <div className="text-sm font-semibold text-slate-700">{r.value}</div>
+          <Reveal delay={200} className="mt-8">
+            <div className="overflow-hidden rounded-3xl border bg-white shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] ring-1 ring-black/5">
+              <div className="p-5 sm:p-8">
+                {/* “таблица” */}
+                <div className="rounded-2xl border bg-slate-50/60 p-3 sm:p-4">
+                  <div className="grid gap-2">
+                    {economyRows.map((r, idx) => (
+                      <Reveal key={r.name} delay={240 + idx * 90}>
+                        <div
+                          className="group flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/5
+                  transition-all duration-300 ease-out
+                  hover:-translate-y-0.5 hover:shadow-md hover:shadow-slate-900/10
+                  hover:border-teal-200/70 hover:ring-teal-100"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="h-2.5 w-2.5 rounded-full bg-teal-500 shadow-[0_0_0_4px_rgba(20,184,166,0.10)]" />
+                            <div className="text-sm font-medium text-slate-800">{r.name}</div>
+                          </div>
+
+                          <div className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-black/5">
+                            {r.value}
+                          </div>
+                        </div>
+                      </Reveal>
+                    ))}
                   </div>
-                ))}
-              </div>
-
-              <div className="mt-6 rounded-2xl bg-emerald-50 px-5 py-4 ring-1 ring-emerald-100">
-                <div className="text-sm font-semibold text-emerald-900">
-                  ИТОГО: вы экономите минимум <span className="text-emerald-700">180 000₽</span>, делая всё это под ключ в Турции
                 </div>
+
+                {/* итог — заметный акцент */}
+                <Reveal delay={240 + economyRows.length * 90 + 80}>
+                  <div className="mt-7">
+                    <div className="relative overflow-hidden rounded-3xl border border-emerald-200/70 bg-white/70 p-6 shadow-[0_26px_80px_-60px_rgba(16,185,129,0.55)] ring-1 ring-emerald-100 backdrop-blur sm:p-8">
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_20%_0%,rgba(16,185,129,0.18),transparent_55%),radial-gradient(900px_circle_at_90%_20%,rgba(20,184,166,0.14),transparent_55%)]" />
+
+                      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-800/90">
+                            Итоговая экономия
+                          </div>
+
+                          <div className="mt-2 text-base font-semibold leading-tight text-slate-900 sm:text-lg">
+                            Вы экономите минимум{" "}
+                            <span className="inline-flex items-center rounded-2xl bg-emerald-600 px-3 py-1 text-white shadow-[0_16px_40px_-25px_rgba(16,185,129,0.75)]">
+                              180 000₽
+                            </span>{" "}
+                            делая всё это под ключ в Турции
+                          </div>
+
+                          <div className="mt-2 text-sm text-slate-600">
+                            Анализы, диагностика, препараты и наблюдение — включены.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Reveal>
               </div>
             </div>
-          </div>
+          </Reveal>
 
-          {/* CTA внутри секции (через одну) */}
-          <div className="mt-8 flex justify-center">
-            <div className="w-full max-w-3xl rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
-              <div className="text-sm font-semibold text-slate-900 sm:text-base">
-                Рассчитать цену и количество графтов
-              </div>
-              <div className="mt-1 text-sm text-slate-600">
-                Пришлите 3 фото — расчёт обычно занимает до 15 минут.
-              </div>
-
-              <div className="mt-4 flex justify-center">
-                <LeadModalCta
-                  buttonText="Получить расчёт бесплатно"
-                  className="w-full sm:w-auto"
-                  buttonVariant="default"
-                />
-              </div>
-            </div>
-          </div>
-
+          {/* CTA внутри секции (через одну) — “дороже” */}
+          <Reveal delay={240 + economyRows.length * 90 + 220} className="mt-8 flex justify-center">
+            <SectionCta
+              title="Рассчитать цену и количество графтов"
+              subtitle="Пришлите 3 фото — расчёт обычно занимает до 15 минут."
+              buttonText="Получить расчёт бесплатно"
+              buttonVariant="default"
+            />
+          </Reveal>
         </section>
 
         {/* OFFICIAL */}
-        <section className="bg-[radial-gradient(900px_circle_at_15%_20%,rgba(20,184,166,0.10),transparent_45%),radial-gradient(900px_circle_at_90%_15%,rgba(59,130,246,0.10),transparent_45%)]">
+        <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(900px_circle_at_15%_20%,rgba(20,184,166,0.10),transparent_55%),radial-gradient(900px_circle_at_90%_15%,rgba(59,130,246,0.10),transparent_55%)]" />
           <div className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
             <div className="mx-auto max-w-3xl text-center">
-              <div className="inline-flex rounded-full border bg-white px-3 py-1 text-xs text-slate-700">
-                Официальная работа
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                Работаем открыто и официально
-              </h2>
-              <p className="mt-3 text-slate-600">Почему это важно для вас?</p>
+              <Reveal>
+                <SectionBadge>Официальная работа</SectionBadge>
+              </Reveal>
+
+              <Reveal delay={80}>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Работаем открыто и официально
+                </h2>
+              </Reveal>
+
+              <Reveal delay={140}>
+                <p className="mt-3 text-slate-600">Почему это важно для вас?</p>
+              </Reveal>
             </div>
 
-            <div className="mt-8 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-3xl border bg-white p-6 shadow-sm">
-                <div className="text-sm font-semibold text-slate-900">Medtravel.me — это платформа медицинского туризма</div>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  Medtravel.me — это платформа медицинского туризма с проверенной сетью партнёров по всему миру.
-                  По услуге пересадки волос в Турции мы работаем с ведущей клиникой-партнером, которая специализируется
-                  на трансплантации волос и имеет все необходимые лицензии и сертификаты.
-                </p>
-              </div>
+            <Stagger className="mt-8 grid gap-4 lg:grid-cols-3" start={200} step={90}>
+              {/* card 1 */}
+              <Reveal delay={200} className="h-full">
+                <div
+                  className="group h-full rounded-3xl border bg-white p-6 shadow-sm ring-1 ring-black/5
+          transition-all duration-300 ease-out
+          hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+          hover:border-teal-200/70 hover:ring-teal-100"
+                >
+                  <div className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800 ring-1 ring-teal-100">
+                    Medtravel.me
+                  </div>
 
-              <div className="rounded-3xl border bg-white p-6 shadow-sm">
-                <div className="text-sm font-semibold text-slate-900">Как это работает?</div>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  Вы обращаетесь к нам — мы организуем вашу поездку и передаём вас в руки нашего проверенного партнёра
-                  с безупречной репутацией. Лечение проходит в их клинике, а мы обеспечиваем полное сопровождение,
-                  трансфер, размещение и поддержку на каждом этапе.
-                </p>
-              </div>
+                  <div className="mt-4 text-sm font-semibold text-slate-900">
+                    Medtravel.me — это платформа медицинского туризма
+                  </div>
 
-              <div className="rounded-3xl border bg-white p-6 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-teal-700" />
-                  <div className="text-sm font-semibold text-slate-900">Ваши гарантии безопасности</div>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    Medtravel.me — это платформа медицинского туризма с проверенной сетью партнёров по всему миру.
+                    По услуге пересадки волос в Турции мы работаем с ведущей клиникой-партнером, которая специализируется
+                    на трансплантации волос и имеет все необходимые лицензии и сертификаты.
+                  </p>
                 </div>
-                <ul className="mt-3 space-y-3 text-sm text-slate-600">
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-teal-600" />
-                    <span>
-                      <b className="text-slate-800">Лицензированные клиники</b> — наши партнёры работают легально, имеют официальный сертификат на медицинский туризм
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-teal-600" />
-                    <span>
-                      <b className="text-slate-800">Прозрачное сотрудничество</b> — мы тщательно отбираем медицинские учреждения по критериям качества
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-teal-600" />
-                    <span>
-                      <b className="text-slate-800">Официальные документы</b> — вы получаете полный пакет медицинской документации и гарантийный сертификат
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-teal-600" />
-                    <span>
-                      <b className="text-slate-800">Наша ответственность</b> — мы координируем весь процесс от первой консультации до завершения восстановления
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+              </Reveal>
+
+              {/* card 2 */}
+              <Reveal delay={290} className="h-full">
+                <div
+                  className="group h-full rounded-3xl border bg-white p-6 shadow-sm ring-1 ring-black/5
+          transition-all duration-300 ease-out
+          hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+          hover:border-teal-200/70 hover:ring-teal-100"
+                >
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                    Процесс
+                  </div>
+
+                  <div className="mt-4 text-sm font-semibold text-slate-900">Как это работает?</div>
+
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    Вы обращаетесь к нам — мы организуем вашу поездку и передаём вас в руки нашего проверенного партнёра
+                    с безупречной репутацией. Лечение проходит в их клинике, а мы обеспечиваем полное сопровождение,
+                    трансфер, размещение и поддержку на каждом этапе.
+                  </p>
+                </div>
+              </Reveal>
+
+              {/* card 3 */}
+              <Reveal delay={380} className="h-full">
+                <div
+                  className="group h-full rounded-3xl border bg-white p-6 shadow-sm ring-1 ring-black/5
+          transition-all duration-300 ease-out
+          hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+          hover:border-teal-200/70 hover:ring-teal-100"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100">
+                      <ShieldCheck className="h-5 w-5 text-teal-700" />
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900">Ваши гарантии безопасности</div>
+                  </div>
+
+                  <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                    {[
+                      {
+                        t: "Лицензированные клиники",
+                        d: "наши партнёры работают легально, имеют официальный сертификат на медицинский туризм",
+                      },
+                      {
+                        t: "Прозрачное сотрудничество",
+                        d: "мы тщательно отбираем медицинские учреждения по критериям качества",
+                      },
+                      {
+                        t: "Официальные документы",
+                        d: "вы получаете полный пакет медицинской документации и гарантийный сертификат",
+                      },
+                      {
+                        t: "Наша ответственность",
+                        d: "мы координируем весь процесс от первой консультации до завершения восстановления",
+                      },
+                    ].map((x) => (
+                      <li key={x.t} className="flex gap-3">
+                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-teal-600 shadow-[0_0_0_4px_rgba(20,184,166,0.10)]" />
+                        <span>
+                          <b className="text-slate-800">{x.t}</b> — {x.d}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            </Stagger>
+
+            {/* CTA внутри секции (через одну) */}
+            <Reveal delay={520} className="mt-8 flex justify-center">
+              <SectionCta
+                title="Хотите убедиться в документах и гарантиях перед поездкой?"
+                subtitle="Подскажем по этапам, договору и подготовке — консультация бесплатная."
+                buttonText="Задать вопрос менеджеру"
+              />
+            </Reveal>
           </div>
         </section>
 
         {/* CERTS */}
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
+        <section className="relative mx-auto max-w-7xl px-4 py-12 sm:py-14">
+
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs text-slate-700">
-              Наши лицензии
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Официальные сертификаты и лицензии
-            </h2>
-            <p className="mt-3 text-slate-600">Полная прозрачность и соответствие стандартам</p>
+            <Reveal>
+              <SectionBadge>Наши лицензии</SectionBadge>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Официальные сертификаты и лицензии
+              </h2>
+            </Reveal>
+
+            <Reveal delay={140}>
+              <p className="mt-3 text-slate-600">Полная прозрачность и соответствие стандартам</p>
+            </Reveal>
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
-              <div className="aspect-[16/9] bg-slate-100">
-                <img
-                  src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/WhatsApp-Image-2025-09-30-at-13.11.22.jpeg"
-                  alt="Международный сертификат медицинского туризма"
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-              <div className="p-4 text-center text-sm text-slate-600">
-                Международный сертификат медицинского туризма
+          <Reveal delay={220} className="mt-8 flex justify-center">
+            <div className="group relative w-full max-w-4xl overflow-hidden rounded-3xl border bg-white/70 p-3 shadow-[0_22px_70px_-45px_rgba(15,23,42,0.55)] ring-1 ring-black/5 backdrop-blur">
+
+              <div className="relative overflow-hidden rounded-2xl border bg-white ring-1 ring-black/5">
+                <div className="aspect-[16/9] bg-slate-100">
+                  <img
+                    src="https://esteinturkey.com/ru/wp-content/uploads/2025/09/WhatsApp-Image-2025-09-30-at-13.11.22.jpeg"
+                    alt="Международный сертификат медицинского туризма"
+                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 border-t bg-white px-4 py-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Международный сертификат медицинского туризма</div>
+                  </div>
+
+                  <div className="inline-flex w-fit items-center justify-center rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                    Проверенный партнёр
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
 
           {/* CTA внутри секции (через одну) */}
-          <div className="mt-8 flex justify-center">
-            <div className="w-full max-w-3xl rounded-3xl border bg-slate-50 p-5 text-center shadow-sm sm:p-6">
-              <div className="text-sm font-semibold text-slate-900 sm:text-base">
-                Хотите пройти всё официально и безопасно?
-              </div>
-              <div className="mt-1 text-sm text-slate-600">
-                Мы подскажем по документам, этапам и подготовке.
-              </div>
-
-              <div className="mt-4 flex justify-center">
-                <LeadModalCta
-                  buttonText="Записаться на консультацию"
-                  className="w-full sm:w-auto"
-                />
-              </div>
-            </div>
-          </div>
-
+          <Reveal delay={340} className="mt-8 flex justify-center">
+            <SectionCta
+              title="Хотите пройти всё официально и безопасно?"
+              subtitle="Подскажем по документам, этапам и подготовке — консультация бесплатная."
+              buttonText="Записаться на консультацию"
+            />
+          </Reveal>
         </section>
 
         {/* WHY TURKEY */}
-        <section className="bg-slate-50/60">
+        <section className="relative overflow-hidden bg-slate-50/60">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(900px_circle_at_20%_20%,rgba(20,184,166,0.10),transparent_55%),radial-gradient(900px_circle_at_85%_30%,rgba(59,130,246,0.08),transparent_55%)]" />
+
           <div className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
             <div className="mx-auto max-w-3xl text-center">
-              <div className="inline-flex rounded-full border bg-white px-3 py-1 text-xs text-slate-700">
-                Мировой лидер
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                Почему наши пациенты выбирают Турцию
-              </h2>
-              <p className="mt-3 text-slate-600">Европейское качество по доступной цене</p>
+              <Reveal>
+                <SectionBadge>Мировой лидер</SectionBadge>
+              </Reveal>
+
+              <Reveal delay={80}>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Почему наши пациенты выбирают Турцию
+                </h2>
+              </Reveal>
+
+              <Reveal delay={140}>
+                <p className="mt-3 text-slate-600">Европейское качество по доступной цене</p>
+              </Reveal>
             </div>
 
-            <div className="mt-8 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-3xl border bg-white p-6 shadow-sm">
-                <div className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100 inline-flex">
-                  <BadgeCheck className="h-5 w-5 text-teal-700" />
-                </div>
-                <div className="mt-4 font-semibold">300 000+ операций ежегодно</div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Стамбул лидирует в мире по пересадке волос
-                </div>
-              </div>
+            <Stagger className="mt-8 grid gap-4 lg:grid-cols-3" start={200} step={90}>
+              {[
+                {
+                  title: "300 000+ операций ежегодно",
+                  desc: "Стамбул лидирует в мире по пересадке волос",
+                  icon: BadgeCheck,
+                },
+                {
+                  title: "Международные стандарты качества",
+                  desc: "Аккредитация JCI, ISO 9001, лицензии Минздрава Турции",
+                  icon: ShieldCheck,
+                },
+                {
+                  title: "Передовые технологии",
+                  desc: "Методы FUE/DHI, микромоторы для безшовной экстракции",
+                  icon: Scissors,
+                },
+              ].map((x, i) => {
+                const Icon = x.icon;
 
-              <div className="rounded-3xl border bg-white p-6 shadow-sm">
-                <div className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100 inline-flex">
-                  <ShieldCheck className="h-5 w-5 text-teal-700" />
-                </div>
-                <div className="mt-4 font-semibold">Международные стандарты качества</div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Аккредитация JCI, ISO 9001, лицензии Минздрава Турции
-                </div>
-              </div>
+                return (
+                  <Reveal key={x.title} delay={200 + i * 90} className="h-full">
+                    <div
+                      className="group h-full rounded-3xl border bg-white p-6 shadow-sm ring-1 ring-black/5
+              transition-all duration-300 ease-out
+              hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
+              hover:border-teal-200/70 hover:ring-teal-100"
+                    >
+                      <div className="inline-flex rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100 transition-transform duration-300 ease-out group-hover:scale-[1.03]">
+                        <Icon className="h-5 w-5 text-teal-700" />
+                      </div>
 
-              <div className="rounded-3xl border bg-white p-6 shadow-sm">
-                <div className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100 inline-flex">
-                  <Scissors className="h-5 w-5 text-teal-700" />
-                </div>
-                <div className="mt-4 font-semibold">Передовые технологии</div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Методы FUE/DHI, микромоторы для безшовной экстракции
-                </div>
-              </div>
-            </div>
+                      <div className="mt-4 font-semibold text-slate-900">{x.title}</div>
+                      <div className="mt-2 text-sm leading-relaxed text-slate-600">{x.desc}</div>
+                    </div>
+                  </Reveal>
+                );
+              })}
+            </Stagger>
           </div>
         </section>
 
         {/* FAQ */}
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
+        <section className="relative mx-auto max-w-7xl px-4 py-12 sm:py-14">
+
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs text-slate-700">
-              Частые вопросы
+            <Reveal>
+              <SectionBadge>Частые вопросы</SectionBadge>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Вопросы, которые вы хотели задать
+              </h2>
+            </Reveal>
+
+            <Reveal delay={140}>
+              <p className="mt-3 text-slate-600">
+                Честные ответы без воды — всё, что важно знать перед процедурой
+              </p>
+            </Reveal>
+          </div>
+
+          <Reveal delay={220} className="mx-auto mt-8 max-w-3xl">
+            <div className="overflow-hidden rounded-3xl border bg-white/70 p-3 shadow-[0_20px_60px_-45px_rgba(15,23,42,0.50)] ring-1 ring-black/5 backdrop-blur">
+              <div className="rounded-2xl border bg-white p-3 sm:p-4">
+                <FaqAccordion items={faq} />
+              </div>
+
+              <div className="px-3 pb-2 pt-3 text-center text-xs text-slate-500 sm:px-4">
+                Если останутся вопросы — просто напишите, всё объясним по шагам.
+              </div>
             </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Вопросы, которые вы хотели задать
-            </h2>
-            <p className="mt-3 text-slate-600">
-              Честные ответы без воды — всё, что важно знать перед процедурой
-            </p>
-          </div>
-
-          <div className="mx-auto mt-8 max-w-3xl">
-            <FaqAccordion items={faq} />
-          </div>
-
+          </Reveal>
         </section>
 
         {/* FINAL CTA */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(1100px_circle_at_20%_10%,rgba(20,184,166,0.16),transparent_50%),radial-gradient(1000px_circle_at_85%_25%,rgba(59,130,246,0.14),transparent_55%),linear-gradient(to_bottom,rgba(255,255,255,1),rgba(248,250,252,1))]" />
+
           <div className="relative mx-auto max-w-7xl px-4 py-12 sm:py-14">
             <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
-                <div className="inline-flex rounded-full border bg-white px-3 py-1 text-xs text-slate-700">
-                  Начните сегодня
-                </div>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                  Начните путь к густым волосам прямо сейчас
-                </h2>
-                <p className="mt-3 max-w-2xl text-slate-600">
-                  Пришлите 3 фото (спереди, сверху, сбоку) — получите расчёт стоимости и план операции в Telegram за 15 минут
-                </p>
+                <Reveal>
+                  <SectionBadge>Начните сегодня</SectionBadge>
+                </Reveal>
+
+                <Reveal delay={80}>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                    Начните путь к густым волосам прямо сейчас
+                  </h2>
+                </Reveal>
+
+                <Reveal delay={140}>
+                  <p className="mt-3 max-w-2xl text-slate-600">
+                    Пришлите 3 фото (спереди, сверху, сбоку) — получите расчёт стоимости и план операции в Telegram за 15 минут
+                  </p>
+                </Reveal>
               </div>
 
               <div className="lg:justify-self-end">
-                <LeadDialog
-                  variant="final"
-                  title="Запишитесь на бесплатную консультацию и расчёт стоимости"
-                  primaryCta="Получить консультацию"
-                  secondaryCta="Получить расчёт в Telegram"
-                />
+                <Reveal delay={220}>
+                  <LeadInlineForm
+                    title="Запишитесь на бесплатную консультацию и расчёт стоимости"
+                    primaryCta="Получить консультацию"
+                  />
+                </Reveal>
               </div>
             </div>
 
-            <div className="mt-10 border-t pt-6 text-center text-xs text-slate-500">
-              © {new Date().getFullYear()} MedTravel. Информация на странице носит ознакомительный характер.
-            </div>
+            <Reveal delay={320}>
+              <div className="mt-10 border-t pt-6 text-center text-xs text-slate-500">
+                © {new Date().getFullYear()} MedTravel. Информация на странице носит ознакомительный характер.
+              </div>
+            </Reveal>
           </div>
         </section>
       </main>
