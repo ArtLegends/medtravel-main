@@ -90,7 +90,7 @@ const steps = [
   },
   {
     title: "12 месяцев с вами",
-    text: "Личный менеджер на связи в Telegram: контрольные фото, корректировка ухода, онлайн-осмотр врачом при необходимости",
+    text: "Личный менеджер на связи: контрольные фото, корректировка ухода, онлайн-осмотр врачом при необходимости",
     icon: ShieldCheck,
   },
 ] as const;
@@ -184,8 +184,15 @@ export default function HairTransplantLP() {
                   </p>
                 </Reveal>
 
+                <Reveal delay={180} className="mt-6 lg:hidden">
+                  <LeadInlineForm
+                    title="Запишитесь на бесплатную консультацию и расчёт стоимости"
+                    primaryCta="Получить консультацию"
+                  />
+                </Reveal>
+
                 <Stagger className="mt-6 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3" start={180} step={90}>
-                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-4 shadow-sm ring-1 ring-black/5
 transition-all duration-300 ease-out
 hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
 hover:border-teal-200/70 hover:ring-teal-100">
@@ -194,13 +201,13 @@ hover:border-teal-200/70 hover:ring-teal-100">
                       <div>
                         <div className="font-semibold">Пожизненная гарантия</div>
                         <div className="mt-1 text-sm leading-relaxed text-slate-600">
-                          На пересаженные волосы — официальный подход и контроль результата
+                          На пересаженные волосы с официальным контролем результата
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-4 shadow-sm ring-1 ring-black/5
 transition-all duration-300 ease-out
 hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
 hover:border-teal-200/70 hover:ring-teal-100">
@@ -209,13 +216,13 @@ hover:border-teal-200/70 hover:ring-teal-100">
                       <div>
                         <div className="font-semibold">Куратор 24/7 на русском</div>
                         <div className="mt-1 text-sm leading-relaxed text-slate-600">
-                          Поддержка по всем вопросам — до, во время и после поездки
+                          Полная поддержка до, во время и после процедуры
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-5 shadow-sm ring-1 ring-black/5
+                  <div className="h-full min-h-[132px] group rounded-2xl border bg-white p-4 shadow-sm ring-1 ring-black/5
 transition-all duration-300 ease-out
 hover:-translate-y-1 hover:shadow-md hover:shadow-slate-900/10
 hover:border-teal-200/70 hover:ring-teal-100">
@@ -224,7 +231,7 @@ hover:border-teal-200/70 hover:ring-teal-100">
                       <div className="flex-1">
                         <div className="font-semibold">До 6 000 графтов за 1 процедуру</div>
                         <div className="mt-1 text-sm leading-relaxed text-slate-600">
-                          Подбираем методику под ваш кейс — FUE или DHI
+                          Методика FUE или DHI под ваш случай
                         </div>
                       </div>
                     </div>
@@ -247,7 +254,7 @@ hover:border-teal-200/70 hover:ring-teal-100">
               </div>
 
               {/* right card */}
-              <div className="lg:justify-self-end">
+              <div className="hidden lg:block lg:justify-self-end">
                 <Reveal delay={200} className="lg:justify-self-end">
                   <LeadInlineForm
                     title="Запишитесь на бесплатную консультацию и расчёт стоимости"
@@ -767,7 +774,7 @@ hover:border-teal-200/70 hover:ring-teal-100">
 
                 <Reveal delay={140}>
                   <p className="mt-3 max-w-2xl text-slate-600">
-                    Пришлите 3 фото (спереди, сверху, сбоку) — получите расчёт стоимости и план операции в Telegram за 15 минут
+                    Пришлите 3 фото (спереди, сверху, сбоку) — получите расчёт стоимости и план операции за 15 минут
                   </p>
                 </Reveal>
               </div>
