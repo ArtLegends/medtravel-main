@@ -6,16 +6,22 @@ import { ImagePlus, X } from "lucide-react";
 type Props = {
   maxFiles?: number;
   helperText?: string;
+  files?: File[];
   onFilesChange?: (files: File[]) => void;
 };
 
 export default function LeadImageUpload({
   maxFiles = 3,
   helperText = "Фото (спереди / сверху / сбоку). До 3 файлов, JPG/PNG.",
+  files: valueFiles,
   onFilesChange,
 }: Props) {
   const id = useId();
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(valueFiles ?? []);
+
+  useEffect(() => {
+    if (valueFiles) setFiles(valueFiles);
+  }, [valueFiles]);
 
   const previews = useMemo(
     () =>

@@ -40,6 +40,7 @@ export default function PartnerLeadsClient() {
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachUrls, setAttachUrls] = useState<string[]>([]);
   const [attachTitle, setAttachTitle] = useState("Images");
+  const [activeIdx, setActiveIdx] = useState(0);
 
   const canPrev = offset > 0;
   const canNext = offset + limit < total;
@@ -107,6 +108,7 @@ export default function PartnerLeadsClient() {
 
             setAttachTitle(`Images for ${r.full_name}`);
             setAttachUrls(urls);
+            setActiveIdx(0);
             setAttachOpen(true);
         } catch (e: any) {
             setError(String(e?.message ?? e));
@@ -122,6 +124,7 @@ export default function PartnerLeadsClient() {
       if (e.key === "Escape") {
         setAttachOpen(false);
         setAttachUrls([]);
+        setActiveIdx(0);
       }
     };
 
@@ -287,6 +290,7 @@ export default function PartnerLeadsClient() {
           onMouseDown={() => {
             setAttachOpen(false);
             setAttachUrls([]);
+            setActiveIdx(0);
           }}
         >
           <div
@@ -300,6 +304,7 @@ export default function PartnerLeadsClient() {
                 onClick={() => {
                   setAttachOpen(false);
                   setAttachUrls([]);
+                  setActiveIdx(0);
                 }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
                 aria-label="Close"
@@ -309,19 +314,50 @@ export default function PartnerLeadsClient() {
             </div>
 
             <div className="bg-gray-50 p-4">
-              {attachUrls.length ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {attachUrls.map((u) => (
-                    <img
-                      key={u}
-                      src={u}
-                      alt="Lead image"
-                      className="max-h-[60vh] w-full rounded-xl border bg-white object-contain"
-                    />
-                  ))}
-                </div>
-              ) : (
+              {!attachUrls.length ? (
                 <div className="text-sm text-gray-600">No images.</div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Main viewer */}
+                  <div className="flex items-center justify-center rounded-2xl border bg-white p-3">
+                    <img
+                      src={attachUrls[Math.min(activeIdx, attachUrls.length - 1)]}
+                      alt="Lead image"
+                      className="h-[60vh] w-full max-w-full rounded-xl object-contain"
+                    />
+                  </div>
+
+                  {/* Thumbnails row */}
+                  <div className="flex max-w-full gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {attachUrls.map((u, i) => {
+                      const active = i === activeIdx;
+                      return (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setActiveIdx(i)}
+                          className={[
+                            "shrink-0 overflow-hidden rounded-xl border bg-white",
+                            active ? "ring-2 ring-emerald-400 border-emerald-300" : "hover:border-slate-300",
+                          ].join(" ")}
+                          style={{ width: 110, height: 80 }}
+                          aria-label={`Open image ${i + 1}`}
+                        >
+                          <img
+                            src={u}
+                            alt="Lead thumbnail"
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-xs text-slate-500">
+                    {activeIdx + 1} / {attachUrls.length}
+                  </div>
+                </div>
               )}
             </div>
           </div>

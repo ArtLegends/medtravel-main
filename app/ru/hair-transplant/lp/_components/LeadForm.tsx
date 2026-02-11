@@ -96,7 +96,7 @@ export default function LeadForm({
       <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
 
       <div className="mt-4">
-        <LeadImageUpload onFilesChange={setFiles} />
+        <LeadImageUpload files={files} onFilesChange={setFiles} />
       </div>
 
       {ok ? (
