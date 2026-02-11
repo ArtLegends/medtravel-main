@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
 
 export const runtime = "nodejs";
 
@@ -8,7 +8,7 @@ function safeEmail(v: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createRouteClient();
+  const supabase = createServiceClient();
 
   try {
     const fd = await req.formData();
@@ -24,13 +24,15 @@ export async function POST(req: NextRequest) {
     if (!email) return NextResponse.json({ error: "Введите email" }, { status: 400 });
     if (!safeEmail(email)) return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
 
-    const age = ageRaw ? Number(ageRaw) : null;
+    const ageNum = ageRaw ? Number(ageRaw) : null;
+    const age = Number.isFinite(ageNum as any) ? (ageNum as number) : null;
+
     const images = fd.getAll("images").filter(Boolean) as File[];
     const image_paths: string[] = [];
 
-    // id будущей записи заранее, чтобы положить файлы в папку leadId
     const leadId = crypto.randomUUID();
 
+    // 1) upload images (service role => пройдёт даже в private bucket)
     for (const file of images.slice(0, 3)) {
       if (!(file instanceof File)) continue;
       if (!file.type.startsWith("image/")) continue;
@@ -53,18 +55,25 @@ export async function POST(req: NextRequest) {
       image_paths.push(path);
     }
 
+    // 2) insert row
     const { error: insErr } = await supabase.from("partner_leads").insert({
       id: leadId,
       source,
       full_name,
       phone,
       email,
-      age: Number.isFinite(age as any) ? age : null,
+      age,
       image_paths,
       status: "new",
     });
 
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+    if (insErr) {
+      // опционально: если запись не вставилась — подчистить загруженные файлы
+      if (image_paths.length) {
+        await supabase.storage.from("partner-leads").remove(image_paths);
+      }
+      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, id: leadId });
   } catch (e: any) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,39 +12,39 @@ async function isAdmin(supabase: any, userId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createRouteClient();
-
-  const { data: auth } = await supabase.auth.getUser();
+  // 1) auth как админ — через route client (cookies)
+  const route = await createRouteClient();
+  const { data: auth } = await route.auth.getUser();
   const user = auth?.user;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const ok = await isAdmin(supabase, user.id);
+  const ok = await isAdmin(route, user.id);
   if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // 2) путь к файлу
   const url = new URL(req.url);
-  const id = (url.searchParams.get("id") || "").trim();
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const path = (url.searchParams.get("path") || "").trim();
+  if (!path) return NextResponse.json({ error: "Missing path" }, { status: 400 });
 
-  const { data, error } = await supabase
-    .from("partner_leads")
-    .select("image_paths")
-    .eq("id", id)
-    .single();
-
+  // 3) скачиваем сервисным ключом
+  const admin = createServiceClient();
+  const { data, error } = await admin.storage.from("partner-leads").download(path);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const paths: string[] = data?.image_paths ?? [];
-  if (!paths.length) return NextResponse.json({ urls: [] });
+  const arr = await data.arrayBuffer();
 
-  const urls: string[] = [];
-  for (const p of paths.slice(0, 3)) {
-    const { data: signed, error: sErr } = await supabase.storage
-      .from("partner-leads")
-      .createSignedUrl(p, 60 * 5); // 5 минут
+  // контент-тайп можно определить грубо по расширению
+  const ext = path.split(".").pop()?.toLowerCase();
+  const contentType =
+    ext === "png" ? "image/png" :
+    ext === "webp" ? "image/webp" :
+    "image/jpeg";
 
-    if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
-    if (signed?.signedUrl) urls.push(signed.signedUrl);
-  }
-
-  return NextResponse.json({ urls });
+  return new NextResponse(arr, {
+    headers: {
+      "content-type": contentType,
+      "cache-control": "private, max-age=300",
+    },
+  });
 }
