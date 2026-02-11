@@ -132,9 +132,6 @@ export default function LeadImageUpload({
                 ))}
               </div>
 
-              <div className="mt-2 text-[11px] text-slate-500">
-                Миниатюры не отправляют данные сами по себе — это только UI (можно подключить загрузку позже).
-              </div>
             </div>
           )}
         </div>

@@ -83,26 +83,37 @@ export default function PartnerLeadsClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryUrl]);
 
-  async function openImages(r: Row) {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/partner-leads/images?id=${encodeURIComponent(r.id)}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(await readError(res));
-      const j = await res.json().catch(() => ({}));
-      const urls: string[] = j?.urls ?? [];
+    async function openImages(r: Row) {
+        setBusy(true);
+        setError(null);
 
-      setAttachTitle(`Images for ${r.full_name}`);
-      setAttachUrls(urls);
-      setAttachOpen(true);
-    } catch (e: any) {
-      setError(String(e?.message ?? e));
-    } finally {
-      setBusy(false);
+        try {
+            const paths = (r.image_paths ?? [])
+                .map((p) => String(p ?? "").trim())
+                .filter(Boolean)
+                .slice(0, 3);
+
+            if (!paths.length) {
+                setAttachTitle(`Images for ${r.full_name}`);
+                setAttachUrls([]);
+                setAttachOpen(true);
+                return;
+            }
+
+            // ВАЖНО: endpoint возвращает image bytes, поэтому URL = сам endpoint с path
+            const urls = paths.map(
+                (p) => `/api/admin/partner-leads/images?path=${encodeURIComponent(p)}`
+            );
+
+            setAttachTitle(`Images for ${r.full_name}`);
+            setAttachUrls(urls);
+            setAttachOpen(true);
+        } catch (e: any) {
+            setError(String(e?.message ?? e));
+        } finally {
+            setBusy(false);
+        }
     }
-  }
 
   useEffect(() => {
     if (!attachOpen) return;
