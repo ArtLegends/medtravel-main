@@ -6,11 +6,13 @@ import { ImagePlus, X } from "lucide-react";
 type Props = {
   maxFiles?: number;
   helperText?: string;
+  onFilesChange?: (files: File[]) => void;
 };
 
 export default function LeadImageUpload({
   maxFiles = 3,
   helperText = "Фото (спереди / сверху / сбоку). До 3 файлов, JPG/PNG.",
+  onFilesChange,
 }: Props) {
   const id = useId();
   const [files, setFiles] = useState<File[]>([]);
@@ -36,10 +38,15 @@ export default function LeadImageUpload({
     const arr = Array.from(next);
     const merged = [...files, ...arr].slice(0, maxFiles);
     setFiles(merged);
+    onFilesChange?.(merged);
   }
 
   function removeAt(i: number) {
-    setFiles((prev) => prev.filter((_, idx) => idx !== i));
+    setFiles((prev) => {
+      const next = prev.filter((_, idx) => idx !== i);
+      onFilesChange?.(next);
+      return next;
+    });
   }
 
   return (
@@ -85,7 +92,10 @@ export default function LeadImageUpload({
             {files.length > 0 && (
               <button
                 type="button"
-                onClick={() => setFiles([])}
+                onClick={() => {
+                  setFiles([]);
+                  onFilesChange?.([]);
+                }}
                 className="text-xs font-semibold text-slate-600 hover:text-slate-900"
               >
                 Очистить

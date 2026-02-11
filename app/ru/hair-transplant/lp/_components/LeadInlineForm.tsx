@@ -1,7 +1,6 @@
 'use client';
 
 import LeadForm from './LeadForm';
-import LeadImageUpload from './LeadImageUpload';
 
 type Props = {
   title: string;

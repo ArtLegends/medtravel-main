@@ -43,9 +43,8 @@ const GROUPS: Group[] = [
       { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck2 },
       { label: "Clinic Requests", href: "/admin/clinic-requests", icon: Inbox },
       { label: "New Clinic Requests", href: "/admin/new-clinic-requests", icon: Inbox },
-
-      // ✅ NEW
       { label: "Customer Signup Requests", href: "/admin/customer-signup-requests", icon: UserPlus },
+      { label: "Partner Leads", href: "/admin/partner-leads", icon: Inbox },
     ],
   },
   {
