@@ -127,7 +127,7 @@ async function ensurePatientAndSendMagicLink(params: {
   });
 
   // 5) генерим magic link (через callback, чтобы выставились cookies session)
-  const redirectTo = `${origin}/auth/callback?as=PATIENT&next=${encodeURIComponent("/patient")}`;
+  const redirectTo = `${origin}/auth/magic?as=PATIENT&next=${encodeURIComponent("/patient")}`;
 
   const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
     type: "magiclink",
