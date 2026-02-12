@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SupabaseContextType } from '@/lib/supabase/supabase-provider';
 import { useSupabase } from '@/lib/supabase/supabase-provider';
+import { useSearchParams } from "next/navigation";
 
 type FormState = {
   firstName: string;
@@ -43,6 +44,17 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const sp = useSearchParams();
+  const passwordHint = sp.get("password") === "1"; // подсказка после magic link
+
+  const [pw, setPw] = useState({
+    newPassword: "",
+    confirm: "",
+  });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwStatus, setPwStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [pwError, setPwError] = useState<string | null>(null);
+
   // список таймзон (если платформа поддерживает — берём полный список)
   const timeZones = useMemo(() => {
     try {
@@ -66,6 +78,46 @@ export default function SettingsPage() {
       'America/Los_Angeles',
     ];
   }, []);
+
+  function validatePassword(p: string) {
+    // минимально безопасно, без усложнений
+    if (!p || p.length < 8) return "Password must be at least 8 characters.";
+    return null;
+  }
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !user) return;
+
+    setPwStatus("idle");
+    setPwError(null);
+
+    const v = validatePassword(pw.newPassword);
+    if (v) {
+      setPwStatus("error");
+      setPwError(v);
+      return;
+    }
+    if (pw.newPassword !== pw.confirm) {
+      setPwStatus("error");
+      setPwError("Passwords do not match.");
+      return;
+    }
+
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({
+      password: pw.newPassword,
+    });
+
+    if (error) {
+      setPwStatus("error");
+      setPwError(error.message || "Failed to update password.");
+    } else {
+      setPwStatus("saved");
+      setPw({ newPassword: "", confirm: "" });
+    }
+    setPwSaving(false);
+  };
 
   // Инициализируем форму из user_metadata
   useEffect(() => {
@@ -313,6 +365,92 @@ export default function SettingsPage() {
               </span>
             </label>
           </div>
+        </section>
+
+        {/* Password */}
+        <section className="rounded-xl border bg-white p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Password</h2>
+              <p className="text-xs text-default-500">
+                Set or change your password for email sign-in.
+              </p>
+            </div>
+
+            {/* подсказка только если пришли по magic link */}
+            {passwordHint ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                Recommended
+              </span>
+            ) : null}
+          </div>
+
+          {passwordHint ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              You signed in via email link. For faster access next time, set a password now.
+            </div>
+          ) : null}
+
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm text-gray-600">New password</label>
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  type="password"
+                  value={pw.newPassword}
+                  onChange={(e) => {
+                    setPw((p) => ({ ...p, newPassword: e.target.value }));
+                    setPwStatus("idle");
+                    setPwError(null);
+                  }}
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600">Confirm password</label>
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  type="password"
+                  value={pw.confirm}
+                  onChange={(e) => {
+                    setPw((p) => ({ ...p, confirm: e.target.value }));
+                    setPwStatus("idle");
+                    setPwError(null);
+                  }}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+
+            {pwStatus === "error" && pwError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {pwError}
+              </div>
+            ) : null}
+
+            {pwStatus === "saved" ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Password updated.
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={pwSaving}
+                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {pwSaving ? "Saving…" : "Save password"}
+              </button>
+
+              <span className="text-[11px] text-gray-400">
+                If you use Google sign-in, password is optional.
+              </span>
+            </div>
+          </form>
         </section>
 
         <div className="flex items-center gap-3">

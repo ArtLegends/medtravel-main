@@ -41,6 +41,8 @@ export default function LeadForm({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
+  const [patientEmailSent, setPatientEmailSent] = useState(false);
+
   const canSubmit = useMemo(() => {
     return fullName.trim() && phone.trim() && email.trim();
   }, [fullName, phone, email]);
@@ -48,6 +50,7 @@ export default function LeadForm({
   async function submit() {
     setError(null);
     setOk(false);
+    setPatientEmailSent(false);
     setBusy(true);
 
     try {
@@ -64,6 +67,7 @@ export default function LeadForm({
       if (!res.ok) throw new Error(json?.error || "Submit failed");
 
       setOk(true);
+      setPatientEmailSent(Boolean(json?.patient?.emailSent));
       fireForm1Step();
 
       onSubmitted?.();
@@ -102,6 +106,12 @@ export default function LeadForm({
       {ok ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           Спасибо! Мы получили заявку и свяжемся с вами.
+        </div>
+      ) : null}
+
+      {ok && patientEmailSent ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
         </div>
       ) : null}
 

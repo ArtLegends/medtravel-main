@@ -138,6 +138,27 @@ export default function NotificationsBell() {
       );
     }
 
+    if (n.type === "set_password") {
+      const url = n.data?.action_url ?? "/settings";
+
+      return (
+        <div className="space-y-2 text-left">
+          <div className="text-sm font-medium">
+            Set a password for faster sign-in
+          </div>
+          <div className="text-xs text-default-500">
+            You signed in via email link. Set a password in Settings.
+          </div>
+          <a
+            href={url}
+            className="inline-flex items-center text-xs font-semibold text-primary underline"
+          >
+            Open settings
+          </a>
+        </div>
+      );
+    }
+
     return (
       <div className="text-sm">
         {n.data?.message ?? "Notification"}
