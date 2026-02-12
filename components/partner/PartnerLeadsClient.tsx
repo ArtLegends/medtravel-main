@@ -11,16 +11,9 @@ type Row = {
   age: number | null;
   image_paths: string[];
   status: string;
-  admin_note: string | null;
   created_at: string;
-
-  assigned_partner_id?: string | null;
   assigned_at?: string | null;
-  assigned_by?: string | null;
-  assigned_note?: string | null;
 };
-
-type Partner = { id: string; name: string; email: string };
 
 function fmt(dt?: string | null) {
   if (!dt) return "—";
@@ -32,7 +25,7 @@ function fmt(dt?: string | null) {
 }
 
 export default function PartnerLeadsClient() {
-  const [status, setStatus] = useState<"all" | "new">("all");
+  const [status, setStatus] = useState<"all" | "assigned" | "processed" | "archived">("all");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
@@ -42,9 +35,6 @@ export default function PartnerLeadsClient() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [assignTo, setAssignTo] = useState<Record<string, string>>({});
 
   // modal
   const [attachOpen, setAttachOpen] = useState(false);
@@ -61,7 +51,7 @@ export default function PartnerLeadsClient() {
     if (q.trim()) sp.set("q", q.trim());
     sp.set("limit", String(limit));
     sp.set("offset", String(offset));
-    return `/api/admin/partner-leads?${sp.toString()}`;
+    return `/api/partner/leads?${sp.toString()}`;
   }, [status, q, limit, offset]);
 
   async function readError(res: Response) {
@@ -89,93 +79,44 @@ export default function PartnerLeadsClient() {
     }
   }
 
-  async function loadPartners() {
-    try {
-      const res = await fetch("/api/admin/partners", { cache: "no-store" });
-      if (!res.ok) throw new Error(await readError(res));
-      const j = await res.json().catch(() => ({}));
-      setPartners(j?.items ?? []);
-    } catch (e: any) {
-      // не блокируем UI — просто покажем ошибку если хочешь
-      setError(String(e?.message ?? e));
-    }
-  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryUrl]);
 
-  async function assignLead(leadId: string) {
-    const partnerId = String(assignTo[leadId] ?? "").trim();
-    if (!partnerId) {
-      setError("Select partner first");
-      return;
-    }
-
+  async function openImages(r: Row) {
     setBusy(true);
     setError(null);
+
     try {
-      const res = await fetch("/api/admin/partner-leads/assign", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lead_id: leadId, partner_id: partnerId }),
-      });
+      const paths = (r.image_paths ?? [])
+        .map((p) => String(p ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 3);
 
-      if (!res.ok) throw new Error(await readError(res));
-      const j = await res.json().catch(() => ({}));
-      const updated: Row | null = j?.item ?? null;
-
-      if (updated?.id) {
-        setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-      } else {
-        // если по какой-то причине не вернул item — просто перегрузи список
-        await load();
+      if (!paths.length) {
+        setAttachTitle(`Images for ${r.full_name}`);
+        setAttachUrls([]);
+        setActiveIdx(0);
+        setAttachOpen(true);
+        return;
       }
+
+      // важно: partner endpoint проверяет, что path принадлежит leadId и lead назначен этому партнеру
+      const urls = paths.map(
+        (p) => `/api/partner/leads/image?leadId=${encodeURIComponent(r.id)}&path=${encodeURIComponent(p)}`
+      );
+
+      setAttachTitle(`Images for ${r.full_name}`);
+      setAttachUrls(urls);
+      setActiveIdx(0);
+      setAttachOpen(true);
     } catch (e: any) {
       setError(String(e?.message ?? e));
     } finally {
       setBusy(false);
     }
   }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryUrl]);
-
-  useEffect(() => {
-    loadPartners();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-    async function openImages(r: Row) {
-        setBusy(true);
-        setError(null);
-
-        try {
-            const paths = (r.image_paths ?? [])
-                .map((p) => String(p ?? "").trim())
-                .filter(Boolean)
-                .slice(0, 3);
-
-            if (!paths.length) {
-                setAttachTitle(`Images for ${r.full_name}`);
-                setAttachUrls([]);
-                setAttachOpen(true);
-                return;
-            }
-
-            // ВАЖНО: endpoint возвращает image bytes, поэтому URL = сам endpoint с path
-            const urls = paths.map(
-                (p) => `/api/admin/partner-leads/images?path=${encodeURIComponent(p)}`
-            );
-
-            setAttachTitle(`Images for ${r.full_name}`);
-            setAttachUrls(urls);
-            setActiveIdx(0);
-            setAttachOpen(true);
-        } catch (e: any) {
-            setError(String(e?.message ?? e));
-        } finally {
-            setBusy(false);
-        }
-    }
 
   useEffect(() => {
     if (!attachOpen) return;
@@ -199,20 +140,10 @@ export default function PartnerLeadsClient() {
   }, [attachOpen]);
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Partner Leads</h1>
-          <p className="text-sm text-slate-500">Leads from landing forms</p>
-        </div>
-
-        <button
-          onClick={() => load()}
-          disabled={busy}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
-        >
-          Refresh
-        </button>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Leads</h1>
+        <p className="text-gray-600">Assigned leads from MedTravel</p>
       </div>
 
       {error ? (
@@ -221,10 +152,10 @@ export default function PartnerLeadsClient() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border bg-white p-4 space-y-4">
+      <div className="rounded-xl border bg-white p-4 space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex gap-2 flex-wrap">
-            {(["all", "new"] as const).map((s) => (
+            {(["all", "assigned", "processed", "archived"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => {
@@ -273,11 +204,9 @@ export default function PartnerLeadsClient() {
                 <th className="py-2 pr-3">Phone</th>
                 <th className="py-2 pr-3">Email</th>
                 <th className="py-2 pr-3">Age</th>
-                <th className="py-2 pr-3">Created</th>
+                <th className="py-2 pr-3">Assigned</th>
                 <th className="py-2 pr-3">Images</th>
                 <th className="py-2 pr-3">Source</th>
-                <th className="py-2 pr-3">Assign</th>
-                <th className="py-2 pr-3">Assigned</th>
               </tr>
             </thead>
 
@@ -291,7 +220,7 @@ export default function PartnerLeadsClient() {
                   <td className="py-3 pr-3">{r.phone}</td>
                   <td className="py-3 pr-3">{r.email}</td>
                   <td className="py-3 pr-3">{r.age ?? "—"}</td>
-                  <td className="py-3 pr-3">{fmt(r.created_at)}</td>
+                  <td className="py-3 pr-3">{fmt(r.assigned_at ?? null)}</td>
 
                   <td className="py-3 pr-3">
                     {r.image_paths?.length ? (
@@ -309,54 +238,12 @@ export default function PartnerLeadsClient() {
                   </td>
 
                   <td className="py-3 pr-3 text-slate-600">{r.source}</td>
-
-                  <td className="py-3 pr-3">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={assignTo[r.id] ?? r.assigned_partner_id ?? ""}
-                        onChange={(e) =>
-                          setAssignTo((m) => ({ ...m, [r.id]: e.target.value }))
-                        }
-                        disabled={busy}
-                        className="h-8 w-48 rounded-lg border border-slate-200 bg-white px-2 text-xs"
-                      >
-                        <option value="">Select partner…</option>
-                        {partners.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        disabled={busy || !(assignTo[r.id] ?? r.assigned_partner_id)}
-                        onClick={() => assignLead(r.id)}
-                        className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-semibold hover:bg-slate-50 disabled:opacity-60"
-                      >
-                        Assign
-                      </button>
-                    </div>
-                  </td>
-
-                  <td className="py-3 pr-3 text-xs text-slate-600">
-                    {r.assigned_partner_id ? (
-                      <div className="space-y-0.5">
-                        <div className="font-semibold text-slate-800">
-                          {partners.find((p) => p.id === r.assigned_partner_id)?.name ?? "Assigned"}
-                        </div>
-                        <div className="text-slate-500">{fmt(r.assigned_at ?? null)}</div>
-                      </div>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
                 </tr>
               ))}
 
               {!items.length ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500">
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
                     No leads found
                   </td>
                 </tr>
@@ -422,7 +309,6 @@ export default function PartnerLeadsClient() {
                 <div className="text-sm text-gray-600">No images.</div>
               ) : (
                 <div className="space-y-4">
-                  {/* Main viewer */}
                   <div className="flex items-center justify-center rounded-2xl border bg-white p-3">
                     <img
                       src={attachUrls[Math.min(activeIdx, attachUrls.length - 1)]}
@@ -431,7 +317,6 @@ export default function PartnerLeadsClient() {
                     />
                   </div>
 
-                  {/* Thumbnails row */}
                   <div className="flex max-w-full gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {attachUrls.map((u, i) => {
                       const active = i === activeIdx;
@@ -447,12 +332,7 @@ export default function PartnerLeadsClient() {
                           style={{ width: 110, height: 80 }}
                           aria-label={`Open image ${i + 1}`}
                         >
-                          <img
-                            src={u}
-                            alt="Lead thumbnail"
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
+                          <img src={u} alt="Lead thumbnail" className="h-full w-full object-cover" loading="lazy" />
                         </button>
                       );
                     })}

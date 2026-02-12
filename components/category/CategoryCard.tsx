@@ -15,7 +15,7 @@ export default function CategoryCard({ category }: Props) {
   return (
     <Link href={`/${category.slug}`} className="block">
       <article className="rounded-xl border p-4 hover:shadow-md transition">
-        <h3 className="text-lg font-medium">{category.name}</h3>
+        <h3 className="text-lg text-center font-medium">{category.name}</h3>
         {/* тут можно добавить описание/иконку */}
       </article>
     </Link>
