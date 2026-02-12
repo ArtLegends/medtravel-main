@@ -43,6 +43,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+    // 1) узнаем user уже по сессии
+    const { data: u } = await supabase.auth.getUser();
+    const user = u?.user;
+
+    if (user?.id) {
+        // 2) подтвердим email (т.к. вход по magic link — это и есть подтверждение)
+        // ВАЖНО: это нужно делать через service role (createServiceClient)
+        const sb = (await import("@/lib/supabase/serviceClient")).createServiceClient();
+
+        await sb.auth.admin.updateUserById(user.id, { email_confirm: true });
+
+        await sb.from("profiles").update({ email_verified: true }).eq("id", user.id);
+    }
+
   // по желанию: можно сделать редирект ответом
   // но проще: фронт сам сделает router.replace(next)
   return res;
