@@ -13,15 +13,24 @@ type Props = {
   buttonClassName?: string;
 };
 
-function fireForm1Step() {
-  // 1) универсально для GTM
-  (window as any).dataLayer?.push?.({ event: "form1step" });
+function fireForm1Step(meta?: { source?: string; patient_email_sent?: boolean }) {
+  // 1) можно оставить — пригодится для GTM в будущем, и для метрики ecommerce
+  (window as any).dataLayer = (window as any).dataLayer || [];
+  (window as any).dataLayer.push({
+    event: "lead_submit",
+    form_name: "hair-transplant-lp",
+    ...meta,
+  });
 
-  // 2) если у тебя подключена метрика и ты хочешь goal
-  // (window as any).ym?.(<COUNTER_ID>, "reachGoal", "form1step");
+  // 2) GA4 (важно: НЕ передавать email/phone — это PII)
+  (window as any).gtag?.("event", "generate_lead", {
+    form_name: "hair-transplant-lp",
+    source: meta?.source || "hair-transplant-lp",
+    patient_email_sent: Boolean(meta?.patient_email_sent),
+  });
 
-  // 3) на всякий — кастомное событие
-  window.dispatchEvent(new Event("form1step"));
+  // 3) optional: DOM event
+  window.dispatchEvent(new Event("lead_submit"));
 }
 
 export default function LeadForm({
@@ -68,7 +77,10 @@ export default function LeadForm({
 
       setOk(true);
       setPatientEmailSent(Boolean(json?.patient?.emailSent));
-      fireForm1Step();
+      fireForm1Step({
+        source: "hair-transplant-lp",
+        patient_email_sent: Boolean(json?.patient?.emailSent),
+      });
 
       onSubmitted?.();
 

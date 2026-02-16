@@ -12647,3 +12647,308 @@ end;
 -------------------------------------
 
 отлично, теперь идем дальше. нам нужно создать новый раздел в партнерской панели с таким путем - app\(partner)\partner\leads\page.tsx, (в сайдбаре я его уже добавил). в этот раздел должны будут приходить лиды, сейчас объясню как. вот каким должен быть флоу: пользователь заполняет и отправляет форму на нашем лендинге, данные с формы у нас уже приходят в раздел админ панели Partner Leads(до этого момента мы уже реализовали), далее админ должен вручную распределить этот лид кому-то из партнеров и уже выбранному партнеру в раздел Leads его партнерской панели должен прийти его лид. то есть из готового раздела Partner Leads в админ панели нужно сделать раздел управления лидами, чтобы не только собирать эти лиды, но и распределять их партнерам. сейчас мы будем реализовывать ручное распределение лидов, но в последствии дойдем и до автоматического распределения, так что имей в виду при реализации. также смотри скриншоты, в админ панели у нас еще есть раздел Partners, в котором находятся зарегистрированные партнеры(в кратце объясню, это пользователи которые зарегистрировались партнерами и подали заявку на какую-либо программу, эта заявка пришла админу в раздел Partners и в нем уже админ модерирует его заявку на получение реферальной ссылки на конкретную программу, их всего две: для категории Dentistry и категории Hair Transplant). сам функционал распределения реализуем в разделе Partner Leads, партнеры для распределения будут браться из supabase, то есть пользователи у которых роль partner. еще я тебе загрузил файл lib\supabase\types.ts типов таблиц и тд. из supabase, прочитай, изучи его, там много чего есть. components\admin\PartnerLeadsClient.tsx: """ "use client"; import { useEffect, useMemo, useState } from "react"; type Row = { id: string; source: string; full_name: string; phone: string; email: string; age: number | null; image_paths: string[]; status: string; admin_note: string | null; created_at: string; }; function fmt(dt?: string | null) { if (!dt) return "—"; try { return new Date(dt).toLocaleString(); } catch { return dt; } } export default function PartnerLeadsClient() { const [status, setStatus] = useState<"all" | "new">("all"); const [q, setQ] = useState(""); const [items, setItems] = useState<Row[]>([]); const [total, setTotal] = useState(0); const [limit] = useState(20); const [offset, setOffset] = useState(0); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null); // modal const [attachOpen, setAttachOpen] = useState(false); const [attachUrls, setAttachUrls] = useState<string[]>([]); const [attachTitle, setAttachTitle] = useState("Images"); const [activeIdx, setActiveIdx] = useState(0); const canPrev = offset > 0; const canNext = offset + limit < total; const queryUrl = useMemo(() => { const sp = new URLSearchParams(); sp.set("status", status); if (q.trim()) sp.set("q", q.trim()); sp.set("limit", String(limit)); sp.set("offset", String(offset)); return /api/admin/partner-leads?${sp.toString()}; }, [status, q, limit, offset]); async function readError(res: Response) { const ct = res.headers.get("content-type") ?? ""; if (ct.includes("application/json")) { const j = await res.json().catch(() => null); return j?.error ? String(j.error) : JSON.stringify(j); } return ${res.status} ${res.statusText}; } async function load() { setError(null); setBusy(true); try { const res = await fetch(queryUrl, { cache: "no-store" }); if (!res.ok) throw new Error(await readError(res)); const json = await res.json().catch(() => ({})); setItems(json.items ?? []); setTotal(Number(json.total ?? 0)); } catch (e: any) { setError(String(e?.message ?? e)); } finally { setBusy(false); } } useEffect(() => { load(); // eslint-disable-next-line react-hooks/exhaustive-deps }, [queryUrl]); async function openImages(r: Row) { setBusy(true); setError(null); try { const paths = (r.image_paths ?? []) .map((p) => String(p ?? "").trim()) .filter(Boolean) .slice(0, 3); if (!paths.length) { setAttachTitle(Images for ${r.full_name}); setAttachUrls([]); setAttachOpen(true); return; } // ВАЖНО: endpoint возвращает image bytes, поэтому URL = сам endpoint с path const urls = paths.map( (p) => /api/admin/partner-leads/images?path=${encodeURIComponent(p)} ); setAttachTitle(Images for ${r.full_name}); setAttachUrls(urls); setActiveIdx(0); setAttachOpen(true); } catch (e: any) { setError(String(e?.message ?? e)); } finally { setBusy(false); } } useEffect(() => { if (!attachOpen) return; const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setAttachOpen(false); setAttachUrls([]); setActiveIdx(0); } }; document.addEventListener("keydown", onKey); const prev = document.body.style.overflow; document.body.style.overflow = "hidden"; return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; }; }, [attachOpen]); return ( <div className="p-6 space-y-5"> <div className="flex items-start justify-between gap-4"> <div> <h1 className="text-xl font-semibold">Partner Leads</h1> <p className="text-sm text-slate-500">Leads from landing forms</p> </div> <button onClick={() => load()} disabled={busy} className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60" > Refresh </button> </div> {error ? ( <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"> {error} </div> ) : null} <div className="rounded-2xl border bg-white p-4 space-y-4"> <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"> <div className="flex gap-2 flex-wrap"> {(["all", "new"] as const).map((s) => ( <button key={s} onClick={() => { setOffset(0); setStatus(s); }} className={[ "rounded-full px-3 py-1 text-sm border", status === s ? "bg-emerald-600 text-white border-emerald-600" : "border-slate-200 hover:bg-slate-50", ].join(" ")} > {s} </button> ))} </div> <div className="flex gap-2"> <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name / phone / email..." className="h-9 w-72 rounded-lg border border-slate-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200" /> <button disabled={busy} onClick={() => { setOffset(0); load(); }} className="h-9 rounded-lg border border-slate-200 px-3 text-sm hover:bg-slate-50 disabled:opacity-60" > Search </button> </div> </div> <div className="text-sm text-slate-500"> Showing <b>{items.length}</b> of <b>{total}</b> </div> <div className="overflow-x-auto"> <table className="w-full text-sm"> <thead> <tr className="text-left border-b"> <th className="py-2 pr-3">Name</th> <th className="py-2 pr-3">Phone</th> <th className="py-2 pr-3">Email</th> <th className="py-2 pr-3">Age</th> <th className="py-2 pr-3">Created</th> <th className="py-2 pr-3">Images</th> <th className="py-2 pr-3">Source</th> </tr> </thead> <tbody> {items.map((r) => ( <tr key={r.id} className="border-b last:border-b-0"> <td className="py-3 pr-3"> <div className="font-medium text-slate-900">{r.full_name}</div> <div className="text-xs text-slate-500">{r.id}</div> </td> <td className="py-3 pr-3">{r.phone}</td> <td className="py-3 pr-3">{r.email}</td> <td className="py-3 pr-3">{r.age ?? "—"}</td> <td className="py-3 pr-3">{fmt(r.created_at)}</td> <td className="py-3 pr-3"> {r.image_paths?.length ? ( <button type="button" onClick={() => openImages(r)} disabled={busy} className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60" > View ({Math.min(3, r.image_paths.length)}) </button> ) : ( <span className="text-xs text-slate-500">—</span> )} </td> <td className="py-3 pr-3 text-slate-600">{r.source}</td> </tr> ))} {!items.length ? ( <tr> <td colSpan={7} className="py-8 text-center text-slate-500"> No leads found </td> </tr> ) : null} </tbody> </table> </div> <div className="flex items-center justify-between"> <button disabled={busy || !canPrev} onClick={() => setOffset((o) => Math.max(0, o - limit))} className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60" > ← Prev </button> <div className="text-sm text-slate-500"> Page {Math.floor(offset / limit) + 1} / {Math.max(1, Math.ceil(total / limit))} </div> <button disabled={busy || !canNext} onClick={() => setOffset((o) => o + limit)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60" > Next → </button> </div> </div> {attachOpen && ( <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onMouseDown={() => { setAttachOpen(false); setAttachUrls([]); setActiveIdx(0); }} > <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl" onMouseDown={(e) => e.stopPropagation()} > <div className="flex items-center justify-between border-b px-4 py-3"> <div className="text-sm font-semibold text-gray-900">{attachTitle}</div> <button type="button" onClick={() => { setAttachOpen(false); setAttachUrls([]); setActiveIdx(0); }} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50" aria-label="Close" > ✕ </button> </div> <div className="bg-gray-50 p-4"> {!attachUrls.length ? ( <div className="text-sm text-gray-600">No images.</div> ) : ( <div className="space-y-4"> {/* Main viewer */} <div className="flex items-center justify-center rounded-2xl border bg-white p-3"> <img src={attachUrls[Math.min(activeIdx, attachUrls.length - 1)]} alt="Lead image" className="h-[60vh] w-full max-w-full rounded-xl object-contain" /> </div> {/* Thumbnails row */} <div className="flex max-w-full gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"> {attachUrls.map((u, i) => { const active = i === activeIdx; return ( <button key={u} type="button" onClick={() => setActiveIdx(i)} className={[ "shrink-0 overflow-hidden rounded-xl border bg-white", active ? "ring-2 ring-emerald-400 border-emerald-300" : "hover:border-slate-300", ].join(" ")} style={{ width: 110, height: 80 }} aria-label={Open image ${i + 1}} > <img src={u} alt="Lead thumbnail" className="h-full w-full object-cover" loading="lazy" /> </button> ); })} </div> <div className="text-xs text-slate-500"> {activeIdx + 1} / {attachUrls.length} </div> </div> )} </div> </div> </div> )} </div> ); } """ ddl public.profiles: """ create table public.profiles ( id uuid not null, first_name text null, last_name text null, email text not null, phone text null, role text not null default 'guest'::text, date_of_birth date null, locale text not null default 'en'::text, created_at timestamp with time zone not null default now(), updated_at timestamp with time zone null, email_verified boolean not null default false, constraint profiles_pkey primary key (id), constraint profiles_email_key unique (email), constraint profiles_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE, constraint profiles_role_check check ( ( role = any ( array[ 'guest'::text, 'patient'::text, 'customer'::text, 'partner'::text, 'admin'::text ] ) ) ) ) TABLESPACE pg_default; create trigger _profiles_updated_at BEFORE update on profiles for EACH row execute FUNCTION set_updated_at (); create trigger set_updated_at_on_profiles BEFORE update on profiles for EACH row execute FUNCTION set_updated_at (); create trigger trg_profiles_updated BEFORE update on profiles for EACH row execute FUNCTION set_updated_at (); create trigger trg_profiles_updated_at BEFORE update on profiles for EACH row execute FUNCTION set_updated_at (); """ ddl public.user_roles: """ create table public.user_roles ( user_id uuid not null, role text not null, constraint user_roles_pkey primary key (user_id, role), constraint user_roles_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE, constraint user_roles_role_check check ( ( role = any ( array[ 'admin'::text, 'customer'::text, 'partner'::text, 'patient'::text ] ) ) ) ) TABLESPACE pg_default; create unique INDEX IF not exists user_roles_user_id_role_uniq on public.user_roles using btree (user_id, role) TABLESPACE pg_default; """ в общем нужно составить четкий план разработки функционала, чтобы потом не было проблем. также говори если тебе что-то надо, я не могу тебе дать все что есть, но если ты попросишь что-то конкретное, я без проблем предоставлю тебе файлы, таблицы, rpc функции, rls политики таблиц и так далее.
+
+------------------------------
+
+хорошо, я чуть позже дам AuthLoginClient, сейчас нужно срочно разобраться с другим.
+в компоненте формы мы же реализовали событие form1step, но оно не рабочее. объясни как оно должно работать, что это такое и тд. потому что я не нашел нигде конкретно определение form1step, но насколько понял это трекинг после отправки формы. нам нужно связать тогда нашу форму с лендинга с google analytics(личный кабинет гугл аналитики у меня есть, главное чтобы это можно было реализовать с любой формой, а не только с google form).
+
+app\ru\hair-transplant\lp\_components\LeadForm.tsx: """
+'use client';
+
+import { useMemo, useState } from "react";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import LeadImageUpload from "./LeadImageUpload";
+
+type Props = {
+  submitText?: string;
+  onSubmitted?: () => void;
+  className?: string;
+  disclaimerText?: string;
+  buttonClassName?: string;
+};
+
+function fireForm1Step() {
+  // 1) универсально для GTM
+  (window as any).dataLayer?.push?.({ event: "form1step" });
+
+  // 2) если у тебя подключена метрика и ты хочешь goal
+  // (window as any).ym?.(<COUNTER_ID>, "reachGoal", "form1step");
+
+  // 3) на всякий — кастомное событие
+  window.dispatchEvent(new Event("form1step"));
+}
+
+export default function LeadForm({
+  submitText = "Отправить",
+  onSubmitted,
+  className,
+  disclaimerText = "Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности",
+  buttonClassName,
+}: Props) {
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [age, setAge] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  const [patientEmailSent, setPatientEmailSent] = useState(false);
+
+  const canSubmit = useMemo(() => {
+    return fullName.trim() && phone.trim() && email.trim();
+  }, [fullName, phone, email]);
+
+  async function submit() {
+    setError(null);
+    setOk(false);
+    setPatientEmailSent(false);
+    setBusy(true);
+
+    try {
+      const fd = new FormData();
+      fd.set("source", "hair-transplant-lp");
+      fd.set("full_name", fullName.trim());
+      fd.set("phone", phone.trim());
+      fd.set("email", email.trim());
+      if (age.trim()) fd.set("age", age.trim());
+      files.slice(0, 3).forEach((f) => fd.append("images", f));
+
+      const res = await fetch("/api/leads/partner", { method: "POST", body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Submit failed");
+
+      setOk(true);
+      setPatientEmailSent(Boolean(json?.patient?.emailSent));
+      fireForm1Step();
+
+      onSubmitted?.();
+
+      // опционально: очистить форму
+      setFullName("");
+      setPhone("");
+      setEmail("");
+      setAge("");
+      setFiles([]);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className={className ?? "space-y-3"}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!canSubmit || busy) return;
+        submit();
+      }}
+    >
+      <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+      <Input placeholder="Телефон*" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <Input placeholder="Email*" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
+
+      <div className="mt-4">
+        <LeadImageUpload files={files} onFilesChange={setFiles} />
+      </div>
+
+      {ok ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Спасибо! Мы получили заявку и свяжемся с вами.
+        </div>
+      ) : null}
+
+      {ok && patientEmailSent ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <Button type="submit" className={buttonClassName ?? "w-full"} size="lg" disabled={!canSubmit || busy}>
+        {busy ? "Отправляем..." : submitText}
+      </Button>
+
+      <p className="text-center text-xs text-slate-500">{disclaimerText}</p>
+    </form>
+  );
+}
+"""
+
+----------------------------------
+
+у нас оказывается вообще не был поставлен google tag manager.
+я надеюсь это он, взял в гугл аналитике: """
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0JF7EP829T"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-0JF7EP829T');
+</script>
+"""
+так что давай его поставим и идеально все настроим как в файлах, так и в самой гугл аналитике.
+
+app\layout.tsx: """
+// app/layout.tsx
+import type { Metadata, Viewport } from "next";
+import { Roboto } from "next/font/google";
+import { headers, cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+
+import "@/styles/globals.css";
+import { detectLocale } from "@/lib/i18n-server";
+import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
+import ThemeRoot from "@/components/ThemeRoot";
+import AppChrome from "@/components/layout/AppChrome";
+import Script from "next/script";
+
+// Font
+const roboto = Roboto({
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+  variable: "--font-roboto",
+  weight: ["300", "400", "500", "700"],
+  preload: true,
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: "MedTravel — Medical Tourism Platform",
+    template: "%s | MedTravel",
+  },
+  description:
+    "MedTravel connects patients with verified clinics worldwide. Compare treatments and book a consultation safely.",
+  keywords: ["medical tourism","clinics","treatments","healthcare abroad","medtravel"],
+  authors: [{ name: "MedTravel Team" }],
+  creator: "MedTravel",
+  publisher: "MedTravel",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://medtravel.me",
+    siteName: "MedTravel",
+    title: "MedTravel — Medical Tourism Platform",
+    description: "Find the best clinics and treatments abroad. Request a free consultation.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MedTravel — Medical Tourism Platform",
+    description: "Find the best clinics and treatments abroad. Request a free consultation.",
+    creator: "@medtravel",
+  },
+  metadataBase: new URL("https://medtravel.me"),
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F4F4F5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C0C0E" },
+  ],
+};
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers();
+  const acceptLanguage = headersList.get("accept-language");
+  const locale = detectLocale(acceptLanguage || undefined);
+
+  // server-side session
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll().map(c => ({ name: c.name, value: c.value })),
+        setAll: () => {}, // не меняем куки тут
+      },
+    }
+  );
+  const { data } = await supabase.auth.getSession();
+
+  return (
+    <html suppressHydrationWarning className={roboto.variable} lang={locale}>
+      <head>
+        <link href="//fonts.googleapis.com" rel="dns-prefetch" />
+        <link href="//api.supabase.co" rel="dns-prefetch" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <style>{`:root{--site-header-h:64px}`}</style>
+      </head>
+      <body suppressHydrationWarning className={`${roboto.className} bg-background text-foreground antialiased`}>
+        {/* Yandex.Metrika counter */}
+        <Script
+          id="yandex-metrika"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+(function(m,e,t,r,i,k,a){
+  m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+  m[i].l=1*new Date();
+  for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+  k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+})(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=106694543', 'ym');
+
+ym(106694543, 'init', {
+  ssr:true,
+  webvisor:true,
+  clickmap:true,
+  ecommerce:"dataLayer",
+  referrer: document.referrer,
+  url: location.href,
+  accurateTrackBounce:true,
+  trackLinks:true
+});
+    `,
+          }}
+        />
+        <noscript>
+          <div>
+            <img
+              src="https://mc.yandex.ru/watch/106694543"
+              style={{ position: "absolute", left: "-9999px" }}
+              alt=""
+            />
+          </div>
+        </noscript>
+        {/* /Yandex.Metrika counter */}
+        <SupabaseProvider initialSession={data.session}>
+          <ThemeRoot>
+            <div id="app-root" className="relative z-0 flex min-h-screen flex-col">
+              <AppChrome>{children}</AppChrome>
+            </div>
+          </ThemeRoot>
+        </SupabaseProvider>
+      </body>
+    </html>
+  );
+}
+"""

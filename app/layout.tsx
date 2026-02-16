@@ -10,6 +10,7 @@ import { SupabaseProvider } from "@/lib/supabase/supabase-provider";
 import ThemeRoot from "@/components/ThemeRoot";
 import AppChrome from "@/components/layout/AppChrome";
 import Script from "next/script";
+import GAProvider from "@/components/analytics/GAProvider";
 
 // Font
 const roboto = Roboto({
@@ -19,6 +20,8 @@ const roboto = Roboto({
   weight: ["300", "400", "500", "700"],
   preload: true,
 });
+
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 export const metadata: Metadata = {
   title: {
@@ -134,7 +137,33 @@ ym(106694543, 'init', {
           </div>
         </noscript>
         {/* /Yandex.Metrika counter */}
+        {/* Google Analytics (gtag.js) */}
+        {GA_ID ? (
+          <>
+            <Script
+              id="ga-gtag-src"
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+            />
+            <Script
+              id="ga-gtag-init"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+window.gtag = gtag;
+gtag('js', new Date());
+
+// важно: отключаем авто page_view, потому что в SPA иначе будет криво/дубли
+gtag('config', '${GA_ID}', { send_page_view: false });
+          `,
+              }}
+            />
+          </>
+        ) : null}
         <SupabaseProvider initialSession={data.session}>
+        <GAProvider gaId={process.env.NEXT_PUBLIC_GA_ID || ""} />
           <ThemeRoot>
             <div id="app-root" className="relative z-0 flex min-h-screen flex-col">
               <AppChrome>{children}</AppChrome>
