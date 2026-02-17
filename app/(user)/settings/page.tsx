@@ -85,8 +85,7 @@ export default function SettingsPage() {
     return null;
   }
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePasswordSubmit = async () => {
     if (!supabase || !user) return;
 
     setPwStatus("idle");
@@ -107,6 +106,9 @@ export default function SettingsPage() {
     setPwSaving(true);
     const { error } = await supabase.auth.updateUser({
       password: pw.newPassword,
+      data: {
+        has_password: true,
+      },
     });
 
     if (error) {
@@ -114,6 +116,12 @@ export default function SettingsPage() {
       setPwError(error.message || "Failed to update password.");
     } else {
       setPwStatus("saved");
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .eq("type", "set_password")
+        .eq("is_read", false);
       setPw({ newPassword: "", confirm: "" });
     }
     setPwSaving(false);
@@ -391,7 +399,7 @@ export default function SettingsPage() {
             </div>
           ) : null}
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-sm text-gray-600">New password</label>
@@ -439,8 +447,9 @@ export default function SettingsPage() {
 
             <div className="flex items-center gap-3">
               <button
-                type="submit"
+                type="button"
                 disabled={pwSaving}
+                onClick={handlePasswordSubmit}
                 className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
                 {pwSaving ? "Saving…" : "Save password"}
@@ -450,7 +459,7 @@ export default function SettingsPage() {
                 If you use Google sign-in, password is optional.
               </span>
             </div>
-          </form>
+          </div>
         </section>
 
         <div className="flex items-center gap-3">
