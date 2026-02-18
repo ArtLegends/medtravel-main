@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { resendSend, partnerNewLeadTemplate } from "@/lib/mail/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function PATCH(req: NextRequest) {
   if (!isUuid(lead_id)) return NextResponse.json({ error: "Invalid lead_id" }, { status: 400 });
   if (!isUuid(partner_id)) return NextResponse.json({ error: "Invalid partner_id" }, { status: 400 });
 
-  // 3) update via service client
+  // 3) service client
   const admin = createServiceClient();
 
   // (опционально) убедимся что partner_id реально partner
@@ -48,6 +49,22 @@ export async function PATCH(req: NextRequest) {
   if (rcErr) return NextResponse.json({ error: rcErr.message }, { status: 500 });
   if (!roleCheck) return NextResponse.json({ error: "User is not a partner" }, { status: 400 });
 
+  // 4) прочитаем текущий lead, чтобы:
+  // - понять изменилось ли назначение (без миграций / без дублей)
+  // - взять данные лида для письма
+  const { data: before, error: beforeErr } = await admin
+    .from("partner_leads")
+    .select("id,assigned_partner_id,full_name,phone,email,source,created_at")
+    .eq("id", lead_id)
+    .maybeSingle();
+
+  if (beforeErr) return NextResponse.json({ error: beforeErr.message }, { status: 500 });
+  if (!before) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+
+  const prevPartnerId = before.assigned_partner_id ?? null;
+  const partnerChanged = prevPartnerId !== partner_id;
+
+  // 5) update lead
   const patch: any = {
     assigned_partner_id: partner_id,
     assigned_at: new Date().toISOString(),
@@ -67,5 +84,55 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, item: data });
+  // 6) email notify (best-effort: не ломаем assignment если email упал)
+  let emailSent = false;
+  let emailError: string | null = null;
+
+  if (partnerChanged) {
+    try {
+      // email партнёра берём из profiles
+      const { data: partnerProfile, error: pErr } = await admin
+        .from("profiles")
+        .select("email,first_name,last_name")
+        .eq("id", partner_id)
+        .maybeSingle();
+
+      if (pErr) throw new Error(pErr.message);
+      const partnerEmail = partnerProfile?.email?.trim();
+      if (!partnerEmail) throw new Error("Partner email not found in profiles");
+
+      const partnerName = `${partnerProfile?.first_name ?? ""} ${partnerProfile?.last_name ?? ""}`.trim() || null;
+
+      const origin = req.nextUrl.origin;
+      const leadsUrl = `${origin}/partner/leads`;
+
+      const tpl = partnerNewLeadTemplate({
+        partnerName,
+        leadsUrl,
+        lead: {
+          full_name: before.full_name,
+          phone: before.phone,
+          email: before.email,
+          source: before.source,
+          created_at: before.created_at,
+        },
+      });
+
+      await resendSend({ to: partnerEmail, subject: tpl.subject, html: tpl.html });
+      emailSent = true;
+    } catch (e: any) {
+      emailError = String(e?.message ?? e);
+      // не бросаем ошибку — assignment уже сделан
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    item: data,
+    email: {
+      attempted: partnerChanged,
+      sent: emailSent,
+      error: emailError,
+    },
+  });
 }

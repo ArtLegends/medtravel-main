@@ -80,3 +80,45 @@ export function patientMagicLinkTemplate(loginUrl: string) {
     `,
   };
 }
+
+export function partnerNewLeadTemplate(params: {
+  partnerName?: string | null;
+  leadsUrl: string;
+  lead: {
+    full_name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    source?: string | null;
+    created_at?: string | null;
+  };
+}) {
+  const partnerName = params.partnerName?.trim() || "Partner";
+  const leadName = params.lead.full_name?.trim() || "New lead";
+
+  return {
+    subject: `New lead assigned — MedTravel`,
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">New lead assigned ✅</h2>
+        <p style="margin:0 0 12px">Hi ${partnerName}, a new lead has been assigned to you.</p>
+
+        <div style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fafafa">
+          <div style="font-weight:600;margin:0 0 6px">${leadName}</div>
+          ${params.lead.phone ? `<div style="margin:0 0 4px;color:#374151"><b>Phone:</b> ${params.lead.phone}</div>` : ""}
+          ${params.lead.email ? `<div style="margin:0 0 4px;color:#374151"><b>Email:</b> ${params.lead.email}</div>` : ""}
+          ${params.lead.source ? `<div style="margin:0 0 4px;color:#6b7280;font-size:12px"><b>Source:</b> ${params.lead.source}</div>` : ""}
+          ${params.lead.created_at ? `<div style="margin:0;color:#6b7280;font-size:12px"><b>Created:</b> ${params.lead.created_at}</div>` : ""}
+        </div>
+
+        <a href="${params.leadsUrl}"
+           style="display:inline-block;margin-top:10px;padding:10px 14px;background:#10b981;color:white;text-decoration:none;border-radius:10px;font-weight:600">
+          Open Partner leads
+        </a>
+
+        <p style="margin:16px 0 0;color:#71717a;font-size:12px">
+          If you didn’t expect this email, just ignore it.
+        </p>
+      </div>
+    `,
+  };
+}
