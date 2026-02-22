@@ -442,8 +442,7 @@ export default function PatientsListClient() {
                   const isLocked = r.status === "cancelled_by_patient";
                   const isLead = (r.booking_method ?? "manual") === "automatic";
 
-                  const canViewAttachment =
-                    !busy && (isLead || Boolean(r.xray_path) || Boolean(r.photo_path));
+                  const canViewAttachment = !busy;
 
                   return (
                     <tr key={r.booking_id} className="border-t">
