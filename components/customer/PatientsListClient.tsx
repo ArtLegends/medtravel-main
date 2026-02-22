@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 
 type Status = "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
+type BookingMethod = "manual" | "automatic";
 
 type Row = {
   booking_id: string;
@@ -11,15 +12,22 @@ type Row = {
   patient_public_id: number | null;
   patient_name: string | null;
   phone: string | null;
+
   service_name: string | null;
   status: Status;
+
+  booking_method: BookingMethod | null;
+
   pre_cost: number | null;
   currency: string | null;
   actual_cost: number | null;
+
   created_at: string;
   clinic_name: string | null;
+
   xray_path: string | null;
   photo_path: string | null;
+
   preferred_date: string | null;
   preferred_time: string | null;
   scheduled_at: string | null;
@@ -38,13 +46,11 @@ const RU_DT = new Intl.DateTimeFormat("ru-RU", {
 function fmtPreferred(d: string | null, t: string | null) {
   if (!d) return "—";
 
-  // d приходит как "YYYY-MM-DD"
   const [yyyy, mm, dd] = d.split("-");
   const date = `${dd}.${mm}.${yyyy}`;
 
   if (!t) return date;
 
-  // t может быть "10:00" или "10:00:00" — режем до HH:MM
   const time = t.slice(0, 5);
   return `${date}, ${time}`;
 }
@@ -53,8 +59,6 @@ function fmtScheduled(ts: string | null) {
   if (!ts) return "—";
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return ts;
-
-  // будет "02.02.2026, 14:00"
   return RU_DT.format(d);
 }
 
@@ -65,7 +69,6 @@ function fmtMoney(v: number | null, cur: string | null) {
 
 function normalizeTime(t: string | null) {
   if (!t) return "";
-  // "10:00:00" -> "10:00"
   const m = t.match(/^(\d{2}:\d{2})/);
   return m ? m[1] : t;
 }
@@ -86,18 +89,20 @@ export default function PatientsListClient() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // attachments modal (like admin)
   const [attachOpen, setAttachOpen] = useState(false);
-  const [attachUrl, setAttachUrl] = useState<string | null>(null);
-  const [attachTitle, setAttachTitle] = useState<string>("Attachment");
-
+  const [attachUrls, setAttachUrls] = useState<string[]>([]);
+  const [attachTitle, setAttachTitle] = useState<string>("Attachments");
+  const [activeIdx, setActiveIdx] = useState(0);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const abortRef = useRef<AbortController | null>(null);
 
+  // schedule modal
   const [schedOpen, setSchedOpen] = useState(false);
   const [schedBookingId, setSchedBookingId] = useState<string | null>(null);
-  const [schedDate, setSchedDate] = useState<string>(""); // yyyy-mm-dd
-  const [schedTime, setSchedTime] = useState<string>(""); // HH:MM
+  const [schedDate, setSchedDate] = useState<string>("");
+  const [schedTime, setSchedTime] = useState<string>("");
   const [schedTitle, setSchedTitle] = useState<string>("Schedule appointment");
 
   function openSchedule(r: Row) {
@@ -105,7 +110,6 @@ export default function PatientsListClient() {
     setSchedTitle(`Schedule for ${r.patient_name ?? "patient"}`);
     setSchedTime(normalizeTime(r.preferred_time));
 
-    // prefill: scheduled_at -> date/time, иначе preferred_date/time
     if (r.scheduled_at) {
       const d = new Date(r.scheduled_at);
       const yyyy = d.getFullYear();
@@ -123,10 +127,18 @@ export default function PatientsListClient() {
     setSchedOpen(true);
   }
 
+  async function readError(res: Response) {
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct.includes("application/json")) {
+      const j = await res.json().catch(() => null);
+      return j?.error ? String(j.error) : JSON.stringify(j);
+    }
+    return `${res.status} ${res.statusText}`;
+  }
+
   async function saveSchedule() {
     if (!schedBookingId) return;
 
-    // можно разрешить сохранить только дату без времени — тогда ставим 00:00
     const date = schedDate.trim();
     if (!date) {
       setErr("Please select a date.");
@@ -150,7 +162,6 @@ export default function PatientsListClient() {
       });
       if (!res.ok) throw new Error(await readError(res));
 
-      // оптимистично обновим локально (чтобы не ждать realtime)
       setItems((prev) =>
         prev.map((r) => (r.booking_id === schedBookingId ? { ...r, scheduled_at: local.toISOString() } : r))
       );
@@ -164,22 +175,35 @@ export default function PatientsListClient() {
     }
   }
 
-  async function readError(res: Response) {
-    const ct = res.headers.get("content-type") ?? "";
-    if (ct.includes("application/json")) {
-      const j = await res.json().catch(() => null);
-      return j?.error ? String(j.error) : JSON.stringify(j);
-    }
-    return `${res.status} ${res.statusText}`;
-  }
-
   async function openAttachment(r: Row) {
     setBusy(true);
     setErr(null);
 
     try {
-      let endpoint: string | null = null;
+      // 1) lead images first
+      {
+        const res = await fetch(
+          `/api/customer/patients/${encodeURIComponent(r.booking_id)}/lead-images`,
+          { cache: "no-store" }
+        );
 
+        if (res.ok) {
+          const j = await res.json().catch(() => ({}));
+          const urls: string[] = (j?.urls ?? []).filter(Boolean);
+
+          if (urls.length) {
+            setAttachTitle("Lead images");
+            setAttachUrls(urls);
+            setActiveIdx(0);
+            setAttachOpen(true);
+            return;
+          }
+        }
+        // ignore any errors and fallback
+      }
+
+      // 2) classic xray/photo single
+      let endpoint: string | null = null;
       if (r.xray_path) endpoint = `/api/customer/patients/${encodeURIComponent(r.booking_id)}/xray-url`;
       else if (r.photo_path) endpoint = `/api/customer/patients/${encodeURIComponent(r.booking_id)}/photo-url`;
 
@@ -199,9 +223,9 @@ export default function PatientsListClient() {
         return;
       }
 
-      // ✅ вместо редиректа
       setAttachTitle(r.xray_path ? "X-ray attachment" : "Photo attachment");
-      setAttachUrl(url);
+      setAttachUrls([url]);
+      setActiveIdx(0);
       setAttachOpen(true);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -209,7 +233,6 @@ export default function PatientsListClient() {
       setBusy(false);
     }
   }
-
 
   async function load(p = page) {
     abortRef.current?.abort();
@@ -270,7 +293,8 @@ export default function PatientsListClient() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setAttachOpen(false);
-        setAttachUrl(null);
+        setAttachUrls([]);
+        setActiveIdx(0);
       }
     };
 
@@ -374,7 +398,6 @@ export default function PatientsListClient() {
             <option value="confirmed">Confirmed</option>
             <option value="cancelled">Cancelled</option>
             <option value="completed">Completed</option>
-
             <option value="cancelled_by_patient" disabled>
               Cancelled by Patient
             </option>
@@ -417,13 +440,28 @@ export default function PatientsListClient() {
               ) : (
                 items.map((r) => {
                   const isLocked = r.status === "cancelled_by_patient";
+                  const isLead = (r.booking_method ?? "manual") === "automatic";
+
+                  const canViewAttachment =
+                    !busy && (isLead || Boolean(r.xray_path) || Boolean(r.photo_path));
 
                   return (
                     <tr key={r.booking_id} className="border-t">
                       <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
                         {r.patient_public_id ? `#${r.patient_public_id}` : "—"}
                       </td>
-                      <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span>{r.patient_name ?? "—"}</span>
+                          {isLead ? (
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                              Landing lead
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+
                       <td className="px-4 py-3">{r.phone ?? "—"}</td>
                       <td className="px-4 py-3">{r.service_name ?? "—"}</td>
                       <td className="px-4 py-3">{fmtPreferred(r.preferred_date, r.preferred_time)}</td>
@@ -451,7 +489,12 @@ export default function PatientsListClient() {
                           <button
                             type="button"
                             onClick={() => openSchedule(r)}
-                            disabled={busy || r.status === "cancelled_by_patient" || r.status === "cancelled" || r.status === "completed"}
+                            disabled={
+                              busy ||
+                              r.status === "cancelled_by_patient" ||
+                              r.status === "cancelled" ||
+                              r.status === "completed"
+                            }
                             className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-60"
                           >
                             Schedule
@@ -460,8 +503,8 @@ export default function PatientsListClient() {
                           <button
                             type="button"
                             onClick={() => openAttachment(r)}
-                            disabled={busy || (!r.xray_path && !r.photo_path)}
-                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 disabled:pointer-events-none"
+                            disabled={!canViewAttachment}
+                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
                           >
                             View attachment
                           </button>
@@ -476,7 +519,6 @@ export default function PatientsListClient() {
                           </button>
                         </div>
                       </td>
-
                     </tr>
                   );
                 })
@@ -490,29 +532,38 @@ export default function PatientsListClient() {
             Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
           </div>
           <div className="flex gap-2">
-            <button disabled={busy || page <= 1} onClick={() => load(page - 1)} className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60">
+            <button
+              disabled={busy || page <= 1}
+              onClick={() => load(page - 1)}
+              className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60"
+            >
               Prev
             </button>
-            <button disabled={busy || page >= totalPages} onClick={() => load(page + 1)} className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60">
+            <button
+              disabled={busy || page >= totalPages}
+              onClick={() => load(page + 1)}
+              className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60"
+            >
               Next
             </button>
           </div>
         </div>
       </div>
 
+      {/* Attachments modal (admin-like) */}
       {attachOpen && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
           onMouseDown={() => {
             setAttachOpen(false);
-            setAttachUrl(null);
+            setAttachUrls([]);
+            setActiveIdx(0);
           }}
         >
           <div
             className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl"
-            onMouseDown={(e) => e.stopPropagation()} // ✅ клики внутри не закрывают
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="text-sm font-semibold text-gray-900">{attachTitle}</div>
 
@@ -520,7 +571,8 @@ export default function PatientsListClient() {
                 type="button"
                 onClick={() => {
                   setAttachOpen(false);
-                  setAttachUrl(null);
+                  setAttachUrls([]);
+                  setActiveIdx(0);
                 }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
                 aria-label="Close"
@@ -529,24 +581,60 @@ export default function PatientsListClient() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="bg-gray-50 p-4">
-              {attachUrl ? (
-                <div className="flex justify-center">
-                  <img
-                    src={attachUrl}
-                    alt={attachTitle}
-                    className="max-h-[75vh] w-auto max-w-full rounded-xl border bg-white object-contain"
-                  />
-                </div>
-              ) : (
+              {!attachUrls.length ? (
                 <div className="text-sm text-gray-600">No attachment.</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center rounded-2xl border bg-white p-3">
+                    <img
+                      src={attachUrls[Math.min(activeIdx, attachUrls.length - 1)]}
+                      alt="Attachment"
+                      className="h-[60vh] w-full max-w-full rounded-xl object-contain"
+                    />
+                  </div>
+
+                  {attachUrls.length > 1 ? (
+                    <div className="flex max-w-full gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {attachUrls.map((u, i) => {
+                        const active = i === activeIdx;
+                        return (
+                          <button
+                            key={u}
+                            type="button"
+                            onClick={() => setActiveIdx(i)}
+                            className={[
+                              "shrink-0 overflow-hidden rounded-xl border bg-white",
+                              active
+                                ? "ring-2 ring-emerald-400 border-emerald-300"
+                                : "hover:border-slate-300",
+                            ].join(" ")}
+                            style={{ width: 110, height: 80 }}
+                            aria-label={`Open image ${i + 1}`}
+                          >
+                            <img
+                              src={u}
+                              alt="Attachment thumbnail"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  <div className="text-xs text-slate-500">
+                    {activeIdx + 1} / {attachUrls.length}
+                  </div>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
+      {/* Schedule modal */}
       {schedOpen && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
@@ -620,7 +708,6 @@ export default function PatientsListClient() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

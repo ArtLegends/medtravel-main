@@ -1,3 +1,4 @@
+// app/api/admin/partner-leads/assign/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
@@ -29,7 +30,7 @@ export async function PATCH(req: NextRequest) {
   // 2) body
   const body = await req.json().catch(() => null);
   const lead_id = String(body?.lead_id ?? "").trim();
-  const partner_id = String(body?.partner_id ?? "").trim();
+  const partner_id = String(body?.partner_id ?? "").trim(); // (исторически) в UI поле называется partner_id, но это customer user_id
   const note = String(body?.note ?? "").trim().slice(0, 500);
 
   if (!isUuid(lead_id)) return NextResponse.json({ error: "Invalid lead_id" }, { status: 400 });
@@ -38,20 +39,18 @@ export async function PATCH(req: NextRequest) {
   // 3) service client
   const admin = createServiceClient();
 
-  // (опционально) убедимся что partner_id реально partner
+  // 3.1) убедимся что user реально customer
   const { data: roleCheck, error: rcErr } = await admin
     .from("user_roles")
     .select("user_id")
     .eq("user_id", partner_id)
-    .eq("role", "partner")
+    .eq("role", "customer")
     .maybeSingle();
 
   if (rcErr) return NextResponse.json({ error: rcErr.message }, { status: 500 });
-  if (!roleCheck) return NextResponse.json({ error: "User is not a partner" }, { status: 400 });
+  if (!roleCheck) return NextResponse.json({ error: "User is not a customer" }, { status: 400 });
 
-  // 4) прочитаем текущий lead, чтобы:
-  // - понять изменилось ли назначение (без миграций / без дублей)
-  // - взять данные лида для письма
+  // 4) прочитаем текущий lead (до обновления)
   const { data: before, error: beforeErr } = await admin
     .from("partner_leads")
     .select("id,assigned_partner_id,full_name,phone,email,source,created_at")
@@ -62,9 +61,75 @@ export async function PATCH(req: NextRequest) {
   if (!before) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
   const prevPartnerId = before.assigned_partner_id ?? null;
-  const partnerChanged = prevPartnerId !== partner_id;
+  const customerChanged = String(prevPartnerId ?? "") !== String(partner_id);
 
-  // 5) update lead
+  // 5) resolve clinic_id by customer user_id
+  const { data: mem, error: memErr } = await admin
+    .from("customer_clinic_membership")
+    .select("clinic_id")
+    .eq("user_id", partner_id)
+    .maybeSingle();
+
+  if (memErr) return NextResponse.json({ error: memErr.message }, { status: 500 });
+  if (!mem?.clinic_id) return NextResponse.json({ error: "Customer has no clinic membership" }, { status: 400 });
+
+  const clinicId = String(mem.clinic_id);
+
+  // 6) resolve patient_id by lead email
+  const leadEmail = String(before.email ?? "").trim().toLowerCase();
+  const { data: pat, error: patErr } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", leadEmail)
+    .maybeSingle();
+
+  if (patErr) return NextResponse.json({ error: patErr.message }, { status: 500 });
+  if (!pat?.id) return NextResponse.json({ error: "Patient profile not found for lead email" }, { status: 400 });
+
+  const patientId = String(pat.id);
+
+  // 7) create booking from lead (ТОЛЬКО если customerChanged)
+  //    + защита от дублей: ищем booking с таким lead маркером
+  const leadMarker = `[lead:${lead_id}]`;
+
+  let bookingId: string | null = null;
+
+  if (customerChanged) {
+    // 7.1) check duplicate booking (same clinic + same patient + same marker in notes)
+    const { data: exists, error: exErr } = await admin
+      .from("patient_bookings")
+      .select("id")
+      .eq("clinic_id", clinicId)
+      .eq("patient_id", patientId)
+      .ilike("notes", `%${leadMarker}%`)
+      .maybeSingle();
+
+    if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
+
+    bookingId = exists?.id ?? null;
+
+    if (!bookingId) {
+      const { data: booking, error: bookErr } = await admin
+        .from("patient_bookings")
+        .insert({
+          patient_id: patientId,
+          clinic_id: clinicId,
+          service_id: 803, // Hair Transplant
+          booking_method: "automatic", // лид
+          status: "pending",
+          full_name: before.full_name,
+          phone: before.phone,
+          notes: `${leadMarker} Landing lead (${before.source ?? "unknown"})`,
+        })
+        .select("id")
+        .single();
+
+      if (bookErr) return NextResponse.json({ error: bookErr.message }, { status: 500 });
+      bookingId = booking?.id ?? null;
+    }
+  }
+
+  // 8) update lead assignment
   const patch: any = {
     assigned_partner_id: partner_id,
     assigned_at: new Date().toISOString(),
@@ -78,37 +143,37 @@ export async function PATCH(req: NextRequest) {
     .update(patch)
     .eq("id", lead_id)
     .select(
-      "id,source,full_name,phone,email,age,image_paths,status,admin_note,created_at,assigned_partner_id,assigned_at,assigned_by,assigned_note"
+      "id,source,full_name,phone,email,age,image_paths,status,admin_note,created_at,assigned_partner_id,assigned_at,assigned_by,assigned_note",
     )
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // 6) email notify (best-effort: не ломаем assignment если email упал)
+  // 9) email notify (best-effort: не ломаем assignment если email упал)
   let emailSent = false;
   let emailError: string | null = null;
 
-  if (partnerChanged) {
+  if (customerChanged) {
     try {
-      // email партнёра берём из profiles
-      const { data: partnerProfile, error: pErr } = await admin
+      const { data: customerProfile, error: pErr } = await admin
         .from("profiles")
         .select("email,first_name,last_name")
         .eq("id", partner_id)
         .maybeSingle();
 
       if (pErr) throw new Error(pErr.message);
-      const partnerEmail = partnerProfile?.email?.trim();
-      if (!partnerEmail) throw new Error("Partner email not found in profiles");
+      const customerEmail = customerProfile?.email?.trim();
+      if (!customerEmail) throw new Error("Customer email not found in profiles");
 
-      const partnerName = `${partnerProfile?.first_name ?? ""} ${partnerProfile?.last_name ?? ""}`.trim() || null;
+      const customerName =
+        `${customerProfile?.first_name ?? ""} ${customerProfile?.last_name ?? ""}`.trim() || null;
 
       const origin = req.nextUrl.origin;
-      const leadsUrl = `${origin}/partner/leads`;
+      const patientsUrl = `${origin}/customer/patients`;
 
       const tpl = partnerNewLeadTemplate({
-        partnerName,
-        leadsUrl,
+        partnerName: customerName,
+        leadsUrl: patientsUrl,
         lead: {
           full_name: before.full_name,
           phone: before.phone,
@@ -118,19 +183,22 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
-      await resendSend({ to: partnerEmail, subject: tpl.subject, html: tpl.html });
+      await resendSend({ to: customerEmail, subject: tpl.subject, html: tpl.html });
       emailSent = true;
     } catch (e: any) {
       emailError = String(e?.message ?? e);
-      // не бросаем ошибку — assignment уже сделан
     }
   }
 
   return NextResponse.json({
     ok: true,
     item: data,
+    booking: {
+      attempted: customerChanged,
+      id: bookingId,
+    },
     email: {
-      attempted: partnerChanged,
+      attempted: customerChanged,
       sent: emailSent,
       error: emailError,
     },

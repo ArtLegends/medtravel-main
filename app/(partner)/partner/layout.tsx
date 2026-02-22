@@ -18,7 +18,6 @@ import {
 const MAIN_MENU = [
   { title: "Dashboard", href: "/partner", icon: LayoutDashboard },
   { title: "Referrals", href: "/partner/referrals", icon: Users },
-  { title: "Leads", href: "/partner/leads", icon: Users },
   { title: "Programs", href: "/partner/programs", icon: ListTree },
   { title: "Reports", href: "/partner/reports", icon: BarChart2 },
   { title: "Bookings", href: "/partner/bookings", icon: Calendar },

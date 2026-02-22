@@ -12952,3 +12952,1065 @@ ym(106694543, 'init', {
   );
 }
 """
+
+-------------------------------------
+
+хорошо. ниже я дал тебе полные файлы в которых выполнил изменения по твоим ответам, проверь все пожалуйста, если ничего править не надо, то продолжим.
+
+components\customer\PatientsListClient.tsx: """
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/browserClient";
+
+type Status = "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
+
+type Row = {
+  booking_id: string;
+  patient_id: string;
+  patient_public_id: number | null;
+  patient_name: string | null;
+  phone: string | null;
+  service_name: string | null;
+  status: Status;
+  pre_cost: number | null;
+  currency: string | null;
+  actual_cost: number | null;
+  created_at: string;
+  clinic_name: string | null;
+  xray_path: string | null;
+  photo_path: string | null;
+  preferred_date: string | null;
+  preferred_time: string | null;
+  scheduled_at: string | null;
+};
+
+const PAGE_SIZE = 15;
+
+const RU_DT = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function fmtPreferred(d: string | null, t: string | null) {
+  if (!d) return "—";
+
+  // d приходит как "YYYY-MM-DD"
+  const [yyyy, mm, dd] = d.split("-");
+  const date = `${dd}.${mm}.${yyyy}`;
+
+  if (!t) return date;
+
+  // t может быть "10:00" или "10:00:00" — режем до HH:MM
+  const time = t.slice(0, 5);
+  return `${date}, ${time}`;
+}
+
+function fmtScheduled(ts: string | null) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts;
+
+  // будет "02.02.2026, 14:00"
+  return RU_DT.format(d);
+}
+
+function fmtMoney(v: number | null, cur: string | null) {
+  if (v == null) return "—";
+  return `${v} ${cur ?? "USD"}`;
+}
+
+function normalizeTime(t: string | null) {
+  if (!t) return "";
+  // "10:00:00" -> "10:00"
+  const m = t.match(/^(\d{2}:\d{2})/);
+  return m ? m[1] : t;
+}
+
+export default function PatientsListClient() {
+  const supabase = useMemo(() => createClient(), []);
+  const [items, setItems] = useState<Row[]>([]);
+  const [total, setTotal] = useState(0);
+
+  const [status, setStatus] = useState<
+    "all" | "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient"
+  >("all");
+
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  const [page, setPage] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachUrls, setAttachUrls] = useState<string[]>([]);
+  const [attachTitle, setAttachTitle] = useState<string>("Attachments");
+  const [activeIdx, setActiveIdx] = useState(0);
+
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const abortRef = useRef<AbortController | null>(null);
+
+  const [schedOpen, setSchedOpen] = useState(false);
+  const [schedBookingId, setSchedBookingId] = useState<string | null>(null);
+  const [schedDate, setSchedDate] = useState<string>(""); // yyyy-mm-dd
+  const [schedTime, setSchedTime] = useState<string>(""); // HH:MM
+  const [schedTitle, setSchedTitle] = useState<string>("Schedule appointment");
+
+  function openSchedule(r: Row) {
+    setSchedBookingId(r.booking_id);
+    setSchedTitle(`Schedule for ${r.patient_name ?? "patient"}`);
+    setSchedTime(normalizeTime(r.preferred_time));
+
+    // prefill: scheduled_at -> date/time, иначе preferred_date/time
+    if (r.scheduled_at) {
+      const d = new Date(r.scheduled_at);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      setSchedDate(`${yyyy}-${mm}-${dd}`);
+      setSchedTime(`${hh}:${mi}`);
+    } else {
+      setSchedDate(r.preferred_date ?? "");
+      setSchedTime(r.preferred_time ?? "");
+    }
+
+    setSchedOpen(true);
+  }
+
+  async function saveSchedule() {
+    if (!schedBookingId) return;
+
+    // можно разрешить сохранить только дату без времени — тогда ставим 00:00
+    const date = schedDate.trim();
+    if (!date) {
+      setErr("Please select a date.");
+      return;
+    }
+
+    const time = (schedTime || "00:00").trim();
+    const local = new Date(`${date}T${time}:00`);
+    if (Number.isNaN(local.getTime())) {
+      setErr("Invalid date/time.");
+      return;
+    }
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(schedBookingId)}/schedule`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scheduled_at: local.toISOString() }),
+      });
+      if (!res.ok) throw new Error(await readError(res));
+
+      // оптимистично обновим локально (чтобы не ждать realtime)
+      setItems((prev) =>
+        prev.map((r) => (r.booking_id === schedBookingId ? { ...r, scheduled_at: local.toISOString() } : r))
+      );
+
+      setSchedOpen(false);
+      setSchedBookingId(null);
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function readError(res: Response) {
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct.includes("application/json")) {
+      const j = await res.json().catch(() => null);
+      return j?.error ? String(j.error) : JSON.stringify(j);
+    }
+    return `${res.status} ${res.statusText}`;
+  }
+
+  async function openAttachment(r: Row) {
+    setBusy(true);
+    setErr(null);
+
+    try {
+      // 1) сначала пробуем lead images (если есть связь)
+      {
+        const res = await fetch(
+          `/api/customer/patients/${encodeURIComponent(r.booking_id)}/lead-images`,
+          { cache: "no-store" }
+        );
+
+        if (res.ok) {
+          const j = await res.json().catch(() => ({}));
+          const urls: string[] = (j?.urls ?? []).filter(Boolean);
+
+          if (urls.length) {
+            setAttachTitle("Lead images");
+            setAttachUrls(urls);
+            setActiveIdx(0);
+            setAttachOpen(true);
+            return;
+          }
+        }
+        // если 400/403/500 — мы не падаем, просто идём дальше (обычные вложения)
+      }
+
+      // 2) обычные xray/photo (1 картинка)
+      let endpoint: string | null = null;
+
+      if (r.xray_path) endpoint = `/api/customer/patients/${encodeURIComponent(r.booking_id)}/xray-url`;
+      else if (r.photo_path) endpoint = `/api/customer/patients/${encodeURIComponent(r.booking_id)}/photo-url`;
+
+      if (!endpoint) {
+        setErr("No attachment for this booking.");
+        return;
+      }
+
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) throw new Error(await readError(res));
+
+      const j = await res.json().catch(() => ({}));
+      const url = j?.url ?? null;
+
+      if (!url) {
+        setErr("Attachment not found or not available.");
+        return;
+      }
+
+      setAttachTitle(r.xray_path ? "X-ray attachment" : "Photo attachment");
+      setAttachUrls([url]);
+      setActiveIdx(0);
+      setAttachOpen(true);
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function load(p = page) {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    setBusy(true);
+    setErr(null);
+
+    try {
+      const q = new URLSearchParams();
+      q.set("page", String(p));
+      q.set("limit", String(PAGE_SIZE));
+      q.set("status", status);
+      if (startDate) q.set("startDate", startDate);
+      if (endDate) q.set("endDate", endDate);
+
+      const res = await fetch(`/api/customer/patients?${q.toString()}`, {
+        cache: "no-store",
+        signal: abortRef.current.signal,
+      });
+
+      if (!res.ok) throw new Error(await readError(res));
+      const json = await res.json();
+
+      setItems(json.items ?? []);
+      setTotal(json.total ?? 0);
+      setPage(json.page ?? p);
+    } catch (e: any) {
+      if (e?.name !== "AbortError") setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    setPage(1);
+    load(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, startDate, endDate]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("customer-patients-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_bookings" }, () => {
+        setTimeout(() => load(1), 150);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, status, startDate, endDate]);
+
+  useEffect(() => {
+    if (!attachOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setAttachOpen(false);
+        setAttachUrls([]);
+        setActiveIdx(0);
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [attachOpen]);
+
+  async function updateStatus(bookingId: string, next: Status) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(bookingId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error(await readError(res));
+      setItems((prev) => prev.map((r) => (r.booking_id === bookingId ? { ...r, status: next } : r)));
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteOne(bookingId: string) {
+    if (!confirm("Delete this patient record? This action cannot be undone.")) return;
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(bookingId)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res));
+      await load(page);
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteAll() {
+    if (!confirm("Delete ALL patient records for current filters? This action cannot be undone.")) return;
+    if (!confirm("Are you absolutely sure?")) return;
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const q = new URLSearchParams();
+      q.set("status", status);
+      if (startDate) q.set("startDate", startDate);
+      if (endDate) q.set("endDate", endDate);
+
+      const res = await fetch(`/api/customer/patients?${q.toString()}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res));
+      await load(1);
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {err && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="max-h-40 overflow-auto whitespace-pre-wrap break-words">{err}</div>
+        </div>
+      )}
+
+      <div className="rounded-xl border bg-white p-4 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={deleteAll}
+            disabled={busy}
+            className="rounded-md px-3 py-2 text-sm bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-60"
+          >
+            Delete All
+          </button>
+          <div className="ml-auto text-sm text-gray-500 flex items-center gap-2">
+            {busy ? "Updating…" : "Live updates enabled"}
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as any)}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="completed">Completed</option>
+
+            <option value="cancelled_by_patient" disabled>
+              Cancelled by Patient
+            </option>
+          </select>
+
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-white overflow-hidden">
+        <div className="p-4 border-b">
+          <div className="text-lg font-semibold">Patients ({total})</div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="px-4 py-3 text-left">Patient ID</th>
+                <th className="px-4 py-3 text-left">Patient Name</th>
+                <th className="px-4 py-3 text-left">Phone</th>
+                <th className="px-4 py-3 text-left">Treatment</th>
+                <th className="px-4 py-3 text-left">Preferred</th>
+                <th className="px-4 py-3 text-left">Scheduled</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Pre-cost</th>
+                <th className="px-4 py-3 text-left">Actual</th>
+                <th className="px-4 py-3 text-left">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                    No patients added yet
+                  </td>
+                </tr>
+              ) : (
+                items.map((r) => {
+                  const isLocked = r.status === "cancelled_by_patient";
+
+                  return (
+                    <tr key={r.booking_id} className="border-t">
+                      <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
+                        {r.patient_public_id ? `#${r.patient_public_id}` : "—"}
+                      </td>
+                      <td className="px-4 py-3">{r.patient_name ?? "—"}</td>
+                      <td className="px-4 py-3">{r.phone ?? "—"}</td>
+                      <td className="px-4 py-3">{r.service_name ?? "—"}</td>
+                      <td className="px-4 py-3">{fmtPreferred(r.preferred_date, r.preferred_time)}</td>
+                      <td className="px-4 py-3">{fmtScheduled(r.scheduled_at)}</td>
+
+                      <td className="px-4 py-3">
+                        <select
+                          disabled={busy || isLocked}
+                          value={r.status}
+                          onChange={(e) => updateStatus(r.booking_id, e.target.value as any)}
+                          className={"border rounded-md px-2 py-1 " + (isLocked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")}
+                        >
+                          <option value="pending">pending</option>
+                          <option value="confirmed">confirmed</option>
+                          <option value="cancelled">cancelled</option>
+                          <option value="completed">completed</option>
+                        </select>
+                      </td>
+
+                      <td className="px-4 py-3">{fmtMoney(r.pre_cost, r.currency)}</td>
+                      <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openSchedule(r)}
+                            disabled={busy || r.status === "cancelled_by_patient" || r.status === "cancelled" || r.status === "completed"}
+                            className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-60"
+                          >
+                            Schedule
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openAttachment(r)}
+                            disabled={busy || (!r.xray_path && !r.photo_path)}
+                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 disabled:pointer-events-none"
+                          >
+                            View attachment
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => deleteOne(r.booking_id)}
+                            disabled={busy}
+                            className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-4 text-sm text-gray-500 flex items-center justify-between">
+          <div>
+            Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </div>
+          <div className="flex gap-2">
+            <button disabled={busy || page <= 1} onClick={() => load(page - 1)} className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60">
+              Prev
+            </button>
+            <button disabled={busy || page >= totalPages} onClick={() => load(page + 1)} className="border rounded-md px-3 py-2 hover:bg-gray-50 disabled:opacity-60">
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {attachOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={() => {
+            setAttachOpen(false);
+            setAttachUrls([]);
+            setActiveIdx(0);
+          }}
+        >
+          <div
+            className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="text-sm font-semibold text-gray-900">{attachTitle}</div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAttachOpen(false);
+                  setAttachUrls([]);
+                  setActiveIdx(0);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-gray-50 p-4">
+              {!attachUrls.length ? (
+                <div className="text-sm text-gray-600">No attachment.</div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Main viewer */}
+                  <div className="flex items-center justify-center rounded-2xl border bg-white p-3">
+                    <img
+                      src={attachUrls[Math.min(activeIdx, attachUrls.length - 1)]}
+                      alt="Attachment"
+                      className="h-[60vh] w-full max-w-full rounded-xl object-contain"
+                    />
+                  </div>
+
+                  {/* Thumbnails row */}
+                  {attachUrls.length > 1 ? (
+                    <div className="flex max-w-full gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {attachUrls.map((u, i) => {
+                        const active = i === activeIdx;
+                        return (
+                          <button
+                            key={u}
+                            type="button"
+                            onClick={() => setActiveIdx(i)}
+                            className={[
+                              "shrink-0 overflow-hidden rounded-xl border bg-white",
+                              active
+                                ? "ring-2 ring-emerald-400 border-emerald-300"
+                                : "hover:border-slate-300",
+                            ].join(" ")}
+                            style={{ width: 110, height: 80 }}
+                            aria-label={`Open image ${i + 1}`}
+                          >
+                            <img
+                              src={u}
+                              alt="Attachment thumbnail"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  <div className="text-xs text-slate-500">
+                    {activeIdx + 1} / {attachUrls.length}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {schedOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={() => {
+            setSchedOpen(false);
+            setSchedBookingId(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="text-sm font-semibold text-gray-900">{schedTitle}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSchedOpen(false);
+                  setSchedBookingId(null);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="mb-1 text-xs font-medium text-gray-600">Date</div>
+                  <input
+                    type="date"
+                    value={schedDate}
+                    onChange={(e) => setSchedDate(e.target.value)}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-gray-600">Time (optional)</div>
+                  <input
+                    type="time"
+                    value={schedTime}
+                    onChange={(e) => setSchedTime(e.target.value)}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSchedOpen(false);
+                    setSchedBookingId(null);
+                  }}
+                  className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveSchedule}
+                  disabled={busy}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Save schedule
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+"""
+app\api\customer\patients\[id]\lead-images\route.ts(это созданный, ты мне его давал полностью готовый, тут ничего не менялось): """
+import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function extractLeadId(notes: string | null, autoWhen: string | null) {
+  const s = `${notes ?? ""} ${autoWhen ?? ""}`;
+  // поддержим оба формата:
+  // 1) [lead:<uuid>]
+  // 2) lead:<uuid>
+  const m =
+    s.match(/\[lead:([0-9a-f-]{36})\]/i) ||
+    s.match(/\blead:([0-9a-f-]{36})\b/i);
+  return m?.[1] ?? null;
+}
+
+export async function GET(_req: Request, ctx: any) {
+  const bookingId = String(ctx?.params?.id ?? "").trim();
+  if (!bookingId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  // 1) auth как customer (route client)
+  const route = await createRouteClient();
+  const { data: au } = await route.auth.getUser();
+  const user = au?.user;
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // 2) узнаём clinic_id текущего customer
+  const { data: clinicId, error: eClinic } = await route.rpc("customer_current_clinic_id");
+  if (eClinic) return NextResponse.json({ error: eClinic.message }, { status: 500 });
+  if (!clinicId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // 3) service role: читаем booking (чтобы достать notes/auto_when и сравнить clinic_id)
+  const admin = createServiceClient();
+
+  const { data: booking, error: bErr } = await admin
+    .from("patient_bookings")
+    .select("id, clinic_id, notes, auto_when")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (bErr) return NextResponse.json({ error: bErr.message }, { status: 500 });
+  if (!booking) return NextResponse.json({ urls: [] });
+
+  if (String(booking.clinic_id) !== String(clinicId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // 4) достаём leadId из notes/auto_when
+  const leadId = extractLeadId(booking.notes ?? null, booking.auto_when ?? null);
+  if (!leadId) return NextResponse.json({ urls: [] });
+
+  // 5) тянем image_paths из partner_leads
+  const { data: lead, error: lErr } = await admin
+    .from("partner_leads")
+    .select("image_paths")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (lErr) return NextResponse.json({ error: lErr.message }, { status: 500 });
+
+  const paths: string[] = (lead as any)?.image_paths ?? [];
+  const sliced = paths.map((p) => String(p ?? "").trim()).filter(Boolean).slice(0, 3);
+  if (!sliced.length) return NextResponse.json({ urls: [] });
+
+  // 6) подписанные ссылки (bucket partner-leads)
+  const urls: string[] = [];
+  for (const p of sliced) {
+    const { data: signed, error: sErr } = await admin.storage
+      .from("partner-leads")
+      .createSignedUrl(p, 60 * 10);
+
+    if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
+    if (signed?.signedUrl) urls.push(signed.signedUrl);
+  }
+
+  return NextResponse.json({ urls });
+}
+"""
+app\api\admin\partners\route.ts: """
+import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+async function isAdmin(route: any, userId: string) {
+  const { data } = await route.from("user_roles").select("role").eq("user_id", userId);
+  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
+  return roles.includes("admin");
+}
+
+export async function GET() {
+  // 1) auth + admin check
+  const route = await createRouteClient();
+  const { data: auth } = await route.auth.getUser();
+  const user = auth?.user;
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const ok = await isAdmin(route, user.id);
+  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // 2) service client for data
+  const admin = createServiceClient();
+
+  // ✅ берём всех user_id у кого есть роль customer
+  const { data: roles, error: rErr } = await admin
+    .from("user_roles")
+    .select("user_id")
+    .eq("role", "customer");
+
+  if (rErr) return NextResponse.json({ error: rErr.message }, { status: 500 });
+
+  const ids = Array.from(new Set((roles ?? []).map((x: any) => x.user_id).filter(Boolean)));
+  if (!ids.length) return NextResponse.json({ items: [] });
+
+  // ✅ оставляем только approved заявки (не обязательно, но правильно)
+  const { data: approved, error: aErr } = await admin
+    .from("customer_registration_requests")
+    .select("user_id")
+    .in("user_id", ids)
+    .eq("status", "approved");
+
+  if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 });
+
+  const approvedIds = new Set((approved ?? []).map((x: any) => x.user_id).filter(Boolean));
+  const filtered = ids.filter((id) => approvedIds.has(id));
+  if (!filtered.length) return NextResponse.json({ items: [] });
+
+  // ✅ оставляем только тех, у кого есть customer_clinic_membership
+  const { data: mem, error: mErr } = await admin
+    .from("customer_clinic_membership")
+    .select("user_id, clinic_id")
+    .in("user_id", filtered);
+
+  if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
+
+  const memMap = new Map<string, string>();
+  (mem ?? []).forEach((x: any) => {
+    if (x?.user_id && x?.clinic_id) memMap.set(String(x.user_id), String(x.clinic_id));
+  });
+
+  const finalIds = filtered.filter((id) => memMap.has(id));
+  if (!finalIds.length) return NextResponse.json({ items: [] });
+
+  // профили этих пользователей
+  const { data: prof, error: pErr } = await admin
+    .from("profiles")
+    .select("id,first_name,last_name,email")
+    .in("id", finalIds)
+    .order("created_at", { ascending: false });
+
+  if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
+
+  // (опционально) подтянем название клиники
+  const clinicIds = Array.from(new Set(Array.from(memMap.values())));
+  const { data: clinics } = await admin
+    .from("clinics")
+    .select("id,name")
+    .in("id", clinicIds);
+
+  const clinicNameById = new Map<string, string>();
+  (clinics ?? []).forEach((c: any) => clinicNameById.set(String(c.id), String(c.name)));
+
+  const items = (prof ?? []).map((p: any) => {
+    const personName = [p.first_name, p.last_name].filter(Boolean).join(" ").trim();
+    const clinicId = memMap.get(String(p.id)) || "";
+    const clinicName = clinicId ? (clinicNameById.get(clinicId) ?? "") : "";
+
+    return {
+      id: p.id,              // customer user_id (то что кладём в partner_leads.assigned_partner_id)
+      clinic_id: clinicId,   // удобно на будущее
+      name: clinicName || personName || p.email || p.id,
+      email: p.email ?? "",
+    };
+  });
+
+  return NextResponse.json({ items });
+}
+"""
+app\api\admin\partner-leads\assign\route.ts: """
+import { NextRequest, NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { resendSend, partnerNewLeadTemplate } from "@/lib/mail/resend";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+async function isAdmin(route: any, userId: string) {
+  const { data } = await route.from("user_roles").select("role").eq("user_id", userId);
+  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
+  return roles.includes("admin");
+}
+
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
+export async function PATCH(req: NextRequest) {
+  // 1) auth + admin check
+  const route = await createRouteClient();
+  const { data: auth } = await route.auth.getUser();
+  const user = auth?.user;
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const ok = await isAdmin(route, user.id);
+  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // 2) body
+  const body = await req.json().catch(() => null);
+  const lead_id = String(body?.lead_id ?? "").trim();
+  const partner_id = String(body?.partner_id ?? "").trim();
+  const note = String(body?.note ?? "").trim().slice(0, 500);
+
+  if (!isUuid(lead_id)) return NextResponse.json({ error: "Invalid lead_id" }, { status: 400 });
+  if (!isUuid(partner_id)) return NextResponse.json({ error: "Invalid partner_id" }, { status: 400 });
+
+  // 3) service client
+  const admin = createServiceClient();
+
+  // (опционально) убедимся что partner_id реально partner
+  const { data: roleCheck, error: rcErr } = await admin
+    .from("user_roles")
+    .select("user_id")
+    .eq("user_id", partner_id)
+    .eq("role", "customer")
+    .maybeSingle();
+
+  if (rcErr) return NextResponse.json({ error: rcErr.message }, { status: 500 });
+  if (!roleCheck) return NextResponse.json({ error: "User is not a customer" }, { status: 400 });
+
+  // 4) прочитаем текущий lead, чтобы:
+  // - понять изменилось ли назначение (без миграций / без дублей)
+  // - взять данные лида для письма
+  const { data: before, error: beforeErr } = await admin
+    .from("partner_leads")
+    .select("id,assigned_partner_id,full_name,phone,email,source,created_at")
+    .eq("id", lead_id)
+    .maybeSingle();
+
+  if (beforeErr) return NextResponse.json({ error: beforeErr.message }, { status: 500 });
+  if (!before) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+
+  const prevPartnerId = before.assigned_partner_id ?? null;
+  const partnerChanged = prevPartnerId !== partner_id;
+
+  // ✅ resolve clinic_id by customer user_id
+  const { data: mem, error: memErr } = await admin
+    .from("customer_clinic_membership")
+    .select("clinic_id")
+    .eq("user_id", partner_id)
+    .maybeSingle();
+
+  if (memErr) return NextResponse.json({ error: memErr.message }, { status: 500 });
+  if (!mem?.clinic_id) return NextResponse.json({ error: "Customer has no clinic membership" }, { status: 400 });
+
+  const clinicId = String(mem.clinic_id);
+
+  // ✅ resolve patient_id by lead email
+  const leadEmail = String(before.email ?? "").trim().toLowerCase();
+  const { data: pat, error: patErr } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", leadEmail)
+    .maybeSingle();
+
+  if (patErr) return NextResponse.json({ error: patErr.message }, { status: 500 });
+  if (!pat?.id) return NextResponse.json({ error: "Patient profile not found for lead email" }, { status: 400 });
+
+  const patientId = String(pat.id);
+
+  // ✅ create booking from lead (чтобы появилось в /customer/patients)
+  const leadMarker = `[lead:${lead_id}]`; // будем использовать для изображений и отличия источника
+  const { data: booking, error: bookErr } = await admin
+    .from("patient_bookings")
+    .insert({
+      patient_id: patientId,
+      clinic_id: clinicId,
+      service_id: 803,               // Hair Transplant
+      booking_method: "automatic",   // лид
+      status: "pending",
+      full_name: before.full_name,
+      phone: before.phone,
+      notes: `${leadMarker} Landing lead (${before.source ?? "unknown"})`,
+    })
+    .select("id")
+    .single();
+
+  if (bookErr) return NextResponse.json({ error: bookErr.message }, { status: 500 });
+
+  // 5) update lead
+  const patch: any = {
+    assigned_partner_id: partner_id,
+    assigned_at: new Date().toISOString(),
+    assigned_by: user.id,
+    assigned_note: note || null,
+    status: "assigned",
+  };
+
+  const { data, error } = await admin
+    .from("partner_leads")
+    .update(patch)
+    .eq("id", lead_id)
+    .select(
+      "id,source,full_name,phone,email,age,image_paths,status,admin_note,created_at,assigned_partner_id,assigned_at,assigned_by,assigned_note"
+    )
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // 6) email notify (best-effort: не ломаем assignment если email упал)
+  let emailSent = false;
+  let emailError: string | null = null;
+
+  if (partnerChanged) {
+    try {
+      // email партнёра берём из profiles
+      const { data: partnerProfile, error: pErr } = await admin
+        .from("profiles")
+        .select("email,first_name,last_name")
+        .eq("id", partner_id)
+        .maybeSingle();
+
+      if (pErr) throw new Error(pErr.message);
+      const partnerEmail = partnerProfile?.email?.trim();
+      if (!partnerEmail) throw new Error("Partner email not found in profiles");
+
+      const partnerName = `${partnerProfile?.first_name ?? ""} ${partnerProfile?.last_name ?? ""}`.trim() || null;
+
+      const origin = req.nextUrl.origin;
+      const patientsUrl = `${origin}/customer/patients`;
+
+      const tpl = partnerNewLeadTemplate({
+        partnerName,
+        leadsUrl: patientsUrl,
+        lead: {
+          full_name: before.full_name,
+          phone: before.phone,
+          email: before.email,
+          source: before.source,
+          created_at: before.created_at,
+        },
+      });
+
+      await resendSend({ to: partnerEmail, subject: tpl.subject, html: tpl.html });
+      emailSent = true;
+    } catch (e: any) {
+      emailError = String(e?.message ?? e);
+      // не бросаем ошибку — assignment уже сделан
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    item: data,
+    email: {
+      attempted: partnerChanged,
+      sent: emailSent,
+      error: emailError,
+    },
+  });
+}
+"""
