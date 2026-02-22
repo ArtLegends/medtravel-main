@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 
 type Status = "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
-type BookingMethod = "manual" | "automatic";
 
 type Row = {
   booking_id: string;
@@ -16,7 +15,7 @@ type Row = {
   service_name: string | null;
   status: Status;
 
-  booking_method: BookingMethod | null;
+  lead_id: string | null;
 
   pre_cost: number | null;
   currency: string | null;
@@ -180,8 +179,8 @@ export default function PatientsListClient() {
     setErr(null);
 
     try {
-      // 1) lead images first
-      {
+      // 1) lead images first — только если это лид
+      if (r.lead_id) {
         const res = await fetch(
           `/api/customer/patients/${encodeURIComponent(r.booking_id)}/lead-images`,
           { cache: "no-store" }
@@ -199,7 +198,6 @@ export default function PatientsListClient() {
             return;
           }
         }
-        // ignore any errors and fallback
       }
 
       // 2) classic xray/photo single
@@ -440,9 +438,10 @@ export default function PatientsListClient() {
               ) : (
                 items.map((r) => {
                   const isLocked = r.status === "cancelled_by_patient";
-                  const isLead = (r.booking_method ?? "manual") === "automatic";
+                  const isLead = Boolean(r.lead_id);
 
-                  const canViewAttachment = !busy;
+                  const canViewAttachment = 
+                    !busy && (Boolean(r.xray_path) || Boolean(r.photo_path) || isLead);
 
                   return (
                     <tr key={r.booking_id} className="border-t">
@@ -503,7 +502,7 @@ export default function PatientsListClient() {
                             type="button"
                             onClick={() => openAttachment(r)}
                             disabled={!canViewAttachment}
-                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 disabled:pointer-events-none"
                           >
                             View attachment
                           </button>
