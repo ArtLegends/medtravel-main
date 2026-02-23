@@ -196,11 +196,19 @@ function ProfileDropdownAuth({
         </DropdownItem>
 
         <DropdownItem
+          key="profile"
+          onPress={() => router.push("/profile")}
+          startContent={<Icon icon="solar:user-circle-linear" width={16} />}
+        >
+          My profile
+        </DropdownItem>
+
+        <DropdownItem
           key="settings"
           onPress={() => router.push("/settings")}
           startContent={<Icon icon="solar:settings-linear" width={16} />}
         >
-          {tSafe(t, "navbar.mySettings", "My settings")}
+          My settings
         </DropdownItem>
 
         {/* ПАНЕЛИ (вернули) */}

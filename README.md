@@ -15306,3 +15306,1046 @@ export default function CredentialsForm({
   );
 }
 """
+
+------------------------------
+
+app\(user)\settings\page.tsx: """
+// app/(user)/settings/page.tsx
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import type { SupabaseContextType } from '@/lib/supabase/supabase-provider';
+import { useSupabase } from '@/lib/supabase/supabase-provider';
+import { useSearchParams } from "next/navigation";
+
+type FormState = {
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  secondaryEmail: string;
+  timeZone: string;
+  phone: string;
+  preferredLanguage: string;
+  marketingEmails: boolean;
+};
+
+export default function SettingsPage() {
+  const { supabase, session } = useSupabase() as SupabaseContextType;
+  const user = session?.user ?? null;
+
+  const browserTz = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      return '';
+    }
+  }, []);
+
+  const [state, setState] = useState<FormState>({
+    firstName: '',
+    lastName: '',
+    displayName: '',
+    secondaryEmail: '',
+    timeZone: browserTz,
+    phone: '',
+    preferredLanguage: 'en',
+    marketingEmails: true,
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const sp = useSearchParams();
+  const passwordHint = sp.get("password") === "1"; // подсказка после magic link
+
+  const [pw, setPw] = useState({
+    newPassword: "",
+    confirm: "",
+  });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwStatus, setPwStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [pwError, setPwError] = useState<string | null>(null);
+
+  // список таймзон (если платформа поддерживает — берём полный список)
+  const timeZones = useMemo(() => {
+    try {
+      // @ts-ignore — поддержка может быть не везде
+      if (typeof Intl.supportedValuesOf === 'function') {
+        // @ts-ignore
+        return Intl.supportedValuesOf('timeZone') as string[];
+      }
+    } catch {
+      // ignore
+    }
+    return [
+      'UTC',
+      'Europe/London',
+      'Europe/Berlin',
+      'Europe/Moscow',
+      'Asia/Istanbul',
+      'Asia/Ho_Chi_Minh',
+      'Asia/Bangkok',
+      'America/New_York',
+      'America/Los_Angeles',
+    ];
+  }, []);
+
+  function validatePassword(p: string) {
+    // минимально безопасно, без усложнений
+    if (!p || p.length < 8) return "Password must be at least 8 characters.";
+    return null;
+  }
+
+  const handlePasswordSubmit = async () => {
+    if (!supabase || !user) return;
+
+    setPwStatus("idle");
+    setPwError(null);
+
+    const v = validatePassword(pw.newPassword);
+    if (v) {
+      setPwStatus("error");
+      setPwError(v);
+      return;
+    }
+    if (pw.newPassword !== pw.confirm) {
+      setPwStatus("error");
+      setPwError("Passwords do not match.");
+      return;
+    }
+
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({
+      password: pw.newPassword,
+      data: {
+        has_password: true,
+      },
+    });
+
+    if (error) {
+      setPwStatus("error");
+      setPwError(error.message || "Failed to update password.");
+    } else {
+      setPwStatus("saved");
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .eq("type", "set_password")
+        .eq("is_read", false);
+      setPw({ newPassword: "", confirm: "" });
+    }
+    setPwSaving(false);
+  };
+
+  // Инициализируем форму из user_metadata
+  useEffect(() => {
+    if (!user) return;
+    const meta: any = user.user_metadata ?? {};
+
+    setState(prev => ({
+      ...prev,
+      firstName: meta.first_name ?? meta.given_name ?? '',
+      lastName: meta.last_name ?? meta.family_name ?? '',
+      displayName:
+        meta.display_name ??
+        meta.name ??
+        (user.email ? user.email.split('@')[0] : ''),
+      secondaryEmail: meta.secondary_email ?? '',
+      timeZone: meta.time_zone ?? prev.timeZone ?? browserTz,
+      phone: meta.phone ?? '',
+      preferredLanguage: meta.preferred_language ?? 'en',
+      marketingEmails:
+        typeof meta.marketing_emails === 'boolean'
+          ? meta.marketing_emails
+          : true,
+    }));
+  }, [user, browserTz]);
+
+  const handleChange =
+    (field: keyof FormState) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const target = e.target as HTMLInputElement;
+      const value =
+        target.type === 'checkbox' ? target.checked : target.value;
+      setState(prev => ({ ...prev, [field]: value as any }));
+      setStatus('idle');
+      setErrorMsg(null);
+    };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !user) return;
+
+    setSaving(true);
+    setStatus('idle');
+    setErrorMsg(null);
+
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        first_name: state.firstName || null,
+        last_name: state.lastName || null,
+        display_name: state.displayName || null,
+        secondary_email: state.secondaryEmail || null,
+        time_zone: state.timeZone || null,
+        phone: state.phone || null,
+        preferred_language: state.preferredLanguage || null,
+        marketing_emails: state.marketingEmails,
+      },
+    });
+
+    if (error) {
+      setStatus('error');
+      setErrorMsg(error.message || 'Failed to update settings');
+    } else {
+      setStatus('saved');
+    }
+    setSaving(false);
+  };
+
+  if (!user) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <h1 className="text-2xl font-semibold mb-4">Settings</h1>
+        <p className="text-default-500">
+          Please sign in to manage your personal settings.
+        </p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-8 space-y-8">
+      <header>
+        <h1 className="text-2xl font-semibold">My settings</h1>
+        <p className="mt-1 text-sm text-default-500">
+          Manage your personal profile and preferences. These settings apply
+          only to your account.
+        </p>
+      </header>
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Account info */}
+        <section className="rounded-xl border bg-white p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Account</h2>
+          <p className="text-xs text-default-500">
+            Basic information about your account. Primary email is used for
+            login and security notifications.
+          </p>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="text-sm text-gray-600">
+                Primary email (read-only)
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2 bg-default-100 text-default-600 cursor-not-allowed"
+                value={user.email ?? ''}
+                disabled
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">
+                First name
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={state.firstName}
+                onChange={handleChange('firstName')}
+                autoComplete="given-name"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">
+                Last name
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={state.lastName}
+                onChange={handleChange('lastName')}
+                autoComplete="family-name"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-sm text-gray-600">
+                Display name
+                <span className="ml-1 text-xs text-gray-400">
+                  (shown in UI and communication)
+                </span>
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={state.displayName}
+                onChange={handleChange('displayName')}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">
+                Additional email{' '}
+                <span className="text-gray-400">(optional)</span>
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                placeholder="name+medtravel@example.com"
+                value={state.secondaryEmail}
+                onChange={handleChange('secondaryEmail')}
+                autoComplete="email"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Used for notifications and backup contact. We&apos;ll never
+                share it with third parties.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">
+                Time zone
+              </label>
+              <select
+                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                value={state.timeZone}
+                onChange={handleChange('timeZone')}
+              >
+                <option value="">Select time zone</option>
+                {timeZones.map(tz => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+              {browserTz && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setState(prev => ({ ...prev, timeZone: browserTz }))
+                  }
+                  className="mt-1 text-[11px] text-primary hover:underline"
+                >
+                  Use browser time zone ({browserTz})
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Personal & communication preferences */}
+        <section className="rounded-xl border bg-white p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Contact & preferences</h2>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm text-gray-600">
+                Phone / WhatsApp
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                placeholder="+90 555 000 00 00"
+                value={state.phone}
+                onChange={handleChange('phone')}
+                autoComplete="tel"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">
+                Preferred language
+              </label>
+              <select
+                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                value={state.preferredLanguage}
+                onChange={handleChange('preferredLanguage')}
+              >
+                <option value="en">English</option>
+                <option value="ru">Russian</option>
+                <option value="pl">Poland</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-2 flex items-start gap-2">
+            <input
+              id="marketingEmails"
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-gray-400"
+              checked={state.marketingEmails}
+              onChange={handleChange('marketingEmails')}
+            />
+            <label
+              htmlFor="marketingEmails"
+              className="text-sm text-gray-700"
+            >
+              Receive product updates and important news about MedTravel
+              <span className="block text-[11px] text-gray-400">
+                No spam – only essential updates a few times per year.
+              </span>
+            </label>
+          </div>
+        </section>
+
+        {/* Password */}
+        <section className="rounded-xl border bg-white p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Password</h2>
+              <p className="text-xs text-default-500">
+                Set or change your password for email sign-in.
+              </p>
+            </div>
+
+            {/* подсказка только если пришли по magic link */}
+            {passwordHint ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                Recommended
+              </span>
+            ) : null}
+          </div>
+
+          {passwordHint ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              You signed in via email link. For faster access next time, set a password now.
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm text-gray-600">New password</label>
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  type="password"
+                  value={pw.newPassword}
+                  onChange={(e) => {
+                    setPw((p) => ({ ...p, newPassword: e.target.value }));
+                    setPwStatus("idle");
+                    setPwError(null);
+                  }}
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600">Confirm password</label>
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  type="password"
+                  value={pw.confirm}
+                  onChange={(e) => {
+                    setPw((p) => ({ ...p, confirm: e.target.value }));
+                    setPwStatus("idle");
+                    setPwError(null);
+                  }}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+
+            {pwStatus === "error" && pwError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {pwError}
+              </div>
+            ) : null}
+
+            {pwStatus === "saved" ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Password updated.
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={pwSaving}
+                onClick={handlePasswordSubmit}
+                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {pwSaving ? "Saving…" : "Save password"}
+              </button>
+
+              <span className="text-[11px] text-gray-400">
+                If you use Google sign-in, password is optional.
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+
+          {status === 'saved' && (
+            <span className="text-xs text-emerald-600">
+              Settings updated.
+            </span>
+          )}
+          {status === 'error' && errorMsg && (
+            <span className="text-xs text-red-600">{errorMsg}</span>
+          )}
+        </div>
+      </form>
+    </main>
+  );
+}
+"""
+lib\supabase\supabase-provider.tsx: """
+// lib/supabase/supabase-provider.tsx
+"use client";
+
+import type { Session } from "@supabase/supabase-js";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/browserClient";
+
+export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
+
+const ROLE_SET = new Set<UserRole>(["GUEST", "PATIENT", "CUSTOMER", "PARTNER", "ADMIN"]);
+
+const mapRole = (r?: string | null): UserRole => {
+  const v = String(r || "guest").toUpperCase();
+  const vv = v as UserRole;
+  return ROLE_SET.has(vv) ? vv : "GUEST";
+};
+
+const readActiveRole = (): UserRole => {
+  if (typeof window === "undefined") return "GUEST";
+  return mapRole(window.localStorage.getItem("mt_active_role"));
+};
+
+const writeActiveRole = (role: UserRole) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem("mt_active_role", role);
+};
+
+export interface SupabaseContextType {
+  supabase: ReturnType<typeof createClient>;
+  session: Session | null;
+  roles: UserRole[];      // все роли пользователя
+  activeRole: UserRole;   // текущий портал/роль в UI
+  setActiveRole: (role: UserRole) => void;
+  refreshRoles: () => Promise<void>;
+}
+
+const Ctx = createContext<SupabaseContextType | undefined>(undefined);
+
+export function SupabaseProvider({
+  children,
+  initialSession = null,
+}: {
+  children: React.ReactNode;
+  initialSession?: Session | null;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [session, setSession] = useState<Session | null>(initialSession);
+  const [roles, setRoles] = useState<UserRole[]>(["GUEST"]);
+  const [activeRole, _setActiveRole] = useState<UserRole>(readActiveRole());
+
+  const setActiveRole = (role: UserRole) => {
+    _setActiveRole(role);
+    writeActiveRole(role);
+  };
+
+  const refreshRoles = async () => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    await fetchRoles(uid);
+  };
+
+  const fetchRoles = async (uid: string) => {
+    // 1) user_roles — источник истины
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", uid);
+
+    let collected: UserRole[] = [];
+
+    if (!error && Array.isArray(data) && data.length) {
+      collected = data
+        .map((r: any) => mapRole(r?.role))
+        .filter((x) => x !== "GUEST");
+    }
+
+    // 2) fallback на profiles.role
+    if (!collected.length) {
+      const { data: pr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", uid)
+        .maybeSingle();
+
+      const primary = mapRole(pr?.role ?? "guest");
+      collected = primary !== "GUEST" ? [primary] : ["GUEST"];
+    }
+
+    // нормализуем
+    const uniq = Array.from(new Set(collected));
+    setRoles(uniq.length ? uniq : ["GUEST"]);
+
+    // activeRole: если текущая активная роль недоступна — ставим первую доступную
+    const current = readActiveRole();
+    const ok = uniq.includes(activeRole);
+    if (!ok) {
+      const next = uniq[0] ?? "GUEST";
+      setActiveRole(next);
+    }
+  };
+
+  useEffect(() => {
+    // подтянуть сессию при старте
+    if (!initialSession) {
+      supabase.auth.getSession().then(({ data }) => {
+        setSession(data.session);
+        if (data.session) fetchRoles(data.session.user.id);
+        else setRoles(["GUEST"]);
+      });
+    } else {
+      fetchRoles(initialSession.user.id);
+    }
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, sess) => {
+      setSession(sess);
+      if (sess) fetchRoles(sess.user.id);
+      else {
+        setRoles(["GUEST"]);
+        setActiveRole("GUEST");
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
+
+  const value = useMemo(
+    () => ({ supabase, session, roles, activeRole, setActiveRole, refreshRoles }),
+    [supabase, session, roles, activeRole],
+  );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export const useSupabase = () => {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useSupabase must be used inside provider");
+  return ctx;
+};
+"""
+components\layout\Navbar.tsx: """
+// components/layout/Navbar.tsx
+"use client";
+
+import React, { useMemo, useCallback, useEffect, useState } from "react";
+import NextLink from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
+
+import {
+  Navbar as HeroUINavbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenu,
+  NavbarMenuItem,
+  NavbarMenuToggle,
+  Link,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Badge,
+  Button,
+} from "@heroui/react";
+
+import type { UserRole } from "@/lib/supabase/supabase-provider";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
+import { ThemeSwitch } from "@/components/shared/ThemeSwitch";
+import {
+  getAccessibleNavItems,
+} from "@/config/nav";
+import UnifiedAuthModal from "@/components/auth/UnifiedAuthModal";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
+
+// безопасный текст без жёсткой завязки на i18n
+const tSafe = (t: any, key: string, fallback: string) => {
+  try {
+    const v = t(key);
+    if (!v || typeof v !== "string" || v.startsWith("navbar.")) return fallback;
+    return v;
+  } catch {
+    return fallback;
+  }
+};
+
+/** Desktop item */
+const NavItemLink = React.memo(
+  ({ item, active, t }: { item: any; active: boolean; t: any }) => (
+    <NavbarItem isActive={active}>
+      <NextLink
+        prefetch
+        className={`font-medium transition-colors ${
+          active ? "text-primary" : "text-foreground hover:text-primary"
+        }`}
+        href={item.href}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </NextLink>
+    </NavbarItem>
+  ),
+);
+NavItemLink.displayName = "NavItemLink";
+
+/** Mobile item */
+const MobileNavItem = React.memo(
+  ({
+    item,
+    active,
+    t,
+    onClose,
+  }: {
+    item: any;
+    active: boolean;
+    t: any;
+    onClose: () => void;
+  }) => (
+    <NavbarMenuItem isActive={active}>
+      <Link
+        prefetch
+        as={NextLink}
+        className="w-full flex items-center gap-4 font-medium text-lg py-2 px-2 justify-center"
+        color={active ? "primary" : "foreground"}
+        href={item.href}
+        onPress={onClose}
+      >
+        {tSafe(t, item.label, String(item.key ?? item.label))}
+      </Link>
+    </NavbarMenuItem>
+  ),
+);
+MobileNavItem.displayName = "MobileNavItem";
+
+/** Дропдаун авторизованного */
+function ProfileDropdownAuth({
+  session,
+  roles,
+  activeRole,
+  setActiveRole,
+  supabase,
+  t,
+  onAddRole,
+}: {
+  session: any;
+  roles: UserRole[];
+  activeRole: UserRole;
+  setActiveRole: (r: UserRole) => void;
+  supabase: any;
+  t: any;
+  onAddRole: () => void;
+}) {
+  const router = useRouter();
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+    router.refresh();
+  }, [supabase, router]);
+
+  const hasAdmin = roles.includes("ADMIN");
+  const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
+  const canAccessPartner = hasAdmin || roles.includes("PARTNER");
+  const canAccessPatient = hasAdmin || roles.includes("PATIENT");
+
+  const goPortal = (role: UserRole) => {
+    setActiveRole(role);
+
+    const map: Record<UserRole, string> = {
+      GUEST: "/",
+      PATIENT: "/patient",
+      PARTNER: "/partner",
+      CUSTOMER: "/customer",
+      ADMIN: "/admin",
+    };
+
+    router.push(map[role] ?? "/");
+  };
+
+  const portalItems = ([
+    {
+      role: "PATIENT" as const,
+      label: "Patient portal",
+      icon: "solar:heart-pulse-2-linear",
+      show: canAccessPatient,
+    },
+    {
+      role: "PARTNER" as const,
+      label: "Partner dashboard",
+      icon: "solar:users-group-two-rounded-linear",
+      show: canAccessPartner,
+    },
+    {
+      role: "CUSTOMER" as const,
+      label: "Clinic panel",
+      icon: "solar:hospital-linear",
+      show: canAccessCustomer,
+    },
+    {
+      role: "ADMIN" as const,
+      label: "Admin panel",
+      icon: "solar:shield-user-bold",
+      show: hasAdmin,
+    },
+  ] satisfies ReadonlyArray<{
+    role: UserRole;
+    label: string;
+    icon: string;
+    show: boolean;
+  }>).filter((x) => x.show);
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
+          <Badge
+            color="success"
+            content=""
+            placement="bottom-right"
+            shape="circle"
+            size="sm"
+          >
+            <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+          </Badge>
+        </Button>
+      </DropdownTrigger>
+
+      <DropdownMenu aria-label="Profile Actions" variant="flat">
+        <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
+          <p className="font-semibold text-small">
+            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+          </p>
+          <p className="font-medium text-tiny text-default-500">
+            {session?.user?.email ?? ""}
+          </p>
+        </DropdownItem>
+
+        <DropdownItem
+          key="settings"
+          onPress={() => router.push("/settings")}
+          startContent={<Icon icon="solar:settings-linear" width={16} />}
+        >
+          {tSafe(t, "navbar.mySettings", "My settings")}
+        </DropdownItem>
+
+        {/* ПАНЕЛИ (вернули) */}
+        {portalItems.length ? (
+          <>
+            <DropdownItem key="portals-title" className="cursor-default text-default-500">
+              Portals
+            </DropdownItem>
+
+            {portalItems.map((it) => (
+              <DropdownItem
+                key={`portal-${it.role}`}
+                onPress={() => goPortal(it.role)}
+                startContent={<Icon icon={it.icon} width={16} />}
+              >
+                {it.label}
+              </DropdownItem>
+            ))}
+          </>
+        ) : null}
+
+        {!hasAdmin && roles.length < 3 ? (
+          <DropdownItem
+            key="add-role"
+            onPress={onAddRole}
+            startContent={<Icon icon="solar:add-circle-linear" width={16} />}
+          >
+            Sign in another panel
+          </DropdownItem>
+        ) : null}
+
+        <DropdownItem
+          key="logout"
+          color="danger"
+          startContent={<Icon icon="solar:logout-linear" width={16} />}
+          onPress={handleLogout}
+        >
+          {tSafe(t, "navbar.logOut", "Log out")}
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+export const Navbar = React.memo(() => {
+  const { t } = useTranslation();
+  const { supabase, session, roles, activeRole, setActiveRole } = useSupabase();
+
+  const pathname = usePathname() ?? "";
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [authOpen, setAuthOpen] = React.useState(false);
+  const [authRole, setAuthRole] = React.useState<"CUSTOMER" | "PARTNER" | "PATIENT" | null>(null);
+
+  const navItems = useMemo(() => getAccessibleNavItems(activeRole), [activeRole]);
+
+  const isAuth = useMemo(
+    () => pathname.startsWith("/login") || pathname.startsWith("/auth"),
+    [pathname],
+  );
+
+  // На /auth/* показываем урезанный navbar
+  if (isAuth) {
+    return (
+      <HeroUINavbar
+        className="border-b border-divider"
+        height="64px"
+        maxWidth="xl"
+      >
+        <NavbarContent justify="end">
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+        </NavbarContent>
+      </HeroUINavbar>
+    );
+  }
+
+  return (
+    <>
+      <HeroUINavbar
+        className="border-b border-divider bg-background/80 backdrop-blur-md"
+        height="64px"
+        maxWidth="xl"
+        shouldHideOnScroll
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+      >
+        <NavbarBrand className="gap-2">
+          <NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
+          <NextLink
+            prefetch
+            className="font-bold text-xl text-inherit hover:text-primary transition-colors"
+            href="/"
+          >
+            MedTravel
+          </NextLink>
+        </NavbarBrand>
+
+        <NavbarContent
+          className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6"
+          justify="center"
+        >
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
+            return (
+              <NavItemLink
+                key={item.key}
+                active={active}
+                item={item}
+                t={t}
+              />
+            );
+          })}
+        </NavbarContent>
+
+        <NavbarContent
+          className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0"
+          justify="end"
+        >
+          <NavbarItem>
+            <LanguageSwitcher />
+          </NavbarItem>
+          <NavbarItem>
+            <ThemeSwitch />
+          </NavbarItem>
+
+          {session && (
+            <NavbarItem>
+              <NotificationsBell />
+            </NavbarItem>
+          )}
+
+          <NavbarItem className="px-2">
+            {session ? (
+              <ProfileDropdownAuth
+                session={session}
+                roles={roles}
+                activeRole={activeRole}
+                setActiveRole={setActiveRole}
+                supabase={supabase}
+                t={t}
+                onAddRole={() => { setAuthRole(null); setAuthOpen(true); }}
+                />
+            ) : (
+                <Button
+                  variant="ghost"
+                  color="primary"
+                  startContent={<Icon icon="solar:user-linear" width={18} />}
+                  onPress={() => { setAuthRole(null); setAuthOpen(true); }}
+                  className="hidden sm:flex"
+                >
+                  Sign up / Sign in
+                </Button>
+            )}
+
+            {!session ? (
+              <Button
+                className="h-8 w-8 min-w-0 p-0 sm:hidden"
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setAuthRole(null);
+                  setAuthOpen(true);
+                }}
+              >
+                <Icon className="text-default-500" icon="solar:user-linear" width={24} />
+              </Button>
+            ) : null}
+          </NavbarItem>
+        </NavbarContent>
+
+        <NavbarMenu className="flex justify-center pt-6">
+          <div className="w-full max-w-screen-md mx-auto space-y-2">
+            {navItems.map((item) => (
+              <MobileNavItem
+                key={item.key}
+                active={
+                  pathname === item.href ||
+                  (item.href !== "/" &&
+                    pathname.startsWith(item.href))
+                }
+                item={item}
+                t={t}
+                onClose={() => setIsMenuOpen(false)}
+              />
+            ))}
+          </div>
+        </NavbarMenu>
+      </HeroUINavbar>
+
+      <UnifiedAuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialRole={authRole}
+        next={pathname || "/"}
+      />
+    </>
+  );
+});
+Navbar.displayName = "Navbar";
+"""
