@@ -131,9 +131,10 @@ export default function AuthLoginClient({ as, next, pending }: Props) {
 
             <Divider />
 
-            {pending === "1" && role === "CUSTOMER" ? (
+            {pending === "1" && (role === "CUSTOMER" || role === "PARTNER") ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                Ваш email подтвержден. Заявка на доступ к customer-панели отправлена. Ожидайте письмо об одобрении.
+                Ваш email подтвержден. Заявка на доступ к {role === "CUSTOMER" ? "customer" : "partner"}-панели отправлена.
+                Ожидайте письмо об одобрении.
               </div>
             ) : null}
 

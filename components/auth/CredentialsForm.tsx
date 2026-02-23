@@ -160,25 +160,31 @@ export default function CredentialsForm({
           return;
         }
 
-        // ✅ для PATIENT/PARTNER оставляем как было (можно слегка почистить, но пусть)
-        const roleSlug = role.toLowerCase();
+        // ✅ PATIENT: можно оставить как было
+        if (roleUpper === "PATIENT") {
+          const roleSlug = "patient";
 
-        await supabase.from("user_roles").upsert(
-          { user_id: userId, role: roleSlug },
-          { onConflict: "user_id,role" }
-        );
+          await supabase.from("user_roles").upsert(
+            { user_id: userId, role: roleSlug },
+            { onConflict: "user_id,role" }
+          );
 
-        await supabase.from("profiles").upsert(
-          { id: userId, email, role: roleSlug },
-          { onConflict: "id" }
-        );
+          await supabase.from("profiles").upsert(
+            { id: userId, email, role: roleSlug },
+            { onConflict: "id" }
+          );
 
-        setActiveRole(roleUpper as any);
-        await refreshRoles();
+          setActiveRole("PATIENT" as any);
+          await refreshRoles();
+          await supabase.auth.updateUser({ data: { requested_role: role } });
 
-        await supabase.auth.updateUser({ data: { requested_role: role } });
+          onSignedIn?.();
+          return;
+        }
 
-        onSignedIn?.();
+        // ❗ PARTNER/CUSTOMER сюда не должны доходить (они обработаны выше)
+        setErrorMsg("Invalid role flow.");
+        await supabase.auth.signOut();
         return;
       }
 

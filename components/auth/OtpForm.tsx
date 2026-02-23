@@ -111,14 +111,21 @@ export default function OtpForm({
       }
 
       // успех verify otp
-      if (String(as).toUpperCase() === "CUSTOMER") {
-        // создаём заявку
-        const r2 = await fetch("/api/customer/registration/request", {
+      const roleUpper = String(as).toUpperCase();
+
+      if (roleUpper === "CUSTOMER" || roleUpper === "PARTNER") {
+        const endpoint =
+          roleUpper === "CUSTOMER"
+            ? "/api/customer/registration/request"
+            : "/api/partner/registration/request";
+
+        const r2 = await fetch(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email }),
           cache: "no-store",
         });
+
         const j2 = await r2.json().catch(() => ({}));
         if (!r2.ok) {
           setErrorMsg(j2?.error || "Failed to submit request");
@@ -126,10 +133,12 @@ export default function OtpForm({
         }
 
         setSuccessMsg(
-          "Ваш email подтвержден. Заявка на доступ к customer-панели отправлена. Ожидайте одобрения — на email придет письмо после завершения регистрации."
+          roleUpper === "CUSTOMER"
+            ? "Ваш email подтвержден. Заявка на доступ к customer-панели отправлена. Ожидайте одобрения — на email придет письмо."
+            : "Ваш email подтвержден. Заявка на доступ к partner-панели отправлена. Ожидайте одобрения — на email придет письмо."
         );
 
-        // НЕ логиним, НЕ редиректим НЕ закрываем модалку
+        // НЕ логиним и не редиректим — как CUSTOMER
         return;
       }
 
