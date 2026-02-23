@@ -14014,3 +14014,1295 @@ export async function PATCH(req: NextRequest) {
   });
 }
 """
+
+-------------------------------
+
+app\(admin)\admin\customer-signup-requests\page.tsx: """
+import CustomerSignupRequestsClient from "@/components/admin/CustomerSignupRequestsClient";
+
+export const dynamic = "force-dynamic";
+
+export default function Page() {
+  return <CustomerSignupRequestsClient />;
+}
+"""
+components\admin\CustomerSignupRequestsClient.tsx: """
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type Row = {
+  id: string;
+  user_id: string;
+  email: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  decided_at: string | null;
+  admin_note: string | null;
+};
+
+function fmt(dt?: string | null) {
+  if (!dt) return "—";
+  try {
+    return new Date(dt).toLocaleString();
+  } catch {
+    return dt;
+  }
+}
+
+export default function CustomerSignupRequestsClient() {
+  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("all");
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<Row[]>([]);
+  const [total, setTotal] = useState(0);
+
+  const [limit] = useState(20);
+  const [offset, setOffset] = useState(0);
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const canPrev = offset > 0;
+  const canNext = offset + limit < total;
+
+  const queryUrl = useMemo(() => {
+    const sp = new URLSearchParams();
+    sp.set("status", status);
+    if (q.trim()) sp.set("q", q.trim());
+    sp.set("limit", String(limit));
+    sp.set("offset", String(offset));
+    return `/api/admin/customer-signup-requests?${sp.toString()}`;
+  }, [status, q, limit, offset]);
+
+  async function load() {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(queryUrl, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Failed to load");
+      setItems(json.items ?? []);
+      setTotal(Number(json.total ?? 0));
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryUrl]);
+
+  async function approve(id: string) {
+    if (!confirm("Approve this customer request?")) return;
+    setToast(null);
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/customer-signup-requests/approve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Approve failed");
+      setToast("Approved and email sent.");
+      await load();
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+      setTimeout(() => setToast(null), 2500);
+    }
+  }
+
+  async function reject(id: string) {
+    const note = prompt("Reject note (optional):", "") ?? "";
+    if (!confirm("Reject this customer request?")) return;
+
+    setToast(null);
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/customer-signup-requests/reject", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, note: note.trim() || null }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Reject failed");
+      setToast("Rejected and email sent.");
+      await load();
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+      setTimeout(() => setToast(null), 2500);
+    }
+  }
+
+  return (
+    <div className="p-6 space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Customer signup requests</h1>
+          <p className="text-sm text-slate-500">
+            Approve or reject clinic (customer) registration requests
+          </p>
+        </div>
+
+        <button
+          onClick={() => load()}
+          disabled={busy}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {toast ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {toast}
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border bg-white p-4 space-y-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="flex gap-2 flex-wrap">
+            {(["pending", "approved", "rejected", "all"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setOffset(0);
+                  setStatus(s);
+                }}
+                className={[
+                  "rounded-full px-3 py-1 text-sm border",
+                  status === s
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "border-slate-200 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search by email..."
+              className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            />
+            <button
+              disabled={busy}
+              onClick={() => {
+                setOffset(0);
+                load();
+              }}
+              className="h-9 rounded-lg border border-slate-200 px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
+            >
+              Search
+            </button>
+          </div>
+        </div>
+
+        <div className="text-sm text-slate-500">
+          Showing <b>{items.length}</b> of <b>{total}</b>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left border-b">
+                <th className="py-2 pr-3">Email</th>
+                <th className="py-2 pr-3">Status</th>
+                <th className="py-2 pr-3">Created</th>
+                <th className="py-2 pr-3">Decided</th>
+                <th className="py-2 pr-3">Note</th>
+                <th className="py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {items.map((r) => (
+                <tr key={r.id} className="border-b last:border-b-0">
+                  <td className="py-3 pr-3">
+                    <div className="font-medium text-slate-900">{r.email}</div>
+                    <div className="text-xs text-slate-500">{r.user_id}</div>
+                  </td>
+
+                  <td className="py-3 pr-3">
+                    <span
+                      className={[
+                        "inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
+                        r.status === "pending"
+                          ? "bg-amber-50 text-amber-700"
+                          : r.status === "approved"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-red-50 text-red-700",
+                      ].join(" ")}
+                    >
+                      {r.status}
+                    </span>
+                  </td>
+
+                  <td className="py-3 pr-3">{fmt(r.created_at)}</td>
+                  <td className="py-3 pr-3">{fmt(r.decided_at)}</td>
+                  <td className="py-3 pr-3 text-slate-600">{r.admin_note || "—"}</td>
+
+                  <td className="py-3 text-right">
+                    {r.status === "pending" ? (
+                      <div className="inline-flex gap-2">
+                        <button
+                          disabled={busy}
+                          onClick={() => approve(r.id)}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => reject(r.id)}
+                          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-500">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+              {!items.length ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                    No requests found
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <button
+            disabled={busy || !canPrev}
+            onClick={() => setOffset((o) => Math.max(0, o - limit))}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
+          >
+            ← Prev
+          </button>
+
+          <div className="text-sm text-slate-500">
+            Page {Math.floor(offset / limit) + 1} / {Math.max(1, Math.ceil(total / limit))}
+          </div>
+
+          <button
+            disabled={busy || !canNext}
+            onClick={() => setOffset((o) => o + limit)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+"""
+app\api\admin\customer-signup-requests\route.ts: """
+import { NextRequest, NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+async function isAdmin(supabase: any, userId: string) {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+
+  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
+  return roles.includes("admin");
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = await createRouteClient();
+
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth?.user;
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const ok = await isAdmin(supabase, user.id);
+  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const url = new URL(req.url);
+
+  const status = (url.searchParams.get("status") || "pending").toLowerCase(); // pending/approved/rejected/all
+  const q = (url.searchParams.get("q") || "").trim().toLowerCase();
+
+  const limit = Math.min(Number(url.searchParams.get("limit") || "20"), 100);
+  const offset = Math.max(Number(url.searchParams.get("offset") || "0"), 0);
+
+  let query = supabase
+    .from("customer_registration_requests")
+    .select(
+      "id,user_id,email,status,created_at,decided_at,decided_by,admin_note",
+      { count: "exact" }
+    )
+    .order("created_at", { ascending: false });
+
+  if (status !== "all") query = query.eq("status", status);
+  if (q) query = query.ilike("email", `%${q}%`);
+
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({
+    items: data ?? [],
+    total: Number(count ?? 0),
+    limit,
+    offset,
+  });
+}
+"""
+app\api\admin\customer-signup-requests\approve\route.ts: """
+import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { resendSend, customerApprovedTemplate } from "@/lib/mail/resend";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+async function isAdmin(supabase: any, userId: string) {
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
+  return roles.includes("admin");
+}
+
+export async function POST(req: Request) {
+  const supabase = await createRouteClient();
+
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user;
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const ok = await isAdmin(supabase, me.id);
+  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const id = String(body?.id || "");
+  const note = body?.note ? String(body.note).slice(0, 500) : null;
+
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const sb = createServiceClient();
+
+  const { data: row, error: selErr } = await sb
+    .from("customer_registration_requests")
+    .select("id,user_id,email,status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (row.status !== "pending") {
+    return NextResponse.json({ error: "Request already processed" }, { status: 400 });
+  }
+
+  // 1) роль customer
+  await sb.from("user_roles").upsert(
+    { user_id: row.user_id, role: "customer" },
+    { onConflict: "user_id,role" }
+  );
+
+  await sb.from("profiles").upsert(
+    { id: row.user_id, email: row.email, role: "customer" },
+    { onConflict: "id" }
+  );
+
+  // 2) обновляем заявку
+  const { error: updErr } = await sb
+    .from("customer_registration_requests")
+    .update({
+      status: "approved",
+      decided_at: new Date().toISOString(),
+      decided_by: me.id,
+      admin_note: note,
+    })
+    .eq("id", id);
+
+  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+  // 3) письмо
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://medtravel.me";
+  const loginUrl = `${origin}/auth/login?as=CUSTOMER&next=%2Fcustomer`;
+
+  const tpl = customerApprovedTemplate(loginUrl);
+  await resendSend({ to: String(row.email).toLowerCase(), subject: tpl.subject, html: tpl.html });
+
+  return NextResponse.json({ ok: true });
+}
+"""
+app\api\admin\customer-signup-requests\reject\route.ts: """
+import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { resendSend, customerRejectedTemplate } from "@/lib/mail/resend";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+async function isAdmin(supabase: any, userId: string) {
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
+  return roles.includes("admin");
+}
+
+export async function POST(req: Request) {
+  const supabase = await createRouteClient();
+
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user;
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const ok = await isAdmin(supabase, me.id);
+  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const id = String(body?.id || "");
+  const note = body?.note ? String(body.note).slice(0, 500) : null;
+
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const sb = createServiceClient();
+
+  const { data: row, error: selErr } = await sb
+    .from("customer_registration_requests")
+    .select("id,user_id,email,status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (row.status !== "pending") {
+    return NextResponse.json({ error: "Request already processed" }, { status: 400 });
+  }
+
+  const { error: updErr } = await sb
+    .from("customer_registration_requests")
+    .update({
+      status: "rejected",
+      decided_at: new Date().toISOString(),
+      decided_by: me.id,
+      admin_note: note,
+    })
+    .eq("id", id);
+
+  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+  const tpl = customerRejectedTemplate();
+  await resendSend({ to: String(row.email).toLowerCase(), subject: tpl.subject, html: tpl.html });
+
+  return NextResponse.json({ ok: true });
+}
+"""
+lib\mail\resend.ts: """
+export async function resendSend(params: { to: string; subject: string; html: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM ?? process.env.EMAIL_FROM;
+
+  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
+  if (!from) throw new Error("Missing RESEND_FROM (or EMAIL_FROM)");
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [params.to],
+      subject: params.subject,
+      html: params.html,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Resend: failed to send email");
+  }
+}
+
+export function customerApprovedTemplate(loginUrl: string) {
+  return {
+    subject: "Your MedTravel Clinic account is approved",
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">Approved ✅</h2>
+        <p style="margin:0 0 12px">Your request to access the Clinic (Customer) panel has been approved.</p>
+        <p style="margin:0 0 12px">You can now sign in using the email and password you set during registration.</p>
+        <a href="${loginUrl}"
+           style="display:inline-block;margin-top:10px;padding:10px 14px;background:#10b981;color:white;text-decoration:none;border-radius:10px;font-weight:600">
+          Sign in to Clinic panel
+        </a>
+      </div>
+    `,
+  };
+}
+
+export function customerRejectedTemplate() {
+  return {
+    subject: "Your MedTravel Clinic request was rejected",
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">Request rejected</h2>
+        <p style="margin:0 0 12px">Unfortunately, your request to access the Clinic (Customer) panel was rejected.</p>
+        <p style="margin:0;color:#71717a">If you think this is a mistake, please contact support.</p>
+      </div>
+    `,
+  };
+}
+
+export function patientMagicLinkTemplate(loginUrl: string) {
+  return {
+    subject: "Your MedTravel Patient account is ready",
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">Your patient account is ready ✅</h2>
+        <p style="margin:0 0 12px">
+          We created your MedTravel Patient account and linked it to this email.
+        </p>
+        <p style="margin:0 0 12px">
+          Click the button below to sign in to your Patient dashboard:
+        </p>
+
+        <a href="${loginUrl}"
+           style="display:inline-block;margin-top:10px;padding:10px 14px;background:#10b981;color:white;text-decoration:none;border-radius:10px;font-weight:600">
+          Sign in to Patient dashboard
+        </a>
+
+        <p style="margin:16px 0 0;color:#71717a;font-size:12px">
+          After signing in, we recommend setting a password in Settings for faster access next time.
+        </p>
+      </div>
+    `,
+  };
+}
+
+export function partnerNewLeadTemplate(params: {
+  partnerName?: string | null;
+  leadsUrl: string;
+  lead: {
+    full_name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    source?: string | null;
+    created_at?: string | null;
+  };
+}) {
+  const partnerName = params.partnerName?.trim() || "Partner";
+  const leadName = params.lead.full_name?.trim() || "New lead";
+
+  return {
+    subject: `New lead assigned — MedTravel`,
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">New lead assigned ✅</h2>
+        <p style="margin:0 0 12px">Hi ${partnerName}, a new lead has been assigned to you.</p>
+
+        <div style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fafafa">
+          <div style="font-weight:600;margin:0 0 6px">${leadName}</div>
+          ${params.lead.phone ? `<div style="margin:0 0 4px;color:#374151"><b>Phone:</b> ${params.lead.phone}</div>` : ""}
+          ${params.lead.email ? `<div style="margin:0 0 4px;color:#374151"><b>Email:</b> ${params.lead.email}</div>` : ""}
+          ${params.lead.source ? `<div style="margin:0 0 4px;color:#6b7280;font-size:12px"><b>Source:</b> ${params.lead.source}</div>` : ""}
+          ${params.lead.created_at ? `<div style="margin:0;color:#6b7280;font-size:12px"><b>Created:</b> ${params.lead.created_at}</div>` : ""}
+        </div>
+
+        <a href="${params.leadsUrl}"
+           style="display:inline-block;margin-top:10px;padding:10px 14px;background:#10b981;color:white;text-decoration:none;border-radius:10px;font-weight:600">
+          Open Partner leads
+        </a>
+
+        <p style="margin:16px 0 0;color:#71717a;font-size:12px">
+          If you didn’t expect this email, just ignore it.
+        </p>
+      </div>
+    `,
+  };
+}
+"""
+
+---------------------------- last
+
+app\auth\callback\route.ts: """
+// app/auth/callback/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type RoleName = "CUSTOMER" | "PARTNER" | "PATIENT" | "ADMIN" | "GUEST";
+
+function normalizeRole(asParam?: string | null): RoleName {
+  const as = (asParam ?? "").toUpperCase();
+  if (as === "CUSTOMER") return "CUSTOMER";
+  if (as === "PARTNER") return "PARTNER";
+  if (as === "PATIENT") return "PATIENT";
+  if (as === "ADMIN") return "ADMIN";
+  return "GUEST";
+}
+
+function normCode(v: string) {
+  return String(v || "").trim().toUpperCase();
+}
+
+async function ensureProfileAndRole(supabase: any, asParam: string | null) {
+  const { data: u } = await supabase.auth.getUser();
+  const user = u?.user;
+  if (!user) return;
+
+  const userId = user.id;
+  const email = user.email ?? null;
+  const meta: any = user.user_metadata ?? {};
+
+  const fromAs = normalizeRole(asParam);
+
+  const metaRoleRaw = (meta.requested_role as string | undefined)?.toUpperCase();
+  const metaRole: RoleName =
+    metaRoleRaw === "ADMIN" ||
+    metaRoleRaw === "CUSTOMER" ||
+    metaRoleRaw === "PARTNER" ||
+    metaRoleRaw === "PATIENT"
+      ? (metaRoleRaw as RoleName)
+      : "GUEST";
+
+  const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
+
+  // ✅ CUSTOMER: выдаём доступ ТОЛЬКО если заявка approved
+  if (finalRole === "CUSTOMER") {
+    const sb = createServiceClient();
+
+    const { data: reqRow, error: reqErr } = await sb
+      .from("customer_registration_requests")
+      .select("status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const st = String(reqRow?.status ?? "").toLowerCase();
+
+    if (!reqErr && st === "approved") {
+      // ✅ уже одобрен — даём роль customer и пускаем
+      await supabase
+        .from("profiles")
+        .upsert({ id: userId, email, role: "customer" }, { onConflict: "id" });
+
+      await supabase
+        .from("user_roles")
+        .upsert(
+          { user_id: userId, role: "customer" } as any,
+          { onConflict: "user_id,role" } as any
+        );
+
+      return { finalRole, customerPending: false };
+    }
+
+    // ❗ не одобрен — держим как guest и создаём/обновляем pending
+    await supabase
+      .from("profiles")
+      .upsert({ id: userId, email, role: "guest" }, { onConflict: "id" });
+
+    await createCustomerRequestIfNeeded(userId, email);
+
+    return { finalRole, customerPending: true };
+  }
+
+  // ✅ остальные роли — как раньше
+  await supabase
+    .from("profiles")
+    .upsert({ id: userId, email, role: finalRole.toLowerCase() }, { onConflict: "id" });
+
+  if (finalRole !== "GUEST") {
+    await supabase
+      .from("user_roles")
+      .upsert(
+        { user_id: userId, role: finalRole.toLowerCase() } as any,
+        { onConflict: "user_id,role" } as any
+      );
+  }
+
+  return { finalRole, customerPending: false };
+}
+
+async function createCustomerRequestIfNeeded(userId: string, email: string | null) {
+  if (!email) return;
+  const sb = createServiceClient();
+
+  await sb
+    .from("customer_registration_requests")
+    .upsert(
+      { user_id: userId, email, status: "pending" },
+      { onConflict: "user_id" }
+    );
+}
+
+/**
+ * IMPORTANT:
+ * - делаем attach через SERVICE ROLE (RLS не мешает)
+ * - cookie очищаем всегда, чтобы не висела
+ */
+async function attachReferralIfAny(
+  res: NextResponse,
+  asParam: string | null,
+  store: Awaited<ReturnType<typeof cookies>>,
+  patientUserId: string | null,
+) {
+  // прикрепляем только при входе как PATIENT
+  if (normalizeRole(asParam) !== "PATIENT") return;
+
+  const refCode = normCode(store.get("mt_ref_code")?.value ?? "");
+  if (!refCode) return;
+
+  const clear = () => {
+    res.cookies.set("mt_ref_code", "", { path: "/", maxAge: 0 });
+  };
+
+  if (!patientUserId) {
+    clear();
+    return;
+  }
+
+  const sb = createServiceClient();
+
+  // 1) найдём владельца кода (approved)
+  const { data: owner, error: ownerErr } = await sb
+    .from("partner_program_requests")
+    .select("user_id, program_key")
+    .eq("ref_code", refCode)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (ownerErr || !owner?.user_id) {
+    clear();
+    return;
+  }
+
+  // 2) пишем регистрацию (на дубль — ок)
+  // если у тебя unique на patient_user_id или на (patient_user_id, partner_user_id) — upsert/ignore must be safe
+  const { error: insErr } = await sb.from("partner_referrals").upsert(
+    {
+      ref_code: refCode,
+      partner_user_id: owner.user_id,
+      program_key: owner.program_key,
+      patient_user_id: patientUserId,
+    } as any,
+    { onConflict: "patient_user_id" }, // <-- если у тебя уникальность другая — скажешь, поправим
+  );
+
+  // если конфликт/дубль — не ломаем логин
+  // если ошибка реальная — тоже не ломаем, но можно поставить debug-cookie
+  if (insErr) {
+    res.cookies.set("mt_ref_attach_error", encodeURIComponent(insErr.message), {
+      path: "/",
+      httpOnly: false,
+      maxAge: 60,
+    });
+  }
+
+  clear();
+}
+
+type CookieToSet = { name: string; value: string; options?: any };
+
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code");
+  const next = url.searchParams.get("next") ?? "/";
+  const asParam = url.searchParams.get("as");
+
+  const res = NextResponse.redirect(new URL(next, req.url));
+  const store = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => store.getAll().map((c) => ({ name: c.name, value: c.value })),
+        setAll: (all: CookieToSet[]) => {
+          all.forEach((cookie) => {
+            res.cookies.set(cookie.name, cookie.value, cookie.options);
+          });
+        },
+      },
+    },
+  );
+
+  if (!code) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+  const result = await ensureProfileAndRole(supabase, asParam);
+
+  // CUSTOMER pending: разлогинить и показать сообщение
+  if (result?.customerPending) {
+    // очистит cookies через твою setAll()
+    await supabase.auth.signOut();
+
+    const pendingUrl = new URL("/auth/login", req.url);
+    pendingUrl.searchParams.set("as", "CUSTOMER");
+    pendingUrl.searchParams.set("pending", "1");
+    pendingUrl.searchParams.set("next", "/customer"); // на будущее
+    return NextResponse.redirect(pendingUrl);
+  }
+
+  await attachReferralIfAny(res, asParam, store, data?.user?.id ?? null);
+  return res;
+}
+"""
+app\api\auth\email\signup\route.ts: """
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+
+export const runtime = "nodejs";
+
+function isValidEmail(email: unknown) {
+  return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normRefCode(v: unknown) {
+  const s = String(v ?? "").trim().toUpperCase();
+  return s.length >= 6 ? s : "";
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+
+    const email = String(body?.email || "").trim().toLowerCase();
+    const password = String(body?.password || "");
+    const as = String(body?.as || "").trim().toUpperCase();
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    }
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters" },
+        { status: 400 },
+      );
+    }
+    if (!["PATIENT", "PARTNER", "CUSTOMER"].includes(as)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return NextResponse.json(
+        { error: "Server auth is not configured (missing Supabase envs)" },
+        { status: 500 },
+      );
+    }
+
+    const supabase = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // ✅ refCode берём либо из body.ref (если ты когда-то начнёшь слать),
+    // ✅ либо из httpOnly cookie mt_ref_code, которую ставит /ref/[code]
+    const store = await cookies();
+    const refFromCookie = store.get("mt_ref_code")?.value;
+    const refCode = normRefCode(body?.ref || refFromCookie);
+
+    // 1) создаём пользователя (НЕ шлём письма)
+    const { data: created, error: createErr } =
+      await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: {
+          requested_role: as,
+          // можно сохранить ref в метадате на будущее (не обязательно)
+          ...(refCode ? { ref_code: refCode } : {}),
+        },
+      });
+
+    if (createErr) {
+      const msg = String(createErr.message || "");
+      if (msg.toLowerCase().includes("already")) {
+        return NextResponse.json(
+          { error: "Account already exists. Please sign in." },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
+    const userId = created?.user?.id;
+    if (!userId) {
+      return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+    }
+
+    // 2) profiles (+ user_roles для НЕ customer)
+    if (as === "CUSTOMER") {
+      // customer: НЕ выдаём роль сразу
+      await supabase.from("profiles").upsert(
+        { id: userId, email, role: "guest", email_verified: false },
+        { onConflict: "id" }
+      );
+
+      // ❌ НЕ вставляем user_roles customer здесь
+    } else {
+      await supabase.from("profiles").upsert(
+        { id: userId, email, role: as.toLowerCase(), email_verified: false },
+        { onConflict: "id" }
+      );
+
+      await supabase.from("user_roles").upsert(
+        { user_id: userId, role: as.toLowerCase() },
+        { onConflict: "user_id,role" }
+      );
+    }
+
+    // 3) ✅ если это PATIENT и есть refCode — пишем регистрацию в partner_referrals
+    if (as === "PATIENT" && refCode) {
+      const { data: rows, error: lookupErr } = await supabase.rpc(
+        "partner_referral_code_lookup",
+        { p_ref_code: refCode }
+      );
+
+      const owner = Array.isArray(rows) ? rows[0] : rows;
+      const partner_user_id = owner?.partner_user_id;
+      const program_key = owner?.program_key;
+
+      if (!lookupErr && partner_user_id && program_key) {
+        // вставляем (если у тебя есть unique constraint — лучше сделать upsert)
+        await supabase.from("partner_referrals").upsert(
+          {
+            ref_code: refCode,
+            partner_user_id,
+            program_key,
+            patient_user_id: userId,
+          } as any,
+          { onConflict: "patient_user_id" }
+        );
+      }
+    }
+
+    const res = NextResponse.json({ ok: true });
+
+    // (опционально) очищаем cookie, чтобы не засчитывать повторно
+    res.cookies.set("mt_ref_code", "", { path: "/", maxAge: 0 });
+
+    return res;
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  }
+}
+"""
+app\api\customer\registration\request\route.ts: """
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+export const dynamic = "force-dynamic";
+
+function adminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, service, { auth: { persistSession: false } });
+}
+
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}));
+  const email = String(body?.email ?? "").trim().toLowerCase();
+
+  if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
+
+  const supabase = adminClient();
+
+  // найти пользователя в auth по email
+  const { data: users, error: e1 } = await supabase.auth.admin.listUsers({ page: 1, perPage: 2000 });
+  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
+
+  const u = users.users.find((x) => String(x.email || "").toLowerCase() === email);
+  if (!u) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // upsert заявки (одна на user_id)
+  const { error } = await supabase
+    .from("customer_registration_requests")
+    .upsert(
+      { user_id: u.id, email, status: "pending" },
+      { onConflict: "user_id" }
+    );
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}
+"""
+components\auth\CredentialsForm.tsx: """
+// components/auth/CredentialsForm.tsx
+"use client";
+
+import React, { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button, Input } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+type Mode = "signin" | "signup";
+
+type Props = {
+  mode: Mode;
+  role: string; // PATIENT | PARTNER | CUSTOMER
+  next: string;
+
+  onOtpRequired: (payload: { email: string; password: string }) => void;
+  onSignedIn?: () => void; // для модалки: закрыть
+};
+
+export default function CredentialsForm({
+  mode,
+  role,
+  next,
+  onOtpRequired,
+  onSignedIn,
+}: Props) {
+  const { supabase, refreshRoles, setActiveRole } = useSupabase();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showPass, setShowPass] = useState(false);
+
+  const schema = useMemo(() => {
+    const base = {
+      email: z.string().email("Enter a valid email"),
+      password: z.string().min(8, "Password must be at least 8 characters"),
+    };
+
+    if (mode === "signin") {
+      return z.object(base);
+    }
+
+    return z
+      .object({
+        ...base,
+        password2: z.string().min(8, "Password must be at least 8 characters"),
+      })
+      .refine((v) => v.password === v.password2, {
+        message: "Passwords do not match",
+        path: ["password2"],
+      });
+  }, [mode]);
+
+  type FormValues = z.infer<typeof schema>;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    setErrorMsg(null);
+
+    const email = String(data.email).trim().toLowerCase();
+    const password = String(data.password);
+
+    try {
+      if (mode === "signin") {
+        const { data: signData, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          setErrorMsg(error.message);
+          return;
+        }
+
+        const userId = signData.user?.id;
+        if (!userId) {
+          setErrorMsg("No user");
+          return;
+        }
+
+        const roleUpper = role.toUpperCase();
+
+        if (roleUpper === "CUSTOMER") {
+          // подтянуть роли (должна появиться только после одобрения админом)
+          await refreshRoles();
+
+          // проверим, есть ли CUSTOMER в user_roles
+          const { data: ur } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId)
+            .eq("role", "customer")
+            .maybeSingle();
+
+          if (!ur) {
+            // читаем статус заявки (разрешено политикой "customer can read own request")
+            const { data: reqRow } = await supabase
+              .from("customer_registration_requests")
+              .select("status")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            const st = String(reqRow?.status ?? "pending");
+
+            await supabase.auth.signOut();
+
+            if (st === "rejected") {
+              setErrorMsg("Ваша заявка на доступ к customer-панели отклонена. Свяжитесь с поддержкой.");
+            } else {
+              setErrorMsg("Ваша заявка на доступ к customer-панели ещё рассматривается. Дождитесь письма об одобрении.");
+            }
+            return;
+          }
+
+          // роль есть — всё ок
+          setActiveRole("CUSTOMER" as any);
+          await refreshRoles();
+
+          onSignedIn?.();
+          return;
+        }
+
+        // ✅ для PATIENT/PARTNER оставляем как было (можно слегка почистить, но пусть)
+        const roleSlug = role.toLowerCase();
+
+        await supabase.from("user_roles").upsert(
+          { user_id: userId, role: roleSlug },
+          { onConflict: "user_id,role" }
+        );
+
+        await supabase.from("profiles").upsert(
+          { id: userId, email, role: roleSlug },
+          { onConflict: "id" }
+        );
+
+        setActiveRole(roleUpper as any);
+        await refreshRoles();
+
+        await supabase.auth.updateUser({ data: { requested_role: role } });
+
+        onSignedIn?.();
+        return;
+      }
+
+      // signup
+      const res = await fetch("/api/auth/email/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password, as: role, next }),
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(json?.error || "Failed to sign up");
+        return;
+      }
+
+      // отправляем OTP (теперь user уже существует, send-otp пропустит)
+      const res2 = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, as: role, next, purpose: "verify_email" }),
+        cache: "no-store",
+      });
+
+      const json2 = await res2.json().catch(() => ({}));
+      if (!res2.ok) {
+        setErrorMsg(json2?.error || "Failed to send code");
+        return;
+      }
+
+      onOtpRequired({ email, password });
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Network error");
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
+      <Input
+        isRequired
+        type="email"
+        variant="bordered"
+        placeholder="you@email.com"
+        errorMessage={errors.email?.message as any}
+        {...register("email")}
+      />
+
+      <Input
+        isRequired
+        type={showPass ? "text" : "password"}
+        variant="bordered"
+        placeholder="Password"
+        errorMessage={errors.password?.message as any}
+        endContent={
+          <button
+            type="button"
+            className="text-default-500"
+            onClick={() => setShowPass((s) => !s)}
+            aria-label="toggle password"
+          >
+            <Icon icon={showPass ? "solar:eye-closed-linear" : "solar:eye-linear"} width={18} />
+          </button>
+        }
+        {...register("password")}
+      />
+
+      {mode === "signup" ? (
+        <Input
+          isRequired
+          type={showPass ? "text" : "password"}
+          variant="bordered"
+          placeholder="Confirm password"
+          errorMessage={(errors as any).password2?.message}
+          {...register("password2" as any)}
+        />
+      ) : null}
+
+      {errorMsg && <p className="text-danger text-small">{errorMsg}</p>}
+
+      <Button
+        color="primary"
+        isLoading={isSubmitting}
+        type="submit"
+        className="justify-center"
+        startContent={<Icon icon={mode === "signin" ? "solar:login-3-linear" : "solar:user-plus-linear"} width={18} />}
+      >
+        {mode === "signin" ? "Sign in" : "Create account"}
+      </Button>
+    </form>
+  );
+}
+"""

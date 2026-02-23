@@ -44,6 +44,7 @@ const GROUPS: Group[] = [
       { label: "Clinic Requests", href: "/admin/clinic-requests", icon: Inbox },
       { label: "New Clinic Requests", href: "/admin/new-clinic-requests", icon: Inbox },
       { label: "Customer Signup Requests", href: "/admin/customer-signup-requests", icon: UserPlus },
+      { label: "Partner Signup Requests", href: "/admin/partner-signup-requests", icon: UserPlus },
       { label: "Partner Leads", href: "/admin/partner-leads", icon: Inbox },
     ],
   },

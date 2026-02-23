@@ -22,6 +22,22 @@ function normCode(v: string) {
   return String(v || "").trim().toUpperCase();
 }
 
+async function createCustomerRequestIfNeeded(userId: string, email: string | null) {
+  if (!email) return;
+  const sb = createServiceClient();
+  await sb
+    .from("customer_registration_requests")
+    .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
+}
+
+async function createPartnerRequestIfNeeded(userId: string, email: string | null) {
+  if (!email) return;
+  const sb = createServiceClient();
+  await sb
+    .from("partner_registration_requests")
+    .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
+}
+
 async function ensureProfileAndRole(supabase: any, asParam: string | null) {
   const { data: u } = await supabase.auth.getUser();
   const user = u?.user;
@@ -44,7 +60,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
 
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
-  // ✅ CUSTOMER: выдаём доступ ТОЛЬКО если заявка approved
+  // ✅ CUSTOMER gating
   if (finalRole === "CUSTOMER") {
     const sb = createServiceClient();
 
@@ -57,29 +73,57 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
     const st = String(reqRow?.status ?? "").toLowerCase();
 
     if (!reqErr && st === "approved") {
-      // ✅ уже одобрен — даём роль customer и пускаем
       await supabase
         .from("profiles")
         .upsert({ id: userId, email, role: "customer" }, { onConflict: "id" });
 
       await supabase
         .from("user_roles")
-        .upsert(
-          { user_id: userId, role: "customer" } as any,
-          { onConflict: "user_id,role" } as any
-        );
+        .upsert({ user_id: userId, role: "customer" } as any, { onConflict: "user_id,role" } as any);
 
-      return { finalRole, customerPending: false };
+      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" };
     }
 
-    // ❗ не одобрен — держим как guest и создаём/обновляем pending
     await supabase
       .from("profiles")
       .upsert({ id: userId, email, role: "guest" }, { onConflict: "id" });
 
     await createCustomerRequestIfNeeded(userId, email);
 
-    return { finalRole, customerPending: true };
+    return { finalRole, pendingKind: "CUSTOMER" as const };
+  }
+
+  // ✅ PARTNER gating (новое)
+  if (finalRole === "PARTNER") {
+    const sb = createServiceClient();
+
+    const { data: reqRow, error: reqErr } = await sb
+      .from("partner_registration_requests")
+      .select("status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const st = String(reqRow?.status ?? "").toLowerCase();
+
+    if (!reqErr && st === "approved") {
+      await supabase
+        .from("profiles")
+        .upsert({ id: userId, email, role: "partner" }, { onConflict: "id" });
+
+      await supabase
+        .from("user_roles")
+        .upsert({ user_id: userId, role: "partner" } as any, { onConflict: "user_id,role" } as any);
+
+      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" };
+    }
+
+    await supabase
+      .from("profiles")
+      .upsert({ id: userId, email, role: "guest" }, { onConflict: "id" });
+
+    await createPartnerRequestIfNeeded(userId, email);
+
+    return { finalRole, pendingKind: "PARTNER" as const };
   }
 
   // ✅ остальные роли — как раньше
@@ -90,30 +134,15 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
   if (finalRole !== "GUEST") {
     await supabase
       .from("user_roles")
-      .upsert(
-        { user_id: userId, role: finalRole.toLowerCase() } as any,
-        { onConflict: "user_id,role" } as any
-      );
+      .upsert({ user_id: userId, role: finalRole.toLowerCase() } as any, { onConflict: "user_id,role" } as any);
   }
 
-  return { finalRole, customerPending: false };
-}
-
-async function createCustomerRequestIfNeeded(userId: string, email: string | null) {
-  if (!email) return;
-  const sb = createServiceClient();
-
-  await sb
-    .from("customer_registration_requests")
-    .upsert(
-      { user_id: userId, email, status: "pending" },
-      { onConflict: "user_id" }
-    );
+  return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" };
 }
 
 /**
  * IMPORTANT:
- * - делаем attach через SERVICE ROLE (RLS не мешает)
+ * - attach делаем через SERVICE ROLE (RLS не мешает)
  * - cookie очищаем всегда, чтобы не висела
  */
 async function attachReferralIfAny(
@@ -122,7 +151,6 @@ async function attachReferralIfAny(
   store: Awaited<ReturnType<typeof cookies>>,
   patientUserId: string | null,
 ) {
-  // прикрепляем только при входе как PATIENT
   if (normalizeRole(asParam) !== "PATIENT") return;
 
   const refCode = normCode(store.get("mt_ref_code")?.value ?? "");
@@ -139,7 +167,6 @@ async function attachReferralIfAny(
 
   const sb = createServiceClient();
 
-  // 1) найдём владельца кода (approved)
   const { data: owner, error: ownerErr } = await sb
     .from("partner_program_requests")
     .select("user_id, program_key")
@@ -154,8 +181,6 @@ async function attachReferralIfAny(
     return;
   }
 
-  // 2) пишем регистрацию (на дубль — ок)
-  // если у тебя unique на patient_user_id или на (patient_user_id, partner_user_id) — upsert/ignore must be safe
   const { error: insErr } = await sb.from("partner_referrals").upsert(
     {
       ref_code: refCode,
@@ -163,11 +188,9 @@ async function attachReferralIfAny(
       program_key: owner.program_key,
       patient_user_id: patientUserId,
     } as any,
-    { onConflict: "patient_user_id" }, // <-- если у тебя уникальность другая — скажешь, поправим
+    { onConflict: "patient_user_id" },
   );
 
-  // если конфликт/дубль — не ломаем логин
-  // если ошибка реальная — тоже не ломаем, но можно поставить debug-cookie
   if (insErr) {
     res.cookies.set("mt_ref_attach_error", encodeURIComponent(insErr.message), {
       path: "/",
@@ -197,31 +220,27 @@ export async function GET(req: NextRequest) {
       cookies: {
         getAll: () => store.getAll().map((c) => ({ name: c.name, value: c.value })),
         setAll: (all: CookieToSet[]) => {
-          all.forEach((cookie) => {
-            res.cookies.set(cookie.name, cookie.value, cookie.options);
-          });
+          all.forEach((cookie) => res.cookies.set(cookie.name, cookie.value, cookie.options));
         },
       },
     },
   );
 
-  if (!code) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
+  if (!code) return NextResponse.redirect(new URL("/", req.url));
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) return NextResponse.redirect(new URL("/", req.url));
 
   const result = await ensureProfileAndRole(supabase, asParam);
 
-  // CUSTOMER pending: разлогинить и показать сообщение
-  if (result?.customerPending) {
-    // очистит cookies через твою setAll()
+  // CUSTOMER/PARTNER pending: разлогинить и показать сообщение
+  if (result?.pendingKind) {
     await supabase.auth.signOut();
 
     const pendingUrl = new URL("/auth/login", req.url);
-    pendingUrl.searchParams.set("as", "CUSTOMER");
+    pendingUrl.searchParams.set("as", result.pendingKind);
     pendingUrl.searchParams.set("pending", "1");
-    pendingUrl.searchParams.set("next", "/customer"); // на будущее
+    pendingUrl.searchParams.set("next", result.pendingKind === "CUSTOMER" ? "/customer" : "/partner");
     return NextResponse.redirect(pendingUrl);
   }
 

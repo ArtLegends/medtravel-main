@@ -124,6 +124,42 @@ export default function CredentialsForm({
           return;
         }
 
+        if (roleUpper === "PARTNER") {
+          await refreshRoles();
+
+          const { data: ur } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId)
+            .eq("role", "partner")
+            .maybeSingle();
+
+          if (!ur) {
+            const { data: reqRow } = await supabase
+              .from("partner_registration_requests")
+              .select("status")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            const st = String(reqRow?.status ?? "pending");
+
+            await supabase.auth.signOut();
+
+            if (st === "rejected") {
+              setErrorMsg("Ваша заявка на доступ к partner-панели отклонена. Свяжитесь с поддержкой.");
+            } else {
+              setErrorMsg("Ваша заявка на доступ к partner-панели ещё рассматривается. Дождитесь письма об одобрении.");
+            }
+            return;
+          }
+
+          setActiveRole("PARTNER" as any);
+          await refreshRoles();
+
+          onSignedIn?.();
+          return;
+        }
+
         // ✅ для PATIENT/PARTNER оставляем как было (можно слегка почистить, но пусть)
         const roleSlug = role.toLowerCase();
 
