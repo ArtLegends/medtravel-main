@@ -53,8 +53,8 @@ export default function LeadForm({
   const [patientEmailSent, setPatientEmailSent] = useState(false);
 
   const canSubmit = useMemo(() => {
-    return fullName.trim() && phone.trim() && email.trim();
-  }, [fullName, phone, email]);
+    return fullName.trim() && phone.trim()
+  }, [fullName, phone]);
 
   async function submit() {
     setError(null);
@@ -67,7 +67,8 @@ export default function LeadForm({
       fd.set("source", "hair-transplant-lp");
       fd.set("full_name", fullName.trim());
       fd.set("phone", phone.trim());
-      fd.set("email", email.trim());
+      const em = email.trim().toLowerCase();
+      if (em) fd.set("email", em);
       if (age.trim()) fd.set("age", age.trim());
       files.slice(0, 3).forEach((f) => fd.append("images", f));
 
@@ -108,7 +109,7 @@ export default function LeadForm({
     >
       <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
       <Input placeholder="Телефон*" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <Input placeholder="Email*" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
 
       <div className="mt-4">

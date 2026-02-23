@@ -15,10 +15,7 @@ function splitName(full: string) {
   const parts = s.split(" ");
   const first = parts[0] ?? "";
   const last = parts.slice(1).join(" ").trim();
-  return {
-    first_name: first || null,
-    last_name: last || null,
-  };
+  return { first_name: first || null, last_name: last || null };
 }
 
 async function ensurePatientAndSendMagicLink(params: {
@@ -30,7 +27,6 @@ async function ensurePatientAndSendMagicLink(params: {
 }) {
   const { supabase, origin, email, full_name, phone } = params;
 
-  // 1) ищем по profiles.email (быстро и без listUsers)
   const { data: prof, error: profErr } = await supabase
     .from("profiles")
     .select("id")
@@ -42,19 +38,14 @@ async function ensurePatientAndSendMagicLink(params: {
   let userId: string | null = prof?.id ?? null;
   let created = false;
 
-  // 2) если нет — создаём auth user
   if (!userId) {
     const { data: createdUser, error: createErr } = await supabase.auth.admin.createUser({
       email,
-      // пароль не задаём — вход по magic link
       email_confirm: false,
-      user_metadata: {
-        requested_role: "PATIENT",
-      },
+      user_metadata: { requested_role: "PATIENT" },
     });
 
     if (createErr) {
-      // если вдруг гонка и юзер уже есть — попробуем снова найти profile
       const msg = String(createErr.message || "");
       if (!msg.toLowerCase().includes("already")) throw new Error(msg);
 
@@ -75,38 +66,29 @@ async function ensurePatientAndSendMagicLink(params: {
 
   if (!userId) throw new Error("Failed to resolve user id");
 
-  // 3) гарантируем роль PATIENT (и в profiles, и в user_roles)
   const { first_name, last_name } = splitName(full_name);
 
-  // profiles
-  await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        email,
-        role: "patient",
-        first_name,
-        last_name,
-        phone: phone || null,
-        // email_verified НЕ трогаем здесь
-      } as any,
-      { onConflict: "id" },
-    );
+  await supabase.from("profiles").upsert(
+    {
+      id: userId,
+      email,
+      role: "patient",
+      first_name,
+      last_name,
+      phone: phone || null,
+    } as any,
+    { onConflict: "id" },
+  );
 
-  // user_roles
   await supabase
     .from("user_roles")
     .upsert({ user_id: userId, role: "patient" } as any, { onConflict: "user_id,role" } as any);
 
-  // 4) обновим user_metadata, чтобы SettingsPage сразу увидел имя/телефон
-  //    (Settings у тебя читает user.user_metadata)
   await supabase.auth.admin.updateUserById(userId, {
     user_metadata: {
       first_name,
       last_name,
       phone: phone || null,
-      // можно добавить display_name по желанию
       display_name: full_name || null,
       requested_role: "PATIENT",
     },
@@ -114,19 +96,17 @@ async function ensurePatientAndSendMagicLink(params: {
 
   const settingsUrl = `${origin}/settings`;
 
-  // создаём уведомление "Set password" (service role)
   await supabase.from("notifications").insert({
     user_id: userId,
     type: "set_password",
     data: {
       title: "Secure your account",
       message: "Set a password to sign in faster next time.",
-      action_url: settingsUrl, // или "/settings" если на клиенте относительный
+      action_url: settingsUrl,
     },
     is_read: false,
   });
 
-  // 5) генерим magic link (через callback, чтобы выставились cookies session)
   const redirectTo = `${origin}/auth/magic?as=PATIENT&next=${encodeURIComponent("/patient")}`;
 
   const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
@@ -144,7 +124,6 @@ async function ensurePatientAndSendMagicLink(params: {
 
   if (!actionLink) throw new Error("Failed to generate magic link");
 
-  // 6) письмо
   const tpl = patientMagicLinkTemplate(actionLink);
   await resendSend({ to: email, subject: tpl.subject, html: tpl.html });
 
@@ -160,13 +139,17 @@ export async function POST(req: NextRequest) {
     const source = String(fd.get("source") ?? "unknown").slice(0, 80);
     const full_name = String(fd.get("full_name") ?? "").trim();
     const phone = String(fd.get("phone") ?? "").trim();
-    const email = String(fd.get("email") ?? "").trim().toLowerCase();
     const ageRaw = String(fd.get("age") ?? "").trim();
+
+    const emailRaw = String(fd.get("email") ?? "").trim().toLowerCase();
+    const email = emailRaw || null;
 
     if (!full_name) return NextResponse.json({ error: "Введите ФИО" }, { status: 400 });
     if (!phone) return NextResponse.json({ error: "Введите телефон" }, { status: 400 });
-    if (!email) return NextResponse.json({ error: "Введите email" }, { status: 400 });
-    if (!safeEmail(email)) return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
+
+    if (email && !safeEmail(email)) {
+      return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
+    }
 
     const ageNum = ageRaw ? Number(ageRaw) : null;
     const age = Number.isFinite(ageNum as any) ? (ageNum as number) : null;
@@ -176,7 +159,6 @@ export async function POST(req: NextRequest) {
 
     const leadId = crypto.randomUUID();
 
-    // 1) upload images
     for (const file of images.slice(0, 3)) {
       if (!(file instanceof File)) continue;
       if (!file.type.startsWith("image/")) continue;
@@ -186,56 +168,52 @@ export async function POST(req: NextRequest) {
 
       const { error: upErr } = await supabase.storage
         .from("partner-leads")
-        .upload(path, file, {
-          contentType: file.type,
-          upsert: false,
-          cacheControl: "3600",
-        });
+        .upload(path, file, { contentType: file.type, upsert: false, cacheControl: "3600" });
 
-      if (upErr) {
-        return NextResponse.json({ error: upErr.message }, { status: 500 });
-      }
+      if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
       image_paths.push(path);
     }
 
-    // 2) insert lead
     const { error: insErr } = await supabase.from("partner_leads").insert({
       id: leadId,
       source,
       full_name,
       phone,
-      email,
+      email, // ✅ теперь допустим null (после миграции)
       age,
       image_paths,
       status: "new",
     });
 
     if (insErr) {
-      if (image_paths.length) {
-        await supabase.storage.from("partner-leads").remove(image_paths);
-      }
+      if (image_paths.length) await supabase.storage.from("partner-leads").remove(image_paths);
       return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
 
-    // 3) create/ensure patient + send magic link
     const origin = req.nextUrl.origin;
-    const patient = await ensurePatientAndSendMagicLink({
-      supabase,
-      origin,
-      email,
-      full_name,
-      phone,
-    });
+
+    // ✅ создаём пациента и шлём письмо ТОЛЬКО если есть email
+    if (email) {
+      const patient = await ensurePatientAndSendMagicLink({
+        supabase,
+        origin,
+        email,
+        full_name,
+        phone,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        id: leadId,
+        patient: { userId: patient.userId, created: patient.created, emailSent: true },
+      });
+    }
 
     return NextResponse.json({
       ok: true,
       id: leadId,
-      patient: {
-        userId: patient.userId,
-        created: patient.created,
-        emailSent: true,
-      },
+      patient: { emailSent: false },
     });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });

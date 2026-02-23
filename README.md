@@ -16349,3 +16349,400 @@ export const Navbar = React.memo(() => {
 });
 Navbar.displayName = "Navbar";
 """
+
+-------------------------
+
+app\ru\hair-transplant\lp\_components\LeadForm.tsx: """
+'use client';
+
+import { useMemo, useState } from "react";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import LeadImageUpload from "./LeadImageUpload";
+
+type Props = {
+  submitText?: string;
+  onSubmitted?: () => void;
+  className?: string;
+  disclaimerText?: string;
+  buttonClassName?: string;
+};
+
+function fireForm1Step(meta?: { source?: string; patient_email_sent?: boolean }) {
+  // 1) можно оставить — пригодится для GTM в будущем, и для метрики ecommerce
+  (window as any).dataLayer = (window as any).dataLayer || [];
+  (window as any).dataLayer.push({
+    event: "lead_submit",
+    form_name: "hair-transplant-lp",
+    ...meta,
+  });
+
+  // 2) GA4 (важно: НЕ передавать email/phone — это PII)
+  (window as any).gtag?.("event", "generate_lead", {
+    form_name: "hair-transplant-lp",
+    source: meta?.source || "hair-transplant-lp",
+    patient_email_sent: Boolean(meta?.patient_email_sent),
+  });
+
+  // 3) optional: DOM event
+  window.dispatchEvent(new Event("lead_submit"));
+}
+
+export default function LeadForm({
+  submitText = "Отправить",
+  onSubmitted,
+  className,
+  disclaimerText = "Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности",
+  buttonClassName,
+}: Props) {
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [age, setAge] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  const [patientEmailSent, setPatientEmailSent] = useState(false);
+
+  const canSubmit = useMemo(() => {
+    return fullName.trim() && phone.trim()
+  }, [fullName, phone]);
+
+  async function submit() {
+    setError(null);
+    setOk(false);
+    setPatientEmailSent(false);
+    setBusy(true);
+
+    try {
+      const fd = new FormData();
+      fd.set("source", "hair-transplant-lp");
+      fd.set("full_name", fullName.trim());
+      fd.set("phone", phone.trim());
+      const em = email.trim().toLowerCase();
+      if (em) fd.set("email", em);
+      if (age.trim()) fd.set("age", age.trim());
+      files.slice(0, 3).forEach((f) => fd.append("images", f));
+
+      const res = await fetch("/api/leads/partner", { method: "POST", body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Submit failed");
+
+      setOk(true);
+      setPatientEmailSent(Boolean(json?.patient?.emailSent));
+      fireForm1Step({
+        source: "hair-transplant-lp",
+        patient_email_sent: Boolean(json?.patient?.emailSent),
+      });
+
+      onSubmitted?.();
+
+      // опционально: очистить форму
+      setFullName("");
+      setPhone("");
+      setEmail("");
+      setAge("");
+      setFiles([]);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className={className ?? "space-y-3"}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!canSubmit || busy) return;
+        submit();
+      }}
+    >
+      <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+      <Input placeholder="Телефон*" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
+
+      <div className="mt-4">
+        <LeadImageUpload files={files} onFilesChange={setFiles} />
+      </div>
+
+      {ok ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Спасибо! Мы получили заявку и свяжемся с вами.
+        </div>
+      ) : null}
+
+      {ok && patientEmailSent ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <Button type="submit" className={buttonClassName ?? "w-full"} size="lg" disabled={!canSubmit || busy}>
+        {busy ? "Отправляем..." : submitText}
+      </Button>
+
+      <p className="text-center text-xs text-slate-500">{disclaimerText}</p>
+    </form>
+  );
+}
+"""
+app\api\leads\partner\route.ts: """
+import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { resendSend, patientMagicLinkTemplate } from "@/lib/mail/resend";
+import crypto from "crypto";
+
+export const runtime = "nodejs";
+
+function safeEmail(v: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function splitName(full: string) {
+  const s = String(full || "").trim().replace(/\s+/g, " ");
+  if (!s) return { first_name: null as string | null, last_name: null as string | null };
+  const parts = s.split(" ");
+  const first = parts[0] ?? "";
+  const last = parts.slice(1).join(" ").trim();
+  return {
+    first_name: first || null,
+    last_name: last || null,
+  };
+}
+
+async function ensurePatientAndSendMagicLink(params: {
+  supabase: ReturnType<typeof createServiceClient>;
+  origin: string;
+  email: string;
+  full_name: string;
+  phone: string;
+}) {
+  const { supabase, origin, email, full_name, phone } = params;
+
+  // 1) ищем по profiles.email (быстро и без listUsers)
+  const { data: prof, error: profErr } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (profErr) throw new Error(profErr.message);
+
+  let userId: string | null = prof?.id ?? null;
+  let created = false;
+
+  // 2) если нет — создаём auth user
+  if (!userId) {
+    const { data: createdUser, error: createErr } = await supabase.auth.admin.createUser({
+      email,
+      // пароль не задаём — вход по magic link
+      email_confirm: false,
+      user_metadata: {
+        requested_role: "PATIENT",
+      },
+    });
+
+    if (createErr) {
+      // если вдруг гонка и юзер уже есть — попробуем снова найти profile
+      const msg = String(createErr.message || "");
+      if (!msg.toLowerCase().includes("already")) throw new Error(msg);
+
+      const { data: prof2, error: prof2Err } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (prof2Err) throw new Error(prof2Err.message);
+      userId = prof2?.id ?? null;
+      if (!userId) throw new Error("User exists but profile not found");
+    } else {
+      userId = createdUser?.user?.id ?? null;
+      created = true;
+    }
+  }
+
+  if (!userId) throw new Error("Failed to resolve user id");
+
+  // 3) гарантируем роль PATIENT (и в profiles, и в user_roles)
+  const { first_name, last_name } = splitName(full_name);
+
+  // profiles
+  await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: userId,
+        email,
+        role: "patient",
+        first_name,
+        last_name,
+        phone: phone || null,
+        // email_verified НЕ трогаем здесь
+      } as any,
+      { onConflict: "id" },
+    );
+
+  // user_roles
+  await supabase
+    .from("user_roles")
+    .upsert({ user_id: userId, role: "patient" } as any, { onConflict: "user_id,role" } as any);
+
+  // 4) обновим user_metadata, чтобы SettingsPage сразу увидел имя/телефон
+  //    (Settings у тебя читает user.user_metadata)
+  await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      first_name,
+      last_name,
+      phone: phone || null,
+      // можно добавить display_name по желанию
+      display_name: full_name || null,
+      requested_role: "PATIENT",
+    },
+  });
+
+  const settingsUrl = `${origin}/settings`;
+
+  // создаём уведомление "Set password" (service role)
+  await supabase.from("notifications").insert({
+    user_id: userId,
+    type: "set_password",
+    data: {
+      title: "Secure your account",
+      message: "Set a password to sign in faster next time.",
+      action_url: settingsUrl, // или "/settings" если на клиенте относительный
+    },
+    is_read: false,
+  });
+
+  // 5) генерим magic link (через callback, чтобы выставились cookies session)
+  const redirectTo = `${origin}/auth/magic?as=PATIENT&next=${encodeURIComponent("/patient")}`;
+
+  const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: { redirectTo },
+  });
+
+  if (linkErr) throw new Error(linkErr.message);
+
+  const actionLink =
+    (linkData as any)?.properties?.action_link ||
+    (linkData as any)?.action_link ||
+    null;
+
+  if (!actionLink) throw new Error("Failed to generate magic link");
+
+  // 6) письмо
+  const tpl = patientMagicLinkTemplate(actionLink);
+  await resendSend({ to: email, subject: tpl.subject, html: tpl.html });
+
+  return { userId, created };
+}
+
+export async function POST(req: NextRequest) {
+  const supabase = createServiceClient();
+
+  try {
+    const fd = await req.formData();
+
+    const source = String(fd.get("source") ?? "unknown").slice(0, 80);
+    const full_name = String(fd.get("full_name") ?? "").trim();
+    const phone = String(fd.get("phone") ?? "").trim();
+    const ageRaw = String(fd.get("age") ?? "").trim();
+    const emailRaw = String(fd.get("email") ?? "").trim().toLowerCase();
+    const email = emailRaw || null;
+
+    if (!full_name) return NextResponse.json({ error: "Введите ФИО" }, { status: 400 });
+    if (!phone) return NextResponse.json({ error: "Введите телефон" }, { status: 400 });
+
+    if (email && !safeEmail(email)) {
+      return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
+    }
+
+    const ageNum = ageRaw ? Number(ageRaw) : null;
+    const age = Number.isFinite(ageNum as any) ? (ageNum as number) : null;
+
+    const images = fd.getAll("images").filter(Boolean) as File[];
+    const image_paths: string[] = [];
+
+    const leadId = crypto.randomUUID();
+
+    // 1) upload images
+    for (const file of images.slice(0, 3)) {
+      if (!(file instanceof File)) continue;
+      if (!file.type.startsWith("image/")) continue;
+
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().slice(0, 10);
+      const path = `${leadId}/${crypto.randomUUID()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("partner-leads")
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+          cacheControl: "3600",
+        });
+
+      if (upErr) {
+        return NextResponse.json({ error: upErr.message }, { status: 500 });
+      }
+
+      image_paths.push(path);
+    }
+
+    // 2) insert lead
+    const { error: insErr } = await supabase.from("partner_leads").insert({
+      id: leadId,
+      source,
+      full_name,
+      phone,
+      email,
+      age,
+      image_paths,
+      status: "new",
+    });
+
+    if (insErr) {
+      if (image_paths.length) {
+        await supabase.storage.from("partner-leads").remove(image_paths);
+      }
+      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+
+    // 3) create/ensure patient + send magic link
+    const origin = req.nextUrl.origin;
+    const patient = await ensurePatientAndSendMagicLink({
+      supabase,
+      origin,
+      email: email,
+      full_name,
+      phone,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      id: leadId,
+      patient: {
+        userId: patient.userId,
+        created: patient.created,
+        emailSent: true,
+      },
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+  }
+}
+"""
