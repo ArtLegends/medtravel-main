@@ -53,15 +53,15 @@ export async function PATCH(req: NextRequest) {
   // 4) прочитаем текущий lead (до обновления)
   const { data: before, error: beforeErr } = await admin
     .from("partner_leads")
-    .select("id,assigned_partner_id,full_name,phone,email,source,created_at")
+    .select("id,assigned_partner_id,full_name,phone,email,patient_id,source,created_at")
     .eq("id", lead_id)
     .maybeSingle();
 
   if (beforeErr) return NextResponse.json({ error: beforeErr.message }, { status: 500 });
   if (!before) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
-  const prevPartnerId = before.assigned_partner_id ?? null;
-  const customerChanged = String(prevPartnerId ?? "") !== String(partner_id);
+  const prevCustomerId = before.assigned_partner_id ?? null;
+  const customerChanged = prevCustomerId !== partner_id;
 
   // 5) resolve clinic_id by customer user_id
   const { data: mem, error: memErr } = await admin
@@ -75,18 +75,31 @@ export async function PATCH(req: NextRequest) {
 
   const clinicId = String(mem.clinic_id);
 
-  // 6) resolve patient_id by lead email
-  const leadEmail = String(before.email ?? "").trim().toLowerCase();
-  const { data: pat, error: patErr } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("email", leadEmail)
-    .maybeSingle();
+  // ✅ resolve patient_id (email OR patient_id)
+  let patientId: string | null = null;
 
-  if (patErr) return NextResponse.json({ error: patErr.message }, { status: 500 });
-  if (!pat?.id) return NextResponse.json({ error: "Patient profile not found for lead email" }, { status: 400 });
+  if (before.patient_id) {
+    patientId = String(before.patient_id);
+  } else {
+    const leadEmail = String(before.email ?? "").trim().toLowerCase();
+    if (leadEmail) {
+      const { data: pat, error: patErr } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", leadEmail)
+        .maybeSingle();
 
-  const patientId = String(pat.id);
+      if (patErr) return NextResponse.json({ error: patErr.message }, { status: 500 });
+      if (pat?.id) patientId = String(pat.id);
+    }
+  }
+
+  if (!patientId) {
+    return NextResponse.json(
+      { error: "Patient not found for lead (no email and not attached by phone OTP yet)" },
+      { status: 400 }
+    );
+  }
 
   // 7) create booking from lead (ТОЛЬКО если customerChanged)
   //    + защита от дублей: ищем booking с таким lead маркером
@@ -102,11 +115,12 @@ export async function PATCH(req: NextRequest) {
       .eq("clinic_id", clinicId)
       .eq("patient_id", patientId)
       .ilike("notes", `%${leadMarker}%`)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
 
-    bookingId = exists?.id ?? null;
+    bookingId = exists?.[0]?.id ?? null;
 
     if (!bookingId) {
       const { data: booking, error: bookErr } = await admin

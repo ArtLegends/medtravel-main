@@ -21,6 +21,7 @@ import { useSupabase } from "@/lib/supabase/supabase-provider";
 
 import CredentialsForm from "@/components/auth/CredentialsForm";
 import OtpForm from "@/components/auth/OtpForm";
+import PhoneAuthForm from "@/components/auth/PhoneAuthForm";
 
 type Step = "role" | "auth" | "otp";
 type Mode = "signin" | "signup";
@@ -82,6 +83,7 @@ export default function UnifiedAuthModal({
     null,
   );
   const [email, setEmail] = useState<string>("");
+  const [patientAuthMode, setPatientAuthMode] = useState<"email" | "phone">("email");
 
   useEffect(() => {
     if (!open) return;
@@ -91,6 +93,7 @@ export default function UnifiedAuthModal({
     setEmail("");
     setMode("signin");
     setStep(r ? "auth" : "role");
+    setPatientAuthMode("email");
   }, [open, initialRole]);
 
   const roleLabel = useMemo(() => (role ? ROLE_META[role]?.title ?? role : ""), [role]);
@@ -202,22 +205,34 @@ export default function UnifiedAuthModal({
                     </Button>
                   </div>
 
-                  <CredentialsForm
-                    mode={mode}
-                    role={role}
-                    next={safeNext}
-                    onSignedIn={() => {
-                      close();
-                      onClose();
-                      router.replace(safeNext);
-                      router.refresh();
-                    }}
-                    onOtpRequired={({ email, password }) => {
-                      setEmail(email);
-                      setOtpPassword(password);
-                      setStep("otp");
-                    }}
-                  />
+                  {role === "PATIENT" && patientAuthMode === "phone" ? (
+                    <PhoneAuthForm
+                      next={safeNext}
+                      onSignedIn={() => {
+                        close();
+                        onClose();
+                        router.replace(safeNext);
+                        router.refresh();
+                      }}
+                    />
+                  ) : (
+                    <CredentialsForm
+                      mode={mode}
+                      role={role}
+                      next={safeNext}
+                      onSignedIn={() => {
+                        close();
+                        onClose();
+                        router.replace(safeNext);
+                        router.refresh();
+                      }}
+                      onOtpRequired={({ email, password }) => {
+                        setEmail(email);
+                        setOtpPassword(password);
+                        setStep("otp");
+                      }}
+                    />
+                  )}
 
                   <Divider />
 
