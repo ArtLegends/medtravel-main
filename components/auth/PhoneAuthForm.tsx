@@ -50,6 +50,17 @@ export default function PhoneAuthForm({
       } as any);
       if (error) throw error;
 
+      // ensure patient role/profile (important for phone users)
+      {
+        const r = await fetch("/api/patient/ensure", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ phone: p }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j?.error || "Failed to initialize patient profile");
+      }
+
       // attach lead if exists
       let leadId = "";
       try { leadId = localStorage.getItem("mt_lead_id") || ""; } catch {}

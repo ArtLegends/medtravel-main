@@ -245,6 +245,44 @@ export default function UnifiedAuthModal({
                     Continue with Google
                   </Button>
 
+                  {role === "PATIENT" ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="text-tiny text-default-500 text-center">
+                        Or use phone number
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={patientAuthMode === "phone" && mode === "signin" ? "solid" : "bordered"}
+                          color="primary"
+                          onPress={() => {
+                            setPatientAuthMode("phone");
+                            setMode("signin");
+                          }}
+                        >
+                          Sign in with phone
+                        </Button>
+
+                        <Button
+                          variant={patientAuthMode === "phone" && mode === "signup" ? "solid" : "bordered"}
+                          color="primary"
+                          onPress={() => {
+                            setPatientAuthMode("phone");
+                            setMode("signup");
+                          }}
+                        >
+                          Sign up with phone
+                        </Button>
+                      </div>
+
+                      {patientAuthMode === "phone" ? (
+                        <p className="text-tiny text-default-500 text-center">
+                          We’ll send a 6-digit code via SMS.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   {mode === "signup" ? (
                     <p className="text-tiny text-default-500 text-center">
                       We’ll send a 6-digit code to confirm your email.

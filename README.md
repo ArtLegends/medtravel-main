@@ -203,1731 +203,534 @@ yarn dev
 
 -------------------------------------------------
 
-отлично. пока еще нет никаких ендпоинтов, ниже дал тебе все файлы включая components\auth\UnifiedAuthModal.tsx и app\auth\magic\page.tsx, в самой модалке регистрации/авторизации нужно это также аккуратно реализовать, чтобы нигде ничего не ломалось, ни по логике, ни по ui.
-
-мы ведь планируем не только при отправке лендинг формы создавать личный кабинет пациента использую номер телефона при таком сценарии, а также в принципе добавить в функционал и регистрацию по номеру телефона/авторизацию по номеру телефона, но это пока что только для роли patient, для остальных ничего трогать не будем.
-
-по остальному, да давай использовать localStorage/cookie для lead_id после отправки формы, если это самый чистый способ связки.
-в supabase phone провайдер еще не включен, а использовать будем Twilio, да, нужно чтобы ты помог настроить провайдера через twilio.
-
-app\api\auth\email\send-otp\route.ts: """
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
-
-export const runtime = "nodejs";
-
-function normalizeEmail(v: any): string {
-  return String(v || "").trim().toLowerCase();
-}
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function safePurpose(v: any): string {
-  const p = String(v || "verify_email").trim();
-  // лучше жёстко разрешить только verify_email, чтобы не плодить мусор:
-  return p === "verify_email" ? "verify_email" : "verify_email";
-}
-
-function generateOtp6(): string {
-  const n = crypto.randomInt(0, 1_000_000);
-  return String(n).padStart(6, "0");
-}
-
-function sha256(input: string): string {
-  return crypto.createHash("sha256").update(input).digest("hex");
-}
-
-async function sendViaResend(params: { to: string; subject: string; html: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM ?? process.env.EMAIL_FROM;
-
-  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
-  if (!from) throw new Error("Missing RESEND_FROM (or EMAIL_FROM)");
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [params.to],
-      subject: params.subject,
-      html: params.html,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || "Resend: failed to send email");
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json().catch(() => ({}));
-
-    const email = normalizeEmail(body.email);
-    const purpose = safePurpose(body.purpose);
-
-    if (!email || !isValidEmail(email)) {
-      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || !serviceKey) {
-      return NextResponse.json(
-        { error: "Server auth is not configured (missing Supabase envs)" },
-        { status: 500 },
-      );
-    }
-
-    const supabase = createClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: profile, error: profErr } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
-
-    if (!profile?.id) {
-      // вариант 1 (как у тебя сейчас): честно говорим что нет юзера
-      // return NextResponse.json({ error: "User not found" }, { status: 404 });
-
-      // вариант 2 (безопаснее): не палим существование email
-      return NextResponse.json({ ok: true });
-    }
-
-    // 1) генерим OTP + hash (как у тебя в verify-otp)
-    const code = generateOtp6();
-    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
-    const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);
-
-    const expiresInMinutes = 10;
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
-
-    // 2) удаляем старые и вставляем новый
-    const del = await supabase
-      .from("email_otps")
-      .delete()
-      .eq("email", email)
-      .eq("purpose", purpose);
-
-    if (del.error) return NextResponse.json({ error: del.error.message }, { status: 500 });
-
-    const ins = await supabase.from("email_otps").insert({
-      email,
-      purpose,
-      code_hash: codeHash,
-      expires_at: expiresAt,
-      attempts: 0,
-    });
-
-    if (ins.error) {
-      return NextResponse.json({ error: ins.error.message }, { status: 500 });
-    }
-
-    // 3) письмо
-    const subject = "Your MedTravel verification code";
-    const html = `
-      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; line-height:1.5">
-        <h2 style="margin:0 0 12px">Your verification code</h2>
-        <p style="margin:0 0 16px">Enter this 6-digit code to confirm your email:</p>
-        <div style="font-size:28px; font-weight:700; letter-spacing:6px; padding:14px 16px; background:#f4f4f5; border-radius:12px; display:inline-block">
-          ${code}
-        </div>
-        <p style="margin:16px 0 0; color:#71717a">This code expires in ${expiresInMinutes} minutes.</p>
-      </div>
-    `;
-
-    await sendViaResend({ to: email, subject, html });
-
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Internal Server Error" }, { status: 500 });
-  }
-}
-"""
-app\api\auth\email\verify-otp\route.ts: """
-import { NextResponse } from "next/server";
-import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
-
-export const runtime = "nodejs";
-
-function sha256(input: string) {
-  return crypto.createHash("sha256").update(input).digest("hex");
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const email = String(body?.email || "").trim().toLowerCase();
-    const token = String(body?.token || "").trim();
-    const purpose = String(body?.purpose || "verify_email").trim() || "verify_email";
-
-    if (!email || !/^[0-9]{6}$/.test(token)) {
-      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabase = createClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: rows, error: selErr } = await supabase
-      .from("email_otps")
-      .select("*")
-      .eq("email", email)
-      .eq("purpose", purpose)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
-
-    const row = rows?.[0];
-    if (!row) return NextResponse.json({ error: "Code not found" }, { status: 400 });
-
-    const expired = new Date(row.expires_at).getTime() < Date.now();
-    if (expired) {
-      await supabase.from("email_otps").delete().eq("id", row.id);
-      return NextResponse.json({ error: "Code expired" }, { status: 400 });
-    }
-
-    const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
-    const expected = sha256(`${email}:${purpose}:${token}:${otpSecret}`);
-
-    if (expected !== row.code_hash) {
-      const attempts = Number(row.attempts || 0) + 1;
-      await supabase.from("email_otps").update({ attempts }).eq("id", row.id);
-
-      if (attempts >= 5) {
-        await supabase.from("email_otps").delete().eq("id", row.id);
-        return NextResponse.json(
-          { error: "Too many attempts. Request new code." },
-          { status: 400 },
-        );
-      }
-
-      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
-    }
-
-    // валидно → удаляем OTP
-    await supabase.from("email_otps").delete().eq("id", row.id);
-
-    const { data: profile, error: profErr } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
-    if (!profile?.id) return NextResponse.json({ error: "User not found" }, { status: 404 });
-
-    const userId = profile.id;
-
-    // подтверждаем email в Supabase Auth
-    const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
-      email_confirm: true,
-    });
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-
-    // ставим флаг в profiles
-    await supabase.from("profiles").update({ email_verified: true }).eq("id", userId);
-
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
-  }
-}
-"""
-app\auth\magic\page.tsx: """
-"use client";
-
-import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-
-function parseHash(hash: string) {
-  const h = hash.startsWith("#") ? hash.slice(1) : hash;
-  const params = new URLSearchParams(h);
-  return {
-    access_token: params.get("access_token") ?? "",
-    refresh_token: params.get("refresh_token") ?? "",
-    expires_in: params.get("expires_in") ?? "",
-    token_type: params.get("token_type") ?? "",
-    type: params.get("type") ?? "",
-  };
-}
-
-export default function MagicAuthPage() {
-  const router = useRouter();
-  const sp = useSearchParams();
-
-  useEffect(() => {
-    const next = sp.get("next") || "/patient";
-    const as = sp.get("as") || "PATIENT";
-
-    const { access_token, refresh_token } = parseHash(window.location.hash);
-
-    // если токенов нет — просто на логин
-    if (!access_token || !refresh_token) {
-      router.replace(`/auth/login?as=${encodeURIComponent(as)}&next=${encodeURIComponent(next)}`);
-      return;
-    }
-
-    (async () => {
-      const res = await fetch("/auth/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token, refresh_token, as, next }),
-      });
-
-      // сервер уже сделает redirect, но на всякий:
-      if (res.ok) {
-        router.replace(next);
-        router.refresh();
-      } else {
-        router.replace(`/auth/login?as=${encodeURIComponent(as)}&next=${encodeURIComponent(next)}`);
-      }
-    })();
-  }, [router, sp]);
-
-  return (
-    <div className="mx-auto max-w-md px-4 py-10 text-center">
-      <div className="text-lg font-semibold">Signing you in…</div>
-      <div className="mt-2 text-sm text-default-500">Please wait.</div>
-    </div>
-  );
-}
-"""
-components\auth\UnifiedAuthModal.tsx: """
-// components/auth/UnifiedAuthModal.tsx
-"use client";
-
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { Icon } from "@iconify/react";
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Divider,
-  Card,
-  CardBody,
-} from "@heroui/react";
-import { useRouter } from "next/navigation";
-
-import type { UserRole } from "@/lib/supabase/supabase-provider";
-import { useSupabase } from "@/lib/supabase/supabase-provider";
-
-import CredentialsForm from "@/components/auth/CredentialsForm";
-import OtpForm from "@/components/auth/OtpForm";
-
-type Step = "role" | "auth" | "otp";
-type Mode = "signin" | "signup";
-
-type Props = {
-  open: boolean;
-  onClose: () => void;
-  initialRole?: Exclude<UserRole, "ADMIN" | "GUEST"> | null;
-  next?: string;
-};
-
-const ROLE_META: Record<
-  Exclude<UserRole, "GUEST">,
-  { title: string; subtitle: string; icon: string }
-> = {
-  PATIENT: {
-    title: "Patient",
-    subtitle: "Book appointments, manage visits, chat with clinics",
-    icon: "solar:heart-pulse-2-linear",
-  },
-  PARTNER: {
-    title: "Partner",
-    subtitle: "Referral links, programs, reports, payouts",
-    icon: "solar:users-group-two-rounded-linear",
-  },
-  CUSTOMER: {
-    title: "Clinic",
-    subtitle: "Manage clinic profile, services, doctors and bookings",
-    icon: "solar:hospital-linear",
-  },
-  ADMIN: {
-    title: "Admin",
-    subtitle: "Administration panel",
-    icon: "solar:shield-user-bold",
-  },
-};
-
-function isAllowedRole(r: any): r is Exclude<UserRole, "ADMIN" | "GUEST"> {
-  return r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER";
-}
-
-export default function UnifiedAuthModal({
-  open,
-  onClose,
-  initialRole = null,
-  next = "/",
-}: Props) {
-  const router = useRouter();
-  const { supabase } = useSupabase();
-
-  const safeNext = useMemo(() => {
-    const n = String(next || "/");
-    return n.startsWith("/") ? n : "/";
-  }, [next]);
-
-  const [step, setStep] = useState<Step>("role");
-  const [mode, setMode] = useState<Mode>("signin");
-  const [role, setRole] = useState<Exclude<UserRole, "ADMIN" | "GUEST"> | null>(
-    null,
-  );
-  const [email, setEmail] = useState<string>("");
-
-  useEffect(() => {
-    if (!open) return;
-
-    const r = isAllowedRole(initialRole) ? initialRole : null;
-    setRole(r);
-    setEmail("");
-    setMode("signin");
-    setStep(r ? "auth" : "role");
-  }, [open, initialRole]);
-
-  const roleLabel = useMemo(() => (role ? ROLE_META[role]?.title ?? role : ""), [role]);
-
-  const title = useMemo(() => {
-    if (step === "role") return "Sign in / Sign up";
-    if (step === "auth") return role ? `${mode === "signin" ? "Sign in" : "Create account"} — ${roleLabel}` : "Sign in";
-    return `Enter code (${roleLabel})`;
-  }, [step, role, roleLabel, mode]);
-
-  const signInWithGoogle = useCallback(async () => {
-    if (!role) return;
-
-    const origin = window.location.origin;
-    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
-      role,
-    )}&next=${encodeURIComponent(safeNext)}`;
-
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-  }, [supabase, role, safeNext]);
-
-  const goBack = useCallback(() => {
-    if (step === "otp") return setStep("auth");
-    if (step === "auth") return setStep(initialRole ? "auth" : "role");
-    onClose();
-  }, [step, onClose, initialRole]);
-
-  const pickRole = (r: Exclude<UserRole, "ADMIN" | "GUEST">) => {
-    setRole(r);
-    setStep("auth");
-  };
-
-  const [otpPassword, setOtpPassword] = useState("");
-
-  return (
-    <Modal
-      isOpen={open}
-      onOpenChange={(v) => {
-        if (!v) onClose();
-      }}
-      placement="center"
-      backdrop="blur"
-      size="md"
-      scrollBehavior="inside"
-    >
-      <ModalContent>
-        {(close) => (
-          <>
-            <ModalHeader className="flex items-center gap-2">
-              <Icon icon="solar:login-3-linear" width={20} />
-              <span>{title}</span>
-            </ModalHeader>
-
-            <Divider />
-
-            <ModalBody className="py-5">
-              {/* STEP: ROLE */}
-              {step === "role" ? (
-                <div className="grid grid-cols-1 gap-3">
-                  {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
-                    <Card
-                      key={r}
-                      isPressable
-                      onPress={() => pickRole(r)}
-                      className="border border-divider hover:border-primary transition-colors"
-                    >
-                      <CardBody className="flex flex-row items-center gap-4 py-4">
-                        <div className="h-10 w-10 rounded-full bg-default-100 flex items-center justify-center">
-                          <Icon icon={ROLE_META[r].icon} width={22} />
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="font-semibold">{ROLE_META[r].title}</div>
-                          <div className="text-tiny text-default-500">
-                            {ROLE_META[r].subtitle}
-                          </div>
-                        </div>
-                        <div className="ml-auto text-default-400">
-                          <Icon icon="solar:alt-arrow-right-linear" width={18} />
-                        </div>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* STEP: AUTH */}
-              {step === "auth" && role ? (
-                <div className="flex flex-col gap-4">
-                  {/* segmented sign in / sign up */}
-                  <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
-                    <Button
-                      className="flex-1"
-                      color={mode === "signin" ? "primary" : "primary"}
-                      variant={mode === "signin" ? "solid" : "ghost"}
-                      onPress={() => setMode("signin")}
-                    >
-                      Sign in
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      color={mode === "signup" ? "primary" : "primary"}
-                      variant={mode === "signup" ? "solid" : "ghost"}
-                      onPress={() => setMode("signup")}
-                    >
-                      Sign up
-                    </Button>
-                  </div>
-
-                  <CredentialsForm
-                    mode={mode}
-                    role={role}
-                    next={safeNext}
-                    onSignedIn={() => {
-                      close();
-                      onClose();
-                      router.replace(safeNext);
-                      router.refresh();
-                    }}
-                    onOtpRequired={({ email, password }) => {
-                      setEmail(email);
-                      setOtpPassword(password);
-                      setStep("otp");
-                    }}
-                  />
-
-                  <Divider />
-
-                  <Button
-                    variant="bordered"
-                    startContent={<Icon icon="logos:google-icon" width={18} />}
-                    onPress={signInWithGoogle}
-                    className="justify-center"
-                  >
-                    Continue with Google
-                  </Button>
-
-                  {mode === "signup" ? (
-                    <p className="text-tiny text-default-500 text-center">
-                      We’ll send a 6-digit code to confirm your email.
-                    </p>
-                  ) : (
-                    <p className="text-tiny text-default-500 text-center">
-                      Use your email and password to sign in.
-                    </p>
-                  )}
-                </div>
-              ) : null}
-
-              {/* STEP: OTP */}
-              {step === "otp" && role ? (
-                <div className="flex flex-col gap-4">
-                  <OtpForm
-                    email={email}
-                    password={otpPassword}
-                    as={role}
-                    next={safeNext}
-                    onBack={() => setStep("auth")}
-                    onSuccess={() => {
-                      close();   // закрывает ModalContent
-                      onClose(); // твой внешний флаг open=false
-                    }}
-                  />
-                </div>
-              ) : null}
-            </ModalBody>
-
-            <Divider />
-
-            <ModalFooter className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                color="primary"
-                onPress={() => {
-                  if (step === "role") {
-                    close();
-                    onClose();
-                    return;
-                  }
-                  goBack();
-                }}
-              >
-                Back
-              </Button>
-
-              {step !== "role" && !initialRole ? (
-                <Button
-                  variant="ghost"
-                  color="primary"
-                  onPress={() => {
-                    setRole(null);
-                    setEmail("");
-                    setMode("signin");
-                    setStep("role");
-                  }}
-                  startContent={<Icon icon="solar:refresh-linear" width={16} />}
-                >
-                  Change role
-                </Button>
-              ) : (
-                <span />
-              )}
-            </ModalFooter>
-          </>
-        )}
-      </ModalContent>
-    </Modal>
-  );
-}
-"""
-
--------------------
-
-хорошо. в supabase подключил phone provider используя twilio, указал Twilio Account SID, Twilio Auth Token и Twilio Message Service SID. в самом twilio создал аккаунт, также все настроил откда и брал данные для supabse phone provider.
-
-в таблице partner_leads вообще-то email text null, мы это уже делали, ниже дал ddl.
-
-app\api\leads\partner\route.ts: """
-import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/serviceClient";
-import { resendSend, patientMagicLinkTemplate } from "@/lib/mail/resend";
-import crypto from "crypto";
-
-export const runtime = "nodejs";
-
-function safeEmail(v: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-}
-
-function splitName(full: string) {
-  const s = String(full || "").trim().replace(/\s+/g, " ");
-  if (!s) return { first_name: null as string | null, last_name: null as string | null };
-  const parts = s.split(" ");
-  const first = parts[0] ?? "";
-  const last = parts.slice(1).join(" ").trim();
-  return { first_name: first || null, last_name: last || null };
-}
-
-async function ensurePatientAndSendMagicLink(params: {
-  supabase: ReturnType<typeof createServiceClient>;
-  origin: string;
-  email: string;
-  full_name: string;
-  phone: string;
-}) {
-  const { supabase, origin, email, full_name, phone } = params;
-
-  const { data: prof, error: profErr } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", email)
-    .maybeSingle();
-
-  if (profErr) throw new Error(profErr.message);
-
-  let userId: string | null = prof?.id ?? null;
-  let created = false;
-
-  if (!userId) {
-    const { data: createdUser, error: createErr } = await supabase.auth.admin.createUser({
-      email,
-      email_confirm: false,
-      user_metadata: { requested_role: "PATIENT" },
-    });
-
-    if (createErr) {
-      const msg = String(createErr.message || "");
-      if (!msg.toLowerCase().includes("already")) throw new Error(msg);
-
-      const { data: prof2, error: prof2Err } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (prof2Err) throw new Error(prof2Err.message);
-      userId = prof2?.id ?? null;
-      if (!userId) throw new Error("User exists but profile not found");
-    } else {
-      userId = createdUser?.user?.id ?? null;
-      created = true;
-    }
-  }
-
-  if (!userId) throw new Error("Failed to resolve user id");
-
-  const { first_name, last_name } = splitName(full_name);
-
-  await supabase.from("profiles").upsert(
-    {
-      id: userId,
-      email,
-      role: "patient",
-      first_name,
-      last_name,
-      phone: phone || null,
-    } as any,
-    { onConflict: "id" },
-  );
-
-  await supabase
-    .from("user_roles")
-    .upsert({ user_id: userId, role: "patient" } as any, { onConflict: "user_id,role" } as any);
-
-  await supabase.auth.admin.updateUserById(userId, {
-    user_metadata: {
-      first_name,
-      last_name,
-      phone: phone || null,
-      display_name: full_name || null,
-      requested_role: "PATIENT",
-    },
-  });
-
-  const settingsUrl = `${origin}/settings`;
-
-  await supabase.from("notifications").insert({
-    user_id: userId,
-    type: "set_password",
-    data: {
-      title: "Secure your account",
-      message: "Set a password to sign in faster next time.",
-      action_url: settingsUrl,
-    },
-    is_read: false,
-  });
-
-  const redirectTo = `${origin}/auth/magic?as=PATIENT&next=${encodeURIComponent("/patient")}`;
-
-  const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo },
-  });
-
-  if (linkErr) throw new Error(linkErr.message);
-
-  const actionLink =
-    (linkData as any)?.properties?.action_link ||
-    (linkData as any)?.action_link ||
-    null;
-
-  if (!actionLink) throw new Error("Failed to generate magic link");
-
-  const tpl = patientMagicLinkTemplate(actionLink);
-  await resendSend({ to: email, subject: tpl.subject, html: tpl.html });
-
-  return { userId, created };
-}
-
-export async function POST(req: NextRequest) {
-  const supabase = createServiceClient();
-
-  try {
-    const fd = await req.formData();
-
-    const source = String(fd.get("source") ?? "unknown").slice(0, 80);
-    const full_name = String(fd.get("full_name") ?? "").trim();
-    const phone = String(fd.get("phone") ?? "").trim();
-    const ageRaw = String(fd.get("age") ?? "").trim();
-
-    const emailRaw = String(fd.get("email") ?? "").trim().toLowerCase();
-    const email = emailRaw || null;
-
-    if (!full_name) return NextResponse.json({ error: "Введите ФИО" }, { status: 400 });
-    if (!phone) return NextResponse.json({ error: "Введите телефон" }, { status: 400 });
-
-    if (email && !safeEmail(email)) {
-      return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
-    }
-
-    const ageNum = ageRaw ? Number(ageRaw) : null;
-    const age = Number.isFinite(ageNum as any) ? (ageNum as number) : null;
-
-    const images = fd.getAll("images").filter(Boolean) as File[];
-    const image_paths: string[] = [];
-
-    const leadId = crypto.randomUUID();
-
-    for (const file of images.slice(0, 3)) {
-      if (!(file instanceof File)) continue;
-      if (!file.type.startsWith("image/")) continue;
-
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().slice(0, 10);
-      const path = `${leadId}/${crypto.randomUUID()}.${ext}`;
-
-      const { error: upErr } = await supabase.storage
-        .from("partner-leads")
-        .upload(path, file, { contentType: file.type, upsert: false, cacheControl: "3600" });
-
-      if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
-
-      image_paths.push(path);
-    }
-
-    const { error: insErr } = await supabase.from("partner_leads").insert({
-      id: leadId,
-      source,
-      full_name,
-      phone,
-      email, // ✅ теперь допустим null (после миграции)
-      age,
-      image_paths,
-      status: "new",
-    });
-
-    if (insErr) {
-      if (image_paths.length) await supabase.storage.from("partner-leads").remove(image_paths);
-      return NextResponse.json({ error: insErr.message }, { status: 500 });
-    }
-
-    const origin = req.nextUrl.origin;
-
-    // ✅ создаём пациента и шлём письмо ТОЛЬКО если есть email
-    if (email) {
-      const patient = await ensurePatientAndSendMagicLink({
-        supabase,
-        origin,
-        email,
-        full_name,
-        phone,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        id: leadId,
-        patient: { userId: patient.userId, created: patient.created, emailSent: true },
-      });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      id: leadId,
-      patient: { emailSent: false },
-    });
-  } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
-  }
-}
-"""
-ddl partner_leads: """
-create table public.partner_leads (
-  id uuid not null default gen_random_uuid (),
-  source text not null default 'hair-transplant-lp'::text,
-  full_name text not null,
-  phone text not null,
-  email text null,
-  age integer null,
-  image_paths text[] null,
-  status text not null default 'new'::text,
-  admin_note text null,
-  created_at timestamp with time zone not null default now(),
-  processed_at timestamp with time zone null,
-  processed_by uuid null,
-  assigned_partner_id uuid null,
-  assigned_at timestamp with time zone null,
-  assigned_by uuid null,
-  assigned_note text null,
-  constraint partner_leads_pkey primary key (id),
-  constraint partner_leads_status_check check (
-    (
-      status = any (
-        array[
-          'new'::text,
-          'assigned'::text,
-          'processed'::text,
-          'archived'::text
-        ]
-      )
-    )
-  )
-) TABLESPACE pg_default;
-
-create index IF not exists partner_leads_assigned_partner_idx on public.partner_leads using btree (assigned_partner_id) TABLESPACE pg_default;
-
-create index IF not exists partner_leads_status_idx on public.partner_leads using btree (status) TABLESPACE pg_default;
-
-create index IF not exists partner_leads_created_idx on public.partner_leads using btree (created_at desc) TABLESPACE pg_default;
-
-create index IF not exists partner_leads_email_idx on public.partner_leads using btree (email) TABLESPACE pg_default;
-
-create index IF not exists partner_leads_phone_idx on public.partner_leads using btree (phone) TABLESPACE pg_default;
-"""
-
----------------
-
-отлично. sql запрос выполнился успешно. файлы components\auth\PhoneAuthForm.tsx и app\api\patient\lead\attach\route.ts также создал.
-в app\ru\hair-transplant\lp\_components\LeadForm.tsx есть ошибки на phone и fullName такого типа: """
-[{
-	"resource": "/c:/Users/Artem/Desktop/artem/medtravel-main/app/ru/hair-transplant/lp/_components/LeadForm.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'phone'.",
-	"source": "ts",
-	"startLineNumber": 47,
-	"startColumn": 23,
-	"endLineNumber": 47,
-	"endColumn": 28,
-	"modelVersionId": 41,
-	"origin": "extHost1"
-}]
-"""
-а в остальном проверь файлы app\ru\hair-transplant\lp\_components\LeadForm.tsx и components\auth\UnifiedAuthModal.tsx, корректно ли я там все сделал?
-
-components\auth\UnifiedAuthModal.tsx: """
-// components/auth/UnifiedAuthModal.tsx
-"use client";
-
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { Icon } from "@iconify/react";
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Divider,
-  Card,
-  CardBody,
-} from "@heroui/react";
-import { useRouter } from "next/navigation";
-
-import type { UserRole } from "@/lib/supabase/supabase-provider";
-import { useSupabase } from "@/lib/supabase/supabase-provider";
-
-import CredentialsForm from "@/components/auth/CredentialsForm";
-import OtpForm from "@/components/auth/OtpForm";
-import PhoneAuthForm from "@/components/auth/PhoneAuthForm";
-
-type Step = "role" | "auth" | "otp";
-type Mode = "signin" | "signup";
-
-type Props = {
-  open: boolean;
-  onClose: () => void;
-  initialRole?: Exclude<UserRole, "ADMIN" | "GUEST"> | null;
-  next?: string;
-};
-
-const ROLE_META: Record<
-  Exclude<UserRole, "GUEST">,
-  { title: string; subtitle: string; icon: string }
-> = {
-  PATIENT: {
-    title: "Patient",
-    subtitle: "Book appointments, manage visits, chat with clinics",
-    icon: "solar:heart-pulse-2-linear",
-  },
-  PARTNER: {
-    title: "Partner",
-    subtitle: "Referral links, programs, reports, payouts",
-    icon: "solar:users-group-two-rounded-linear",
-  },
-  CUSTOMER: {
-    title: "Clinic",
-    subtitle: "Manage clinic profile, services, doctors and bookings",
-    icon: "solar:hospital-linear",
-  },
-  ADMIN: {
-    title: "Admin",
-    subtitle: "Administration panel",
-    icon: "solar:shield-user-bold",
-  },
-};
-
-function isAllowedRole(r: any): r is Exclude<UserRole, "ADMIN" | "GUEST"> {
-  return r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER";
-}
-
-export default function UnifiedAuthModal({
-  open,
-  onClose,
-  initialRole = null,
-  next = "/",
-}: Props) {
-  const router = useRouter();
-  const { supabase } = useSupabase();
-
-  const safeNext = useMemo(() => {
-    const n = String(next || "/");
-    return n.startsWith("/") ? n : "/";
-  }, [next]);
-
-  const [step, setStep] = useState<Step>("role");
-  const [mode, setMode] = useState<Mode>("signin");
-  const [role, setRole] = useState<Exclude<UserRole, "ADMIN" | "GUEST"> | null>(
-    null,
-  );
-  const [email, setEmail] = useState<string>("");
-  const [patientAuthMode, setPatientAuthMode] = useState<"email" | "phone">("email");
-
-  useEffect(() => {
-    if (!open) return;
-
-    const r = isAllowedRole(initialRole) ? initialRole : null;
-    setRole(r);
-    setEmail("");
-    setMode("signin");
-    setStep(r ? "auth" : "role");
-  }, [open, initialRole]);
-
-  setPatientAuthMode("email");
-
-  const roleLabel = useMemo(() => (role ? ROLE_META[role]?.title ?? role : ""), [role]);
-
-  const title = useMemo(() => {
-    if (step === "role") return "Sign in / Sign up";
-    if (step === "auth") return role ? `${mode === "signin" ? "Sign in" : "Create account"} — ${roleLabel}` : "Sign in";
-    return `Enter code (${roleLabel})`;
-  }, [step, role, roleLabel, mode]);
-
-  const signInWithGoogle = useCallback(async () => {
-    if (!role) return;
-
-    const origin = window.location.origin;
-    const redirectTo = `${origin}/auth/callback?as=${encodeURIComponent(
-      role,
-    )}&next=${encodeURIComponent(safeNext)}`;
-
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-  }, [supabase, role, safeNext]);
-
-  const goBack = useCallback(() => {
-    if (step === "otp") return setStep("auth");
-    if (step === "auth") return setStep(initialRole ? "auth" : "role");
-    onClose();
-  }, [step, onClose, initialRole]);
-
-  const pickRole = (r: Exclude<UserRole, "ADMIN" | "GUEST">) => {
-    setRole(r);
-    setStep("auth");
-  };
-
-  const [otpPassword, setOtpPassword] = useState("");
-
-  return (
-    <Modal
-      isOpen={open}
-      onOpenChange={(v) => {
-        if (!v) onClose();
-      }}
-      placement="center"
-      backdrop="blur"
-      size="md"
-      scrollBehavior="inside"
-    >
-      <ModalContent>
-        {(close) => (
-          <>
-            <ModalHeader className="flex items-center gap-2">
-              <Icon icon="solar:login-3-linear" width={20} />
-              <span>{title}</span>
-            </ModalHeader>
-
-            <Divider />
-
-            <ModalBody className="py-5">
-              {/* STEP: ROLE */}
-              {step === "role" ? (
-                <div className="grid grid-cols-1 gap-3">
-                  {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
-                    <Card
-                      key={r}
-                      isPressable
-                      onPress={() => pickRole(r)}
-                      className="border border-divider hover:border-primary transition-colors"
-                    >
-                      <CardBody className="flex flex-row items-center gap-4 py-4">
-                        <div className="h-10 w-10 rounded-full bg-default-100 flex items-center justify-center">
-                          <Icon icon={ROLE_META[r].icon} width={22} />
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="font-semibold">{ROLE_META[r].title}</div>
-                          <div className="text-tiny text-default-500">
-                            {ROLE_META[r].subtitle}
-                          </div>
-                        </div>
-                        <div className="ml-auto text-default-400">
-                          <Icon icon="solar:alt-arrow-right-linear" width={18} />
-                        </div>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* STEP: AUTH */}
-              {step === "auth" && role ? (
-                <div className="flex flex-col gap-4">
-                  {/* segmented sign in / sign up */}
-                  <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
-                    <Button
-                      className="flex-1"
-                      color={mode === "signin" ? "primary" : "primary"}
-                      variant={mode === "signin" ? "solid" : "ghost"}
-                      onPress={() => setMode("signin")}
-                    >
-                      Sign in
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      color={mode === "signup" ? "primary" : "primary"}
-                      variant={mode === "signup" ? "solid" : "ghost"}
-                      onPress={() => setMode("signup")}
-                    >
-                      Sign up
-                    </Button>
-                  </div>
-
-                  {role === "PATIENT" ? (
-                    <div className="w-full rounded-xl border border-divider bg-default-50 p-1 flex gap-1">
-                      <Button
-                        className="flex-1"
-                        variant={patientAuthMode === "email" ? "solid" : "ghost"}
-                        color="primary"
-                        onPress={() => setPatientAuthMode("email")}
-                      >
-                        Email
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        variant={patientAuthMode === "phone" ? "solid" : "ghost"}
-                        color="primary"
-                        onPress={() => setPatientAuthMode("phone")}
-                      >
-                        Phone
-                      </Button>
-                    </div>
-                  ) : null}
-
-                  <CredentialsForm
-                    mode={mode}
-                    role={role}
-                    next={safeNext}
-                    onSignedIn={() => {
-                      close();
-                      onClose();
-                      router.replace(safeNext);
-                      router.refresh();
-                    }}
-                    onOtpRequired={({ email, password }) => {
-                      setEmail(email);
-                      setOtpPassword(password);
-                      setStep("otp");
-                    }}
-                  />
-
-                  <Divider />
-
-                  <Button
-                    variant="bordered"
-                    startContent={<Icon icon="logos:google-icon" width={18} />}
-                    onPress={signInWithGoogle}
-                    className="justify-center"
-                  >
-                    Continue with Google
-                  </Button>
-
-                  {mode === "signup" ? (
-                    <p className="text-tiny text-default-500 text-center">
-                      We’ll send a 6-digit code to confirm your email.
-                    </p>
-                  ) : (
-                    <p className="text-tiny text-default-500 text-center">
-                      Use your email and password to sign in.
-                    </p>
-                  )}
-                </div>
-              ) : null}
-
-              {/* STEP: OTP */}
-              {step === "otp" && role ? (
-                <div className="flex flex-col gap-4">
-                  <OtpForm
-                    email={email}
-                    password={otpPassword}
-                    as={role}
-                    next={safeNext}
-                    onBack={() => setStep("auth")}
-                    onSuccess={() => {
-                      close();   // закрывает ModalContent
-                      onClose(); // твой внешний флаг open=false
-                    }}
-                  />
-                </div>
-              ) : null}
-            </ModalBody>
-
-            <Divider />
-
-            <ModalFooter className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                color="primary"
-                onPress={() => {
-                  if (step === "role") {
-                    close();
-                    onClose();
-                    return;
-                  }
-                  goBack();
-                }}
-              >
-                Back
-              </Button>
-
-              {step !== "role" && !initialRole ? (
-                <Button
-                  variant="ghost"
-                  color="primary"
-                  onPress={() => {
-                    setRole(null);
-                    setEmail("");
-                    setMode("signin");
-                    setStep("role");
-                  }}
-                  startContent={<Icon icon="solar:refresh-linear" width={16} />}
-                >
-                  Change role
-                </Button>
-              ) : (
-                <span />
-              )}
-            </ModalFooter>
-          </>
-        )}
-      </ModalContent>
-    </Modal>
-  );
-}
-"""
-app\ru\hair-transplant\lp\_components\LeadForm.tsx: """
-'use client';
-
-import { useMemo, useState } from "react";
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import LeadImageUpload from "./LeadImageUpload";
-import { createClient } from "@/lib/supabase/browserClient";
-
-type Props = {
-  submitText?: string;
-  onSubmitted?: () => void;
-  className?: string;
-  disclaimerText?: string;
-  buttonClassName?: string;
-};
-
-const supabase = useMemo(() => createClient(), []);
-const [phoneOtpMode, setPhoneOtpMode] = useState<"idle" | "sent" | "verified">("idle");
-const [otp, setOtp] = useState("");
-const [otpBusy, setOtpBusy] = useState(false);
-const [otpError, setOtpError] = useState<string | null>(null);
-
-function fireForm1Step(meta?: { source?: string; patient_email_sent?: boolean }) {
-  // 1) можно оставить — пригодится для GTM в будущем, и для метрики ecommerce
-  (window as any).dataLayer = (window as any).dataLayer || [];
-  (window as any).dataLayer.push({
-    event: "lead_submit",
-    form_name: "hair-transplant-lp",
-    ...meta,
-  });
-
-  // 2) GA4 (важно: НЕ передавать email/phone — это PII)
-  (window as any).gtag?.("event", "generate_lead", {
-    form_name: "hair-transplant-lp",
-    source: meta?.source || "hair-transplant-lp",
-    patient_email_sent: Boolean(meta?.patient_email_sent),
-  });
-
-  // 3) optional: DOM event
-  window.dispatchEvent(new Event("lead_submit"));
-}
-
-async function sendPhoneOtp() {
-  setOtpError(null);
-  setOtpBusy(true);
-  try {
-    const phoneE164 = phone.trim(); // лучше: хранить уже E.164
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: phoneE164,
-      options: { channel: "sms" as any },
-    } as any);
-    if (error) throw error;
-    setPhoneOtpMode("sent");
-  } catch (e: any) {
-    setOtpError(e?.message ?? String(e));
-  } finally {
-    setOtpBusy(false);
-  }
-}
-
-async function verifyPhoneOtp() {
-  setOtpError(null);
-  setOtpBusy(true);
-  try {
-    const phoneE164 = phone.trim();
-    const token = otp.trim();
-
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone: phoneE164,
-      token,
-      type: "sms",
-    } as any);
-
-    if (error) throw error;
-
-    // attach lead -> patient
-    let leadId = "";
-    try { leadId = localStorage.getItem("mt_lead_id") || ""; } catch {}
-    if (leadId) {
-      const r = await fetch("/api/patient/lead/attach", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lead_id: leadId, full_name: fullName.trim(), phone: phone.trim() }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j?.error || "Failed to attach lead");
-      try { localStorage.removeItem("mt_lead_id"); } catch {}
-    }
-
-    setPhoneOtpMode("verified");
-    // переходим в кабинет
-    window.location.href = "/patient";
-  } catch (e: any) {
-    setOtpError(e?.message ?? String(e));
-  } finally {
-    setOtpBusy(false);
-  }
-}
-
-export default function LeadForm({
-  submitText = "Отправить",
-  onSubmitted,
-  className,
-  disclaimerText = "Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности",
-  buttonClassName,
-}: Props) {
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [age, setAge] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
-
-  const [patientEmailSent, setPatientEmailSent] = useState(false);
-
-  const canSubmit = useMemo(() => {
-    return fullName.trim() && phone.trim()
-  }, [fullName, phone]);
-
-  async function submit() {
-    setError(null);
-    setOk(false);
-    setPatientEmailSent(false);
-    setBusy(true);
-
-    try {
-      const fd = new FormData();
-      fd.set("source", "hair-transplant-lp");
-      fd.set("full_name", fullName.trim());
-      fd.set("phone", phone.trim());
-      const em = email.trim().toLowerCase();
-      if (em) fd.set("email", em);
-      if (age.trim()) fd.set("age", age.trim());
-      files.slice(0, 3).forEach((f) => fd.append("images", f));
-
-      const res = await fetch("/api/leads/partner", { method: "POST", body: fd });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || "Submit failed");
-
-      setOk(true);
-      setPatientEmailSent(Boolean(json?.patient?.emailSent));
-      fireForm1Step({
-        source: "hair-transplant-lp",
-        patient_email_sent: Boolean(json?.patient?.emailSent),
-      });
-
-      onSubmitted?.();
-
-      const leadId = String(json?.id ?? "");
-      if (leadId) {
-        try { localStorage.setItem("mt_lead_id", leadId); } catch { }
-      }
-
-      setOk(true);
-
-      const hasEmail = Boolean(em);
-      if (!hasEmail) {
-        // email нет => запускаем phone OTP флоу
-        setPhoneOtpMode("idle");
-      }
-
-      // опционально: очистить форму
-      setFullName("");
-      setPhone("");
-      setEmail("");
-      setAge("");
-      setFiles([]);
-    } catch (e: any) {
-      setError(String(e?.message ?? e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form
-      className={className ?? "space-y-3"}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!canSubmit || busy) return;
-        submit();
-      }}
-    >
-      <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-      <Input placeholder="Телефон*" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
-
-      <div className="mt-4">
-        <LeadImageUpload files={files} onFilesChange={setFiles} />
-      </div>
-
-      {ok ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Спасибо! Мы получили заявку и свяжемся с вами.
-        </div>
-      ) : null}
-
-      {ok && patientEmailSent ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
-        </div>
-      ) : null}
-
-      {ok && !email.trim() ? (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-          <div className="font-semibold">Вход в личный кабинет по SMS</div>
-          <div className="mt-1 text-slate-600">
-            Мы можем открыть кабинет по номеру телефона. Отправим код в SMS.
-          </div>
-
-          {otpError ? (
-            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {otpError}
-            </div>
-          ) : null}
-
-          {phoneOtpMode === "idle" ? (
-            <Button className="mt-3 w-full" onClick={sendPhoneOtp} disabled={otpBusy}>
-              {otpBusy ? "Отправляем..." : "Отправить код"}
-            </Button>
-          ) : null}
-
-          {phoneOtpMode === "sent" ? (
-            <div className="mt-3 space-y-2">
-              <Input
-                placeholder="Код из SMS (6 цифр)"
-                inputMode="numeric"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-              />
-              <Button className="w-full" onClick={verifyPhoneOtp} disabled={otpBusy || otp.trim().length !== 6}>
-                {otpBusy ? "Проверяем..." : "Подтвердить и войти"}
-              </Button>
-            </div>
-          ) : null}
-
-          <div className="mt-2 text-xs text-slate-500">
-            Номер должен быть в международном формате, например: +905551112233
-          </div>
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-
-      <Button type="submit" className={buttonClassName ?? "w-full"} size="lg" disabled={!canSubmit || busy}>
-        {busy ? "Отправляем..." : submitText}
-      </Button>
-
-      <p className="text-center text-xs text-slate-500">{disclaimerText}</p>
-    </form>
-  );
-}
-"""
-
------------------------
-
-отлично, выполнил правки, а ниже полный app\api\admin\partner-leads\assign\route.ts
-
-app\api\admin\partner-leads\assign\route.ts: """
-// app/api/admin/partner-leads/assign/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { createRouteClient } from "@/lib/supabase/routeClient";
-import { createServiceClient } from "@/lib/supabase/serviceClient";
-import { resendSend, partnerNewLeadTemplate } from "@/lib/mail/resend";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-async function isAdmin(route: any, userId: string) {
-  const { data } = await route.from("user_roles").select("role").eq("user_id", userId);
-  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
-  return roles.includes("admin");
-}
-
-function isUuid(v: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-}
-
-export async function PATCH(req: NextRequest) {
-  // 1) auth + admin check
-  const route = await createRouteClient();
-  const { data: auth } = await route.auth.getUser();
-  const user = auth?.user;
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const ok = await isAdmin(route, user.id);
-  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
-  // 2) body
-  const body = await req.json().catch(() => null);
-  const lead_id = String(body?.lead_id ?? "").trim();
-  const partner_id = String(body?.partner_id ?? "").trim(); // (исторически) в UI поле называется partner_id, но это customer user_id
-  const note = String(body?.note ?? "").trim().slice(0, 500);
-
-  if (!isUuid(lead_id)) return NextResponse.json({ error: "Invalid lead_id" }, { status: 400 });
-  if (!isUuid(partner_id)) return NextResponse.json({ error: "Invalid partner_id" }, { status: 400 });
-
-  // 3) service client
-  const admin = createServiceClient();
-
-  // 3.1) убедимся что user реально customer
-  const { data: roleCheck, error: rcErr } = await admin
-    .from("user_roles")
-    .select("user_id")
-    .eq("user_id", partner_id)
-    .eq("role", "customer")
-    .maybeSingle();
-
-  if (rcErr) return NextResponse.json({ error: rcErr.message }, { status: 500 });
-  if (!roleCheck) return NextResponse.json({ error: "User is not a customer" }, { status: 400 });
-
-  // 4) прочитаем текущий lead (до обновления)
-  const { data: before, error: beforeErr } = await admin
-    .from("partner_leads")
-    .select("id,assigned_partner_id,full_name,phone,email,patient_id,source,created_at")
-    .eq("id", lead_id)
-    .maybeSingle();
-
-  if (beforeErr) return NextResponse.json({ error: beforeErr.message }, { status: 500 });
-  if (!before) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-
-  const prevPartnerId = before.assigned_partner_id ?? null;
-  const customerChanged = String(prevPartnerId ?? "") !== String(partner_id);
-
-  // 5) resolve clinic_id by customer user_id
-  const { data: mem, error: memErr } = await admin
-    .from("customer_clinic_membership")
-    .select("clinic_id")
-    .eq("user_id", partner_id)
-    .maybeSingle();
-
-  if (memErr) return NextResponse.json({ error: memErr.message }, { status: 500 });
-  if (!mem?.clinic_id) return NextResponse.json({ error: "Customer has no clinic membership" }, { status: 400 });
-
-  const clinicId = String(mem.clinic_id);
-
-  // ✅ resolve patient_id (email OR patient_id)
-  let patientId: string | null = null;
-
-  if (before.patient_id) {
-    patientId = String(before.patient_id);
-  } else {
-    const leadEmail = String(before.email ?? "").trim().toLowerCase();
-    if (leadEmail) {
-      const { data: pat, error: patErr } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("email", leadEmail)
-        .maybeSingle();
-
-      if (patErr) return NextResponse.json({ error: patErr.message }, { status: 500 });
-      if (pat?.id) patientId = String(pat.id);
-    }
-  }
-
-  if (!patientId) {
-    return NextResponse.json(
-      { error: "Patient not found for lead (no email and not attached by phone OTP yet)" },
-      { status: 400 }
-    );
-  }
-
-  // 7) create booking from lead (ТОЛЬКО если customerChanged)
-  //    + защита от дублей: ищем booking с таким lead маркером
-  const leadMarker = `[lead:${lead_id}]`;
-
-  let bookingId: string | null = null;
-
-  if (customerChanged) {
-    // 7.1) check duplicate booking (same clinic + same patient + same marker in notes)
-    const { data: exists, error: exErr } = await admin
-      .from("patient_bookings")
-      .select("id")
-      .eq("clinic_id", clinicId)
-      .eq("patient_id", patientId)
-      .ilike("notes", `%${leadMarker}%`)
-      .maybeSingle();
-
-    if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
-
-    bookingId = exists?.id ?? null;
-
-    if (!bookingId) {
-      const { data: booking, error: bookErr } = await admin
-        .from("patient_bookings")
-        .insert({
-          patient_id: patientId,
-          clinic_id: clinicId,
-          service_id: 803, // Hair Transplant
-          booking_method: "automatic", // лид
-          status: "pending",
-          full_name: before.full_name,
-          phone: before.phone,
-          notes: `${leadMarker} Landing lead (${before.source ?? "unknown"})`,
-        })
-        .select("id")
-        .single();
-
-      if (bookErr) return NextResponse.json({ error: bookErr.message }, { status: 500 });
-      bookingId = booking?.id ?? null;
-    }
-  }
-
-  // 8) update lead assignment
-  const patch: any = {
-    assigned_partner_id: partner_id,
-    assigned_at: new Date().toISOString(),
-    assigned_by: user.id,
-    assigned_note: note || null,
-    status: "assigned",
-  };
-
-  const { data, error } = await admin
-    .from("partner_leads")
-    .update(patch)
-    .eq("id", lead_id)
-    .select(
-      "id,source,full_name,phone,email,age,image_paths,status,admin_note,created_at,assigned_partner_id,assigned_at,assigned_by,assigned_note",
-    )
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // 9) email notify (best-effort: не ломаем assignment если email упал)
-  let emailSent = false;
-  let emailError: string | null = null;
-
-  if (customerChanged) {
-    try {
-      const { data: customerProfile, error: pErr } = await admin
-        .from("profiles")
-        .select("email,first_name,last_name")
-        .eq("id", partner_id)
-        .maybeSingle();
-
-      if (pErr) throw new Error(pErr.message);
-      const customerEmail = customerProfile?.email?.trim();
-      if (!customerEmail) throw new Error("Customer email not found in profiles");
-
-      const customerName =
-        `${customerProfile?.first_name ?? ""} ${customerProfile?.last_name ?? ""}`.trim() || null;
-
-      const origin = req.nextUrl.origin;
-      const patientsUrl = `${origin}/customer/patients`;
-
-      const tpl = partnerNewLeadTemplate({
-        partnerName: customerName,
-        leadsUrl: patientsUrl,
-        lead: {
-          full_name: before.full_name,
-          phone: before.phone,
-          email: before.email,
-          source: before.source,
-          created_at: before.created_at,
-        },
-      });
-
-      await resendSend({ to: customerEmail, subject: tpl.subject, html: tpl.html });
-      emailSent = true;
-    } catch (e: any) {
-      emailError = String(e?.message ?? e);
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    item: data,
-    booking: {
-      attempted: customerChanged,
-      id: bookingId,
-    },
-    email: {
-      attempted: customerChanged,
-      sent: emailSent,
-      error: emailError,
-    },
-  });
-}
-"""
+привет. прошлый чат где мы разрабатывали проект стал сильно большим и поэтому мы переходим в новый чат. в прошлом чате я попросил сделать отчет в целом о проекте и о текущей реализации. поэтому сначала изучи полностью подробно отчет, не торопись, а уже потом будем продолжать.
+
+Ниже — подробный отчёт по текущей реализации MedTravel, который можно целиком вставить в новый чат, чтобы ассистент сразу понял контекст, стек, архитектуру, что уже сделано и что делаем дальше.
+
+Отчёт по проекту MedTravel (текущее состояние)
+1) Что за сервис и для кого
+MedTravel — платформа медицинского туризма. Цель: соединять пациентов с клиниками, показывать услуги/цены, давать возможность записаться/отправить заявку, а клиникам — вести простую “мини-CRM” по пациентским обращениям и записям.
+Основные аудитории:
+Пациенты (Patient Panel): выбирают клинику/услугу, создают запись (booking), прикладывают файлы (рентген/фото), видят статус и назначенное время.
+Партнеры (Partner Panel): выбирают программу, при одобрении админа получают реферальную ссылку, по которой пациенты регистрируются и рефералами партнера.
+Клиники (Customer Panel): видят список пациентов/записей, статусы, стоимость, прикреплённые файлы, могут назначить/изменить время визита, менять статус (в рамках правил).
+Админ/модерация (Admin Panel): управление клиниками/контентом/заявками и т.п. (в проекте есть отдельные ветки функционала и ограничения по доступу).
+
+2) Технологический стек
+Frontend / Web
+Next.js 15 (App Router), SSR/RSC + Client Components по необходимости.
+TypeScript
+TailwindCSS (глобальные стили + утилитарные классы)
+UI-компоненты: частично shadcn/ui (Button/Input/Dialog/Accordion), частично HeroUI (подключали/пробовали; важно не ломать глобальные темы).
+Backend / Data
+Supabase:
+Postgres (таблицы, view, функции/RPC)
+Supabase Auth (пользователи)
+Storage (файлы пациентов: xray/photo)
+RLS + SECURITY DEFINER функции
+Взаимодействие: supabase.rpc(...), supabase.from(view).select(...), а также Next.js API routes.
+Деплой
+Vercel (production build)
+Supabase как бэкенд (DB + Storage)
+
+3) Архитектура приложения (App Router)
+Корневой layout
+app/layout.tsx — общий RootLayout:
+подключает globals.css
+SupabaseProvider (session)
+ThemeRoot
+оборачивает всё в AppChrome, который решает показывать ли Navbar/Footer.
+AppChrome
+components/layout/AppChrome.tsx (client):
+по pathname скрывает Navbar/Footer для /admin, /auth, /login.
+текущая задача: также скрыть хедер/футер для лендинга /ru/hair-transplant/lp (реализуется через условие в AppChrome, без отдельного root layout).
+
+4) Система ролей и панелей
+Роли концептуально:
+PATIENT — личный кабинет пациента (страницы в app/(patient)/patient/...)
+CUSTOMER — кабинет клиники (страницы в app/(customer)/customer/...)
+PARTNER — личный кабинет пациента (страницы в app/(partner)/partner/...)
+ADMIN — админка
+Доступы обеспечиваются:
+Supabase Auth user
+(частично) RLS и SECURITY DEFINER функции
+Скрытие/доступ к роутам на уровне Next.js (редиректы, проверки user session)
+
+5) База данных: ключевая сущность patient_bookings
+Таблица public.patient_bookings
+Основные поля (важное):
+id uuid — booking_id
+patient_id uuid, clinic_id uuid, service_id int
+status text: pending | confirmed | cancelled | cancelled_by_patient | completed
+preferred_date date, preferred_time text — что указал пациент
+scheduled_at timestamptz — что назначила клиника
+schedule_set_by uuid, schedule_set_at timestamptz — кто/когда назначил
+pre_cost numeric, currency text, actual_cost numeric
+xray_path text, photo_path text — пути в Supabase Storage
+индексы по scheduled_at, patient_id, clinic_id, status, created_at
+Логика: пациент задаёт preferred, клиника подтверждает/меняет и пишет scheduled_at.
+
+6) VIEW для единообразного чтения: v_customer_patients
+public.v_customer_patients — основной “read model” для списков:
+содержит booking_id, clinic_id, patient_id, patient_public_id (генерация через dense_rank)
+patient_name/phone, service_name
+status, booking_method, preferred_date, preferred_time, scheduled_at
+цены pre_cost, currency, actual_cost
+xray_path, photo_path
+clinic_name
+Эта вьюха используется:
+в кабинете пациента (/patient/bookings)
+в кабинете клиники (списки пациентов и фильтры)
+Важно: при изменении колонок view нельзя просто “переименовать” колонки через CREATE OR REPLACE без ALTER — были ошибки типа:
+cannot change name of view column "created_at" to "scheduled_at" Решено обновлением view корректным образом (колонки добавлены правильно).
+
+7) RPC функции (Postgres)
+7.1 Список пациентов для клиники
+public.customer_patients_list(...)
+параметры: p_status, p_start_date, p_end_date, p_limit, p_offset
+источник: v_customer_patients
+фильтр по клинике через customer_current_clinic_id()
+поддержка total_count: count(*) over() as total_count
+статус: умеет корректно отображать cancelled/cancelled_by_patient при фильтре cancelled
+лимит clamp 1..50
+Используется в Next route: app/api/customer/patients/route.ts (GET)
+7.2 Обновление статуса записи клиникой
+customer_patient_update_status(p_booking_id, p_status) (уже существует в проекте) Используется: app/api/customer/patients/[id]/route.ts (PATCH/POST)
+7.3 Удаление
+customer_patient_delete_one(p_booking_id)
+customer_patients_delete_all(...) Используется: app/api/customer/patients/[id]/route.ts (DELETE) app/api/customer/patients/route.ts (DELETE)
+7.4 Назначение времени клиникой
+Добавлена функция вида: public.customer_patient_set_schedule(p_booking_id, p_scheduled_at)
+пишет scheduled_at, schedule_set_by, schedule_set_at
+доступ через SECURITY DEFINER / RLS-совместимый подход
+Используется: app/api/customer/patients/[id]/schedule/route.ts (PATCH)
+На этапе интеграции была ошибка:
+Could not find the function ... in the schema cache Решение: пересоздать функцию/обновить, убедиться что имя/параметры совпадают, и что Supabase schema cache обновился (после этого заработало).
+
+8) Storage: файлы пациента (рентген/фото)
+Пути хранятся в patient_bookings.xray_path / photo_path.
+Для открытия используются Next API endpoints:
+app/api/customer/patients/[id]/xray-url/route.ts
+app/api/customer/patients/[id]/photo-url/route.ts
+Эндпоинты:
+проверяют доступ клиники к booking
+генерируют signed URL Supabase Storage (/storage/v1/object/sign/...)
+возвращают { url }
+Сначала была ошибка 403 на запрос signed url, потом исправили routes и доступ.
+На фронте:
+кнопка View attachment открывает модальное окно внутри сервиса (без редиректа), показывает изображение.
+закрытие: крестик, ESC, клик вне модального.
+
+9) UI Customer Panel: список пациентов клиники
+Файл: components/customer/PatientsListClient.tsx
+пагинация
+фильтры по статусу, date range
+realtime подписка Supabase channel на patient_bookings (postgres_changes)
+таблица: patient_id, name, phone, treatment, preferred, scheduled, status, costs, actions
+actions:
+Schedule (открывает модалку для выбора даты/времени, отправляет PATCH /schedule)
+View attachment (модалка с изображением)
+Delete
+статус “cancelled_by_patient” блокирует изменение статуса клиникой (селект disabled) — это поведение важно.
+Также ранее был момент, когда после отмены пациентом у клиники статус отображался неверно (pending вместо cancelled_by_patient) — исправлялось на стороне view/rpc/маппинга статусов.
+
+10) UI Patient Panel: “My Bookings”
+Файл: app/(patient)/patient/bookings/page.tsx
+SSR страница, берёт user session через supabase server client
+читает из v_customer_patients, фильтр .eq("patient_id", user.id)
+отображает:
+clinic, service, location
+если есть scheduled_at → показываем назначенное клиникой время + подпись “Scheduled by clinic”
+иначе preferred_date/time
+статус бейджем
+цены
+booking_method
+отмена записи через patient_cancel_booking (server action), с мягкой обработкой ошибок (redirect с cancel_error)
+Согласована логика:
+пациент отменяет → у пациента отображается cancelled
+у клиники должно отображаться cancelled_by_patient (и быть locked для редактирования статуса)
+
+11) Форматирование даты/времени и TZ
+Было:
+клиника видит одно время, пациент другое (разница из-за timezone/locale форматтера).
+Сделано:
+привели формат отображения к единому виду:
+DD.MM.YYYY, HH:mm (без секунд)
+показ по timezone пользователя (браузер пациента).
+при назначении времени клиникой — сохраняем корректный timestamp в ISO, а отображаем по локали/таймзоне.
+
+12) Текущий этап разработки: лендинг /ru/hair-transplant/lp
+Цель: рекламный лендинг под русскоязычную аудиторию для услуги пересадки волос в Стамбуле.
+Реализовано
+Страница: app/ru/hair-transplant/lp/page.tsx
+Секции лендинга:
+Hero: заголовок/подзаголовок/3 преимущества + рейтинг 4.8/5
+справа инлайн-форма (НЕ модалка): LeadInlineForm
+Steps: 9 шагов карточками с иконками (lucide-react)
+Results: карусель результатов ResultsCarousel
+Economy: “табличка” со сравнением и итоговой экономией
+Official: карточки про легальность/гарантии
+Certificates: 1 изображение лицензии
+Why Turkey: 3 карточки преимуществ
+FAQ: аккордеон FaqAccordion + JSON-LD FAQPage
+Final CTA: блок с формой
+SEO:
+metadata (title/description/canonical/openGraph/twitter/robots)
+FAQ JSON-LD schema.org
+Формы:
+Изначально было модальное окно, затем поменяли:
+в первой секции форма всегда открыта (inline)
+CTA-кнопки (через одну секцию — т.е. внутри основных секций, а не отдельной секцией) должны открывать модальное окно с формой.
+Сделали общий компонент формы (чтобы не дублировать разметку):
+LeadForm — общая форма
+LeadInlineForm — карточка с заголовком + LeadForm
+LeadModalCta — кнопка → Dialog → LeadForm
+Карусель:
+пока базовая реализация со скроллом и dot-индикаторами.
+нужно привести изображения к единому размеру (на десктопе ~345×345) и адаптивность.
+Важно по layout / header-footer
+Проект использует общий RootLayout + AppChrome (Navbar/Footer). На лендинге header/footer не нужны.
+Правильный способ (без отдельного layout, т.к. root layout единый):
+в components/layout/AppChrome.tsx добавить условие:
+если pathname начинается с /ru/hair-transplant/lp → скрываем Navbar/Footer.
+(Страница not-found.tsx — пример того, как выглядит “без chrome”, но она не влияет на обычные страницы.)
+Что осталось доделать по лендингу (актуальные задачи)
+Скрыть Navbar/Footer только на лендинге через AppChrome (path-based).
+CTA через одну секцию:
+не вставлять отдельные секции,
+добавить внутри основных секций (например, after Steps, after Economy, after Why Turkey) небольшую CTA-строку/кнопку LeadModalCta.
+Карусель изображений привести к единому размеру:
+на desktop карточка изображения ~345×345 (квадрат),
+на мобилке адаптивно (например, 70–85vw) и без кривых высот.
+Доработка визуала:
+избегать монотонных “простыней” текста на мобилке,
+аккуратные отступы/иерархия, единые типографические правила,
+оставить стили в рамках дизайна MedTravel (без поломки глобальной темы).
+(Потом, позже) подключение логики отправки формы — пока не требуется.
+
+13) Известные ошибки/риски из недавнего
+Vercel build ошибка: Can't resolve '@/lib/utils' при подключении некоторых UI компонентов.
+Решалось добавлением файла/исправлением импорта/откатом спорных изменений.
+HeroUI peer dependency: в логах предупреждение про tailwindcss@>=4.0.0 для @heroui/theme.
+Нужно следить, чтобы установка/импорт heroUI не ломал глобальные цвета/тему.
+“цвета по всему сайту сломались” — случалось после вмешательств в глобальные темы/провайдеры/стили; откатывали обратно.
+Важно: не менять глобальные темы ради лендинга.
+
+14) Ключевые файлы/директории (ориентиры)
+Layout/Chrome
+app/layout.tsx — root layout, провайдеры, темы, AppChrome
+components/layout/AppChrome.tsx — условное отображение Navbar/Footer
+components/layout/Navbar.tsx
+components/layout/Footer.tsx
+styles/globals.css
+Customer (клиника)
+components/customer/PatientsListClient.tsx
+app/api/customer/patients/route.ts
+app/api/customer/patients/[id]/route.ts
+app/api/customer/patients/[id]/schedule/route.ts
+app/api/customer/patients/[id]/xray-url/route.ts
+app/api/customer/patients/[id]/photo-url/route.ts
+Patient
+app/(patient)/patient/bookings/page.tsx
+RPC: patient_cancel_booking
+DB
+public.patient_bookings (таблица)
+public.v_customer_patients (view)
+RPC:
+customer_patients_list
+customer_patient_update_status
+customer_patient_set_schedule
+delete функций
+Landing
+app/ru/hair-transplant/lp/page.tsx
+app/ru/hair-transplant/lp/_components/LeadForm.tsx
+app/ru/hair-transplant/lp/_components/LeadInlineForm.tsx
+app/ru/hair-transplant/lp/_components/LeadModalCta.tsx
+app/ru/hair-transplant/lp/_components/ResultsCarousel.tsx
+app/ru/hair-transplant/lp/_components/FaqAccordion.tsx
+
+15) На чём остановились прямо сейчас
+Функционал расписания (preferred vs scheduled) — работает:
+клиника назначает время → пациент видит назначенное время.
+формат дат приведён в порядок, TZ учтён.
+Файлы (attachments) — работают:
+подписанные URL получают через API, показываются в модалке.
+Лендинг — основной активный этап:
+уже сверстан по секциям, формы и FAQ/JSON-LD есть.
+
+репозиторий проекта(публичный, заходи, смотри, изучай) - https://github.com/ArtLegends/medtravel-main
+продакшен - https://medtravel.me/
+
+как закончишь изучать, напиши просто "Я готов" и будем продолжать.
+
+----------------------- next
+
+Ниже — отчёт, который можно целиком вставить в новый чат. Я разделил на: **(A) общий статус проекта MedTravel**, **(B) что именно сделали в ЭТОМ чате по шагам**, **(C) текущая точка и что дальше**.
+
+---
+
+# Отчёт по проекту MedTravel (текущее состояние)
+
+## 1) Кратко о продукте и ролях
+
+**MedTravel.me** — платформа медтуризма с 4 сущностями (по твоему описанию):
+
+1. **Пациент (PATIENT)**
+
+* Может оставить заявку/лид (лендинг) или создать букинг на конкретную клинику из кабинета.
+* Имеет кабинет пациента, видит записи/статусы/назначенную клинику, позже будет выбирать клинику вручную/авто.
+
+2. **Клиника-партнёр (CUSTOMER)**
+
+* Регистрируется, требует **апрува админом**.
+* После апрува получает доступ к customer-панели и видит записи пациентов в `/customer/patients`.
+* Может менять статус, назначать дату (schedule), работать с вложениями.
+
+3. **Партнёр-аффилейт (PARTNER)**
+
+* Отдельная роль для реферального привлечения.
+* Теперь тоже требует **апрува админом** (как customer).
+* Ранее временно использовался путь “лиды → партнёру”, но по бизнес-логике лиды должны приходить **клиникам (customer)**, а партнёры — к реферальной программе/аналитике.
+
+4. **Партнёр-супервайзер**
+
+* Пока не реализован. Учтено в будущем для иерархии партнёров.
+
+---
+
+## 2) Технологический стек / архитектура
+
+* **Next.js App Router** (route handlers, server components + client components)
+* **Supabase**: Auth (email/pass + OTP, Google OAuth, теперь ещё Phone provider через Twilio), Postgres, Storage, RLS
+* **Postgres SQL**: views + rpc функции для панелей (например `customer_patients_list`)
+* UI: **HeroUI**, TailwindCSS, кастомные компоненты
+* Email: **Resend** (шаблоны в `lib/mail/resend.ts`)
+* Analytics: **Yandex Metrika** + **GA4 gtag** (CSP учитываем)
+
+---
+
+# (B) Что реализовали в этом чате — по этапам
+
+## Этап 1 — Google Analytics / CSP
+
+1. Добавили GA4 (gtag.js) в `app/layout.tsx` через `next/script`.
+2. Включили ручные page_view через `components/analytics/GAProvider.tsx` (send_page_view: false).
+3. Исправили CSP в `next.config.js`, добавили **разрешение только для `googletagmanager.com`** в `script-src`, не ломая остальное.
+
+---
+
+## Этап 2 — Пароль в Settings (установка/смена)
+
+* В `app/(user)/settings/page.tsx` реализована корректная смена/установка пароля через `supabase.auth.updateUser({ password })`.
+* Добавлен UX-хинт `?password=1` после magic link (рекомендация поставить пароль).
+* Исправлены ошибки поведения кнопки/submit (в итоге “изменение пароля работает корректно”).
+
+---
+
+## Этап 3 — Перенос логики “лиды → partner” на “лиды → customer/patients”
+
+Изначально был путь:
+
+* лид с лендинга → таблица `partner_leads` → админ назначал → `/partner/leads` + email партнёру.
+
+Выяснили бизнес-логику:
+
+* лиды должны попадать **к клинике (CUSTOMER)** в `/customer/patients`.
+* партнёрам (affiliate) лиды напрямую не выдаём, `/partner/leads` убрали из UI.
+
+### Что сделано:
+
+1. `/partner/leads` убран из sidebar партнёра (файл переименован `_old`).
+2. В админском распределении лидов мы **оставили таблицу `partner_leads`** (название не трогаем), но назначение теперь делаем на customer (clinic user).
+3. При назначении лид **создаётся запись** в `patient_bookings` (чтобы появилось у клиники в `/customer/patients`) со следующими свойствами:
+
+   * `service_id = 803` (Hair Transplant)
+   * `booking_method = "automatic"` (маркер “лендинг/лид”)
+   * `notes` содержит маркер `[lead:<uuid>]` для связки с изображениями лида
+4. Клиника получает email-уведомление при назначении (через Resend).
+
+---
+
+## Этап 4 — Customer пациенты: бейдж “Landing lead” + просмотр изображений как в админке
+
+### База:
+
+* Таблица записей: `patient_bookings`
+* View для customer: `v_customer_patients`
+* RPC список: `customer_patients_list` (читает из view, фильтры по статусу/датам)
+
+### Что улучшили:
+
+1. Добавили в выборку `booking_method` в RPC/view, чтобы на UI различать:
+
+   * manual = пациент создал запись сам
+   * automatic = лид с лендинга
+2. Исправили ошибку `return type mismatch` в `customer_patients_list` (важно: добавляя поле в select, нужно добавить его в RETURNS TABLE в нужной позиции).
+3. Бейдж `Landing lead` отображается только если:
+
+   * `booking_method === "automatic"`
+   * * улучшено через `lead_id` (в view добавили вычисление `lead_id` через regexp на `[lead:uuid]`) чтобы не было ложных срабатываний.
+4. Кнопка `View attachment`:
+
+   * стала неактивной, если вложений реально нет
+   * добавили просмотр **нескольких картинок** (как в админ-панели) через модалку с превью/thumbnail
+5. Добавлен endpoint:
+
+   * `app/api/customer/patients/[id]/lead-images` — вытаскивает `lead_id` из notes/auto_when, подписывает ссылки из storage bucket `partner-leads`.
+6. Обычные вложения пациента (xray/photo):
+
+   * `photo-url` и `xray-url` используют service role для signed URL и проверяют clinic_id через `customer_current_clinic_id`.
+
+---
+
+## Этап 5 — Пациент: показ записи после назначения клинике
+
+Требование: когда лид назначили клинике, у пациента в `/patient/bookings` должна появиться запись.
+
+Фактически это уже работает, потому что:
+
+* при назначении создаётся запись в `patient_bookings` с `patient_id`.
+* `/patient/bookings` читает данные (через `v_customer_patients` с join clinic/services) и показывает:
+
+  * clinic, service, location
+  * scheduled_at если клиника назначила
+  * иначе preferred_date/time пусто/— (для лидов)
+  * method отображается (manual/automatic)
+
+---
+
+## Этап 6 — Approval-gating для Partner (как для Customer)
+
+Было: customer требует апрува админа, partner — нет.
+
+Сделали:
+
+1. Создали `partner_registration_requests` (DDL предоставлен).
+2. Добавили gating на:
+
+   * Google OAuth flow через `app/auth/callback/route.ts`: если роль PARTNER и заявка не approved → держим guest, создаём pending request, разлогиниваем, редирект на `/auth/login?as=PARTNER&pending=1`.
+   * Email/password sign-in: проверяем наличие `user_roles.partner`; если нет → читаем статус заявки, signOut, показываем сообщение.
+3. Доработали UX: уведомления в окне логина (как у customer).
+4. Для email+password signup: поправили создание заявки/поток OTP так, чтобы partner тоже работал как customer.
+5. Политики RLS для customer requests добавлены (и аналогично для partner requests тоже было добавлено позже).
+
+---
+
+## Этап 7 — Разделение “Settings” и будущего “Profile”
+
+План согласован:
+
+* В navbar сейчас один пункт `/settings`.
+* Нужно:
+
+  * Создать `/profile` и перенести туда блоки **Account** + **Contact & preferences**.
+  * В `/settings` оставить пароль + добавить 2–3 настройки “best practice”, чтобы не было пусто.
+  * Обновить Navbar dropdown: вместо одного “Settings” будет “Profile” и “Settings”.
+
+(Этот этап ещё **не выполнен**, только сформулирован.)
+
+---
+
+## Этап 8 — Email опционален в лендинг-форме + подготовка Phone-auth
+
+### Что сделано:
+
+1. В `LeadForm.tsx` email сделан **необязательным**:
+
+   * `canSubmit` зависит только от `fullName` + `phone`
+   * email отправляем только если заполнен
+2. В `partner_leads` email теперь **NULLABLE** (DDL: `email text null`).
+3. `app/api/leads/partner/route.ts` изменён:
+
+   * если email есть → создаём/ensure patient и шлём magic link на email (как раньше)
+   * если email нет → **только создаём lead**, и возвращаем `emailSent: false`
+4. Подключили Supabase **Phone provider через Twilio** (SID/token/service SID).
+5. Созданы:
+
+   * `components/auth/PhoneAuthForm.tsx` (для общей авторизации пациента по телефону — отдельным экраном/режимом)
+   * `app/api/patient/lead/attach/route.ts` — endpoint для привязки `lead_id` к patient (чтобы админ мог назначать клинике даже если email не указан)
+
+### Что было исправлено:
+
+* В `UnifiedAuthModal.tsx` изначально была ошибка: `setPatientAuthMode("email")` было вызвано **вне useEffect** (ломает рендер). Исправлялось в ходе правок.
+* В `LeadForm.tsx` у тебя были TS ошибки “Cannot find name phone/fullName” — потому что `useMemo/useState` и `supabase` были объявлены **вне компонента**. Это надо держать **внутри** React компонента.
+
+---
+
+# (C) Текущее состояние и что делаем сейчас
+
+## Текущая точка (на момент смены чата)
+
+1. Флоу лендинга по email полностью рабочий:
+
+* lead → admin panel → assign to clinic → появляется в `/customer/patients` + письмо клинике
+* появляется у пациента в `/patient/bookings` после назначения
+
+2. Email теперь опционален в LeadForm:
+
+* lead создаётся и без email
+* но “создание кабинета пациента без email” пока делаем через phone-auth и attach lead_id
+
+3. Phone-auth (PATIENT) начат:
+
+* Supabase Phone provider подключен (Twilio)
+* Созданы PhoneAuthForm и endpoint attach lead.
+
+## Что нужно продолжить/довести до идеала (следующий чат)
+
+### 1) Phone OTP flow на лендинге — довести UX/логику
+
+* В `LeadForm.tsx`:
+
+  * supabase client + otp state должны быть внутри компонента
+  * логика: после submit без email → показываем SMS OTP блок, отправка OTP, verify OTP
+  * после verify: делаем `/api/patient/lead/attach` (привязать lead к user), затем редирект в `/patient`
+* Убедиться, что `mt_lead_id` корректно пишется/чистится.
+* Привести номер к E.164 (валидация/подсказка).
+
+### 2) UnifiedAuthModal — режим “Patient: Email/Phone”
+
+* Сейчас добавлен переключатель, но нужно:
+
+  * реально рендерить **PhoneAuthForm вместо CredentialsForm**, когда выбран phone
+  * не показывать Google OAuth, если phone mode (или оставить, но логично)
+  * не ломать остальные роли
+
+### 3) Gating/создание пациента по телефону
+
+* Принять решение: создаём ли patient профиль при первом verifyOtp по телефону (обычно Supabase создаёт user автоматически).
+* После verifyOtp:
+
+  * ensure `profiles.role=patient`, `user_roles.patient`
+  * записать `profiles.phone`, `user_metadata.phone`, имя из формы (если передаём)
+  * прикрепить lead через attach endpoint
+
+### 4) Админ assign: поддержка lead без email (уже есть)
+
+* Сейчас `assign` ищет patient_id:
+
+  * либо `before.patient_id`, либо через email
+  * иначе 400
+* Нужно убедиться, что `partner_leads` действительно хранит `patient_id` (если добавляли колонку), и что attach endpoint её заполняет.
+* Доработка “duplicate check” (если нужно): `.maybeSingle()` заменить на `.limit(1)` чтобы не упасть при дублях.
+
+### 5) Разделение Settings/Profile (отложенная задача)
+
+* Создать `/profile`
+* Перенести Account + Contact туда
+* `/settings` оставить пароль + добавить 2–3 настройки (например: language/timezone можно оставить в profile, а в settings добавить security/notifications/marketing переключатели — без БД миграций можно хранить в user_metadata)
+
+---
+
+# Приложение: ключевые файлы/точки, к которым возвращаемся
+
+* `app/ru/hair-transplant/lp/_components/LeadForm.tsx` — форма лида, email optional, sms otp блок
+* `app/api/leads/partner/route.ts` — создание lead + email flow, без email пока только lead
+* `app/api/patient/lead/attach/route.ts` — привязка lead → patient user
+* `components/auth/UnifiedAuthModal.tsx` — переключатель Patient Email/Phone и правильный рендер нужной формы
+* `components/auth/PhoneAuthForm.tsx` — авторизация по телефону (PATIENT only)
+* `app/auth/callback/route.ts` — gating customer/partner
+* `customer_patients_list` + `v_customer_patients` — источник правды для customer/частично patient bookings
+* `app/api/admin/partner-leads/assign/route.ts` — assign lead → clinic + booking + email notify
+
+---

@@ -14,6 +14,8 @@ type Props = {
   buttonClassName?: string;
 };
 
+type Stage = "form" | "sms" | "done";
+
 function fireForm1Step(meta?: { source?: string; patient_email_sent?: boolean }) {
   (window as any).dataLayer = (window as any).dataLayer || [];
   (window as any).dataLayer.push({
@@ -40,27 +42,33 @@ export default function LeadForm({
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
+  const [stage, setStage] = useState<Stage>("form");
+
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState(""); // желательно E.164 (+90...)
+  const [phone, setPhone] = useState(""); // E.164
   const [email, setEmail] = useState("");
   const [age, setAge] = useState("");
   const [files, setFiles] = useState<File[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
 
   const [patientEmailSent, setPatientEmailSent] = useState(false);
 
   // phone OTP state
-  const [phoneOtpMode, setPhoneOtpMode] = useState<"idle" | "sent" | "verified">("idle");
+  const [phoneOtpMode, setPhoneOtpMode] = useState<"idle" | "sent">("idle");
   const [otp, setOtp] = useState("");
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
 
-  const canSubmit = useMemo(() => {
-    return fullName.trim() && phone.trim();
-  }, [fullName, phone]);
+  const canSubmit = useMemo(() => fullName.trim() && phone.trim(), [fullName, phone]);
+
+  function resetOtpUi() {
+    setOtp("");
+    setOtpError(null);
+    setPhoneOtpMode("idle");
+    setOtpBusy(false);
+  }
 
   async function sendPhoneOtp() {
     setOtpError(null);
@@ -92,10 +100,23 @@ export default function LeadForm({
         token,
         type: "sms",
       } as any);
-
       if (error) throw error;
 
-      // attach lead -> patient
+      // ensure patient role/profile even without lead attach
+      {
+        const r = await fetch("/api/patient/ensure", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            full_name: fullName.trim(),
+            phone: phoneE164,
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j?.error || "Failed to initialize patient profile");
+      }
+
+      // attach lead -> patient if exists
       let leadId = "";
       try { leadId = localStorage.getItem("mt_lead_id") || ""; } catch {}
       if (leadId) {
@@ -105,7 +126,7 @@ export default function LeadForm({
           body: JSON.stringify({
             lead_id: leadId,
             full_name: fullName.trim(),
-            phone: phone.trim(),
+            phone: phoneE164,
           }),
         });
         const j = await r.json().catch(() => ({}));
@@ -113,7 +134,7 @@ export default function LeadForm({
         try { localStorage.removeItem("mt_lead_id"); } catch {}
       }
 
-      setPhoneOtpMode("verified");
+      setStage("done");
       window.location.href = "/patient";
     } catch (e: any) {
       setOtpError(e?.message ?? String(e));
@@ -122,16 +143,12 @@ export default function LeadForm({
     }
   }
 
-  async function submit() {
+  async function submitLead() {
     setError(null);
-    setOk(false);
     setPatientEmailSent(false);
-    setOtpError(null);
-    setPhoneOtpMode("idle");
-    setOtp("");
+    resetOtpUi();
 
     setBusy(true);
-
     try {
       const fd = new FormData();
       fd.set("source", "hair-transplant-lp");
@@ -153,30 +170,33 @@ export default function LeadForm({
         try { localStorage.setItem("mt_lead_id", leadId); } catch {}
       }
 
-      setOk(true);
-      setPatientEmailSent(Boolean(json?.patient?.emailSent));
+      const emailSent = Boolean(json?.patient?.emailSent);
+      setPatientEmailSent(emailSent);
 
       fireForm1Step({
         source: "hair-transplant-lp",
-        patient_email_sent: Boolean(json?.patient?.emailSent),
+        patient_email_sent: emailSent,
       });
 
       onSubmitted?.();
 
-      // ⚠️ важное: НЕ очищаем fullName/phone если email пустой,
-      // иначе OTP-блок не сможет использовать данные
-      if (em) {
+      // если email есть — остаёмся на form и показываем success (или можно done)
+      if (em && emailSent) {
+        // чистим поля
         setFullName("");
         setPhone("");
         setEmail("");
         setAge("");
         setFiles([]);
-      } else {
-        // email нет → оставляем fullName/phone, чтобы OTP работал
-        setEmail("");
-        setAge("");
-        setFiles([]);
+        setStage("done");
+        return;
       }
+
+      // email нет → переключаемся на SMS шаг
+      setEmail("");
+      setAge("");
+      setFiles([]);
+      setStage("sms");
     } catch (e: any) {
       setError(String(e?.message ?? e));
     } finally {
@@ -184,43 +204,18 @@ export default function LeadForm({
     }
   }
 
-  const showSmsBlock = ok && !email.trim() && !patientEmailSent;
-
-  return (
-    <form
-      className={className ?? "space-y-3"}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!canSubmit || busy) return;
-        submit();
-      }}
-    >
-      <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-      <Input placeholder="Телефон* (E.164, напр. +905...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <Input placeholder="Email (опционально)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
-
-      <div className="mt-4">
-        <LeadImageUpload files={files} onFilesChange={setFiles} />
-      </div>
-
-      {ok ? (
+  // ---------- RENDER ----------
+  if (stage === "sms") {
+    return (
+      <div className={className ?? "space-y-3"}>
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           Спасибо! Мы получили заявку и свяжемся с вами.
         </div>
-      ) : null}
 
-      {ok && patientEmailSent ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
-        </div>
-      ) : null}
-
-      {showSmsBlock ? (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
           <div className="font-semibold">Вход в личный кабинет по SMS</div>
           <div className="mt-1 text-slate-600">
-            Мы можем открыть кабинет по номеру телефона. Отправим код в SMS.
+            Отправим код на номер <span className="font-medium">{phone.trim()}</span>.
           </div>
 
           {otpError ? (
@@ -233,9 +228,7 @@ export default function LeadForm({
             <Button className="mt-3 w-full" type="button" onClick={sendPhoneOtp} disabled={otpBusy}>
               {otpBusy ? "Отправляем..." : "Отправить код"}
             </Button>
-          ) : null}
-
-          {phoneOtpMode === "sent" ? (
+          ) : (
             <div className="mt-3 space-y-2">
               <Input
                 placeholder="Код из SMS (6 цифр)"
@@ -251,12 +244,75 @@ export default function LeadForm({
               >
                 {otpBusy ? "Проверяем..." : "Подтвердить и войти"}
               </Button>
-            </div>
-          ) : null}
 
-          <div className="mt-2 text-xs text-slate-500">
-            Номер должен быть в международном формате, например: +905551112233
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    resetOtpUi();
+                    setStage("form"); // возвращаемся к форме
+                  }}
+                  disabled={otpBusy}
+                >
+                  Назад
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    resetOtpUi();
+                    sendPhoneOtp();
+                  }}
+                  disabled={otpBusy}
+                >
+                  Отправить ещё раз
+                </Button>
+              </div>
+
+              <div className="mt-2 text-xs text-slate-500">
+                Номер должен быть в международном формате, например: +705551112233
+              </div>
+            </div>
+          )}
+        </div>
+
+        {error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
           </div>
+        ) : null}
+
+        <p className="text-center text-xs text-slate-500">{disclaimerText}</p>
+      </div>
+    );
+  }
+
+  // stage: form (default)
+  return (
+    <form
+      className={className ?? "space-y-3"}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!canSubmit || busy) return;
+        submitLead();
+      }}
+    >
+      <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+      <Input placeholder="Телефон* (напр. +705...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <Input placeholder="Email (опционально)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
+
+      <div className="mt-4">
+        <LeadImageUpload files={files} onFilesChange={setFiles} />
+      </div>
+
+      {patientEmailSent ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
         </div>
       ) : null}
 
