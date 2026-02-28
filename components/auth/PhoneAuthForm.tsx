@@ -89,10 +89,10 @@ export default function PhoneAuthForm({
       <Input
         isRequired
         variant="bordered"
-        placeholder="+905551112233"
+        placeholder="+705551112233"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
-        description="International format (E.164)"
+        description="International format (+705...)"
       />
 
       {step === "code" ? (

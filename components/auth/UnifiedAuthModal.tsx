@@ -236,6 +236,7 @@ export default function UnifiedAuthModal({
 
                   <Divider />
 
+                  {/* Google */}
                   <Button
                     variant="bordered"
                     startContent={<Icon icon="logos:google-icon" width={18} />}
@@ -245,51 +246,46 @@ export default function UnifiedAuthModal({
                     Continue with Google
                   </Button>
 
+                  {/* Patient: switch between email & phone — one action depending on current tab */}
                   {role === "PATIENT" ? (
                     <div className="flex flex-col gap-2">
                       <div className="text-tiny text-default-500 text-center">
-                        Or use phone number
+                        Or use {patientAuthMode === "phone" ? "email" : "phone number"}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* One button only (depends on Sign in / Sign up tab) */}
+                      {patientAuthMode === "email" ? (
                         <Button
-                          variant={patientAuthMode === "phone" && mode === "signin" ? "solid" : "bordered"}
+                          variant="bordered"
                           color="primary"
-                          onPress={() => {
-                            setPatientAuthMode("phone");
-                            setMode("signin");
-                          }}
+                          onPress={() => setPatientAuthMode("phone")}
                         >
-                          Sign in with phone
+                          {mode === "signin" ? "Sign in with phone" : "Sign up with phone"}
                         </Button>
-
+                      ) : (
                         <Button
-                          variant={patientAuthMode === "phone" && mode === "signup" ? "solid" : "bordered"}
+                          variant="bordered"
                           color="primary"
-                          onPress={() => {
-                            setPatientAuthMode("phone");
-                            setMode("signup");
-                          }}
+                          onPress={() => setPatientAuthMode("email")}
                         >
-                          Sign up with phone
+                          {mode === "signin" ? "Sign in with email" : "Sign up with email"}
                         </Button>
-                      </div>
+                      )}
 
-                      {patientAuthMode === "phone" ? (
-                        <p className="text-tiny text-default-500 text-center">
-                          We’ll send a 6-digit code via SMS.
-                        </p>
-                      ) : null}
+                      {/* Single, non-spammy hint */}
+                      <p className="text-tiny text-default-500 text-center">
+                        {patientAuthMode === "phone"
+                          ? "We’ll send a 6-digit code via SMS."
+                          : mode === "signup"
+                            ? "We’ll send a 6-digit code to confirm your email."
+                            : "Use your email and password to sign in."}
+                      </p>
                     </div>
-                  ) : null}
-
-                  {mode === "signup" ? (
-                    <p className="text-tiny text-default-500 text-center">
-                      We’ll send a 6-digit code to confirm your email.
-                    </p>
                   ) : (
                     <p className="text-tiny text-default-500 text-center">
-                      Use your email and password to sign in.
+                      {mode === "signup"
+                        ? "We’ll send a 6-digit code to confirm your email."
+                        : "Use your email and password to sign in."}
                     </p>
                   )}
                 </div>
