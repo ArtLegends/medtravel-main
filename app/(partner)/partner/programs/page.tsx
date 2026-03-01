@@ -27,14 +27,6 @@ const PROGRAMS: PartnerProgram[] = [
     cookieLifetimeDays: 90,
     platforms: "Desktop, Mobile web",
   },
-  {
-    id: "plastic-surgery",
-    slug: "plastic-surgery",
-    name: "Plastic surgery",
-    rewardRatePercent: 5,
-    cookieLifetimeDays: 90,
-    platforms: "Desktop, Mobile web",
-  },
 ];
 
 export default function PartnerProgramsPage() {

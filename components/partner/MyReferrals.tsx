@@ -44,12 +44,14 @@ export default function MyReferrals() {
       const { data: clickRows } = await supabase
         .from("partner_referral_clicks")
         .select("ref_code, program_key, created_at")
+        .eq("partner_user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(500);
 
       const { data: refRows } = await supabase
         .from("partner_referrals")
         .select("ref_code, program_key, patient_user_id, created_at")
+        .eq("partner_user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -108,7 +110,10 @@ export default function MyReferrals() {
           <div className="mt-4 space-y-3">
             {approved.map((p) => {
               const code = String(p.ref_code || "");
-              const link = `${siteUrl()}/ref/${code}`;
+              const link =
+                p.program_key === "hair-transplant"
+                  ? `${siteUrl()}/ru/hair-transplant/lp/${code}`
+                  : `${siteUrl()}/ref/${code}`; // пока для dentistry оставим как есть
               const key = `${p.program_key}__${code}`;
               const s = statsByCode.get(key) ?? { clicks: 0, signups: 0 };
               const conv = s.clicks > 0 ? Math.round((s.signups / s.clicks) * 1000) / 10 : 0;

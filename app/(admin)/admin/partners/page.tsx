@@ -60,7 +60,10 @@ async function updateRequest(formData: FormData) {
       (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "") ||
       "https://medtravel.me";
 
-    const referralUrl = `${siteUrl}/ref/${refCode}`;
+    const referralUrl =
+      programKey === "hair-transplant"
+        ? `${siteUrl}/ru/hair-transplant/lp/${refCode}`
+        : `${siteUrl}/ref/${refCode}`;
 
     await sb.from("notifications").insert({
       user_id: userId,
