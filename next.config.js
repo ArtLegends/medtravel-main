@@ -100,6 +100,8 @@ const nextConfig = {
     const country = `:country((?!${RESERVED})(?:[^/]+))`;
 
     const clinicRewrites = [
+      { source: `/${country}/hair-transplant/lp/:code`, destination: `/ru/hair-transplant/lp/:code` },
+      
       { source: `/${country}/:path*/:slug/review`, destination: '/clinic/:slug/review' },
       { source: `/${country}/:path*/:slug/inquiry`, destination: '/clinic/:slug/inquiry' },
       { source: `/${country}/:path*/:slug`, destination: '/clinic/:slug' },
