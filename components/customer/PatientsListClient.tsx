@@ -104,6 +104,41 @@ export default function PatientsListClient() {
   const [schedTime, setSchedTime] = useState<string>("");
   const [schedTitle, setSchedTitle] = useState<string>("Schedule appointment");
 
+  // details modal
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailRow, setDetailRow] = useState<Row | null>(null);
+
+  // actual cost edit state (in modal)
+  const [actualCostDraft, setActualCostDraft] = useState<string>("");
+  const [currencyDraft, setCurrencyDraft] = useState<string>("USD");
+
+  function openDetails(r: Row) {
+    setDetailRow(r);
+    setDetailOpen(true);
+
+    setActualCostDraft(r.actual_cost == null ? "" : String(r.actual_cost));
+    setCurrencyDraft((r.currency || "USD").toUpperCase());
+
+    // schedule draft
+    setSchedBookingId(r.booking_id);
+    setSchedTitle(`Booking details — ${r.patient_name ?? "patient"}`);
+    setSchedTime(normalizeTime(r.preferred_time));
+
+    if (r.scheduled_at) {
+      const d = new Date(r.scheduled_at);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      setSchedDate(`${yyyy}-${mm}-${dd}`);
+      setSchedTime(`${hh}:${mi}`);
+    } else {
+      setSchedDate(r.preferred_date ?? "");
+      setSchedTime(r.preferred_time ?? "");
+    }
+  }
+
   function openSchedule(r: Row) {
     setSchedBookingId(r.booking_id);
     setSchedTitle(`Schedule for ${r.patient_name ?? "patient"}`);
@@ -124,6 +159,59 @@ export default function PatientsListClient() {
     }
 
     setSchedOpen(true);
+  }
+
+  async function saveActualCost() {
+    if (!detailRow) return;
+
+    const v = actualCostDraft.trim();
+    const num = Number(v);
+
+    if (!v || !Number.isFinite(num) || num < 0) {
+      setErr("Invalid actual cost.");
+      return;
+    }
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/customer/patients/${encodeURIComponent(detailRow.booking_id)}/actual-cost`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ actual_cost: num, currency: currencyDraft.trim() || null }),
+      });
+      if (!res.ok) throw new Error(await readError(res));
+
+      const j = await res.json().catch(() => ({}));
+      const updated = j?.booking ?? null;
+
+      // ✅ обновляем rows в таблице и detailRow
+      setItems((prev) =>
+        prev.map((x) =>
+          x.booking_id === detailRow.booking_id
+            ? {
+              ...x,
+              actual_cost: updated?.actual_cost ?? num,
+              currency: updated?.currency ?? currencyDraft,
+            }
+            : x
+        )
+      );
+
+      setDetailRow((prev) =>
+        prev
+          ? {
+            ...prev,
+            actual_cost: updated?.actual_cost ?? num,
+            currency: updated?.currency ?? currencyDraft,
+          }
+          : prev
+      );
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function readError(res: Response) {
@@ -416,32 +504,22 @@ export default function PatientsListClient() {
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="px-4 py-3 text-left">Patient ID</th>
-                <th className="px-4 py-3 text-left">Patient Name</th>
-                <th className="px-4 py-3 text-left">Phone</th>
+                <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Treatment</th>
-                <th className="px-4 py-3 text-left">Preferred</th>
-                <th className="px-4 py-3 text-left">Scheduled</th>
                 <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Pre-cost</th>
-                <th className="px-4 py-3 text-left">Actual</th>
                 <th className="px-4 py-3 text-left">Actions</th>
               </tr>
             </thead>
-
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
                     No patients added yet
                   </td>
                 </tr>
               ) : (
                 items.map((r) => {
-                  const isLocked = r.status === "cancelled_by_patient";
                   const isLead = Boolean(r.lead_id);
-
-                  const canViewAttachment = 
-                    !busy && (Boolean(r.xray_path) || Boolean(r.photo_path) || isLead);
 
                   return (
                     <tr key={r.booking_id} className="border-t">
@@ -460,51 +538,33 @@ export default function PatientsListClient() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-3">{r.phone ?? "—"}</td>
                       <td className="px-4 py-3">{r.service_name ?? "—"}</td>
-                      <td className="px-4 py-3">{fmtPreferred(r.preferred_date, r.preferred_time)}</td>
-                      <td className="px-4 py-3">{fmtScheduled(r.scheduled_at)}</td>
 
                       <td className="px-4 py-3">
-                        <select
-                          disabled={busy || isLocked}
-                          value={r.status}
-                          onChange={(e) => updateStatus(r.booking_id, e.target.value as any)}
-                          className={"border rounded-md px-2 py-1 " + (isLocked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")}
+                        <span
+                          className={[
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
+                            r.status === "confirmed"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : r.status === "completed"
+                                ? "bg-sky-50 text-sky-700"
+                                : r.status === "cancelled" || r.status === "cancelled_by_patient"
+                                  ? "bg-rose-50 text-rose-700"
+                                  : "bg-amber-50 text-amber-700",
+                          ].join(" ")}
                         >
-                          <option value="pending">pending</option>
-                          <option value="confirmed">confirmed</option>
-                          <option value="cancelled">cancelled</option>
-                          <option value="completed">completed</option>
-                        </select>
+                          {r.status}
+                        </span>
                       </td>
-
-                      <td className="px-4 py-3">{fmtMoney(r.pre_cost, r.currency)}</td>
-                      <td className="px-4 py-3">{fmtMoney(r.actual_cost, r.currency)}</td>
 
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => openSchedule(r)}
-                            disabled={
-                              busy ||
-                              r.status === "cancelled_by_patient" ||
-                              r.status === "cancelled" ||
-                              r.status === "completed"
-                            }
-                            className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-60"
+                            onClick={() => openDetails(r)}
+                            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
                           >
-                            Schedule
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => openAttachment(r)}
-                            disabled={!canViewAttachment}
-                            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 disabled:pointer-events-none"
-                          >
-                            View attachment
+                            View
                           </button>
 
                           <button
@@ -701,6 +761,223 @@ export default function PatientsListClient() {
                 >
                   Save schedule
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {detailOpen && detailRow && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={() => {
+            setDetailOpen(false);
+            setDetailRow(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="text-sm font-semibold text-gray-900">
+                Booking #{detailRow.patient_public_id ?? "—"}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailOpen(false);
+                  setDetailRow(null);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-gray-50"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 p-4">
+              {/* top meta */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">Name</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{detailRow.patient_name ?? "—"}</div>
+                </div>
+
+                <div className="rounded-xl border bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">Treatment</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{detailRow.service_name ?? "—"}</div>
+                </div>
+
+                <div className="rounded-xl border bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">Phone</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{detailRow.phone ?? "—"}</div>
+                </div>
+
+                <div className="rounded-xl border bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">Preferred</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                    {fmtPreferred(detailRow.preferred_date, detailRow.preferred_time)}
+                  </div>
+                </div>
+              </div>
+
+              {/* status */}
+              {(() => {
+                const locked = detailRow.status === "cancelled_by_patient";
+                return (
+                  <div className="rounded-2xl border p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm font-semibold text-slate-900">Status</div>
+
+                      <select
+                        disabled={busy || locked}
+                        value={detailRow.status}
+                        onChange={(e) => updateStatus(detailRow.booking_id, e.target.value as any)}
+                        className={"rounded-md border px-3 py-2 text-sm " + (locked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")}
+                      >
+                        <option value="pending">pending</option>
+                        <option value="confirmed">confirmed</option>
+                        <option value="cancelled">cancelled</option>
+                        <option value="completed">completed</option>
+                        <option value="cancelled_by_patient" disabled>
+                          cancelled_by_patient
+                        </option>
+                      </select>
+                    </div>
+
+                    {locked ? (
+                      <div className="mt-2 text-xs text-slate-500">
+                        This booking was cancelled by patient. Editing is disabled.
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()}
+
+              {/* schedule */}
+              <div className="rounded-2xl border p-4">
+                <div className="text-sm font-semibold text-slate-900">Schedule</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Current: {fmtScheduled(detailRow.scheduled_at)}
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <div className="mb-1 text-xs font-medium text-gray-600">Date</div>
+                    <input
+                      type="date"
+                      value={schedDate}
+                      onChange={(e) => setSchedDate(e.target.value)}
+                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      disabled={busy || detailRow.status === "cancelled_by_patient" || detailRow.status === "cancelled" || detailRow.status === "completed"}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-1 text-xs font-medium text-gray-600">Time</div>
+                    <input
+                      type="time"
+                      value={schedTime}
+                      onChange={(e) => setSchedTime(e.target.value)}
+                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      disabled={busy || detailRow.status === "cancelled_by_patient" || detailRow.status === "cancelled" || detailRow.status === "completed"}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveSchedule();
+                      // подтянем локально detailRow.scheduled_at
+                      setDetailRow((prev) => (prev ? { ...prev, scheduled_at: `${new Date(`${schedDate}T${(schedTime || "00:00").trim()}:00`).toISOString()}` } : prev));
+                    }}
+                    disabled={
+                      busy ||
+                      !schedDate ||
+                      detailRow.status === "cancelled_by_patient" ||
+                      detailRow.status === "cancelled" ||
+                      detailRow.status === "completed"
+                    }
+                    className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    Save schedule
+                  </button>
+                </div>
+              </div>
+
+              {/* pricing */}
+              <div className="rounded-2xl border p-4">
+                <div className="text-sm font-semibold text-slate-900">Pricing</div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border bg-slate-50 p-3">
+                    <div className="text-xs text-slate-500">Pre-cost</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">{fmtMoney(detailRow.pre_cost, detailRow.currency)}</div>
+                  </div>
+
+                  <div className="rounded-xl border bg-slate-50 p-3">
+                    <div className="text-xs text-slate-500">Actual</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">{fmtMoney(detailRow.actual_cost, detailRow.currency)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_110px]">
+                  <input
+                    value={actualCostDraft}
+                    onChange={(e) => setActualCostDraft(e.target.value)}
+                    placeholder="Actual cost"
+                    inputMode="decimal"
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    disabled={busy || detailRow.status === "cancelled_by_patient" || detailRow.status === "cancelled" || detailRow.status === "completed"}
+                  />
+
+                  <input
+                    value={currencyDraft}
+                    onChange={(e) => setCurrencyDraft(e.target.value.toUpperCase())}
+                    placeholder="USD"
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    disabled={busy || detailRow.status === "cancelled_by_patient" || detailRow.status === "cancelled" || detailRow.status === "completed"}
+                  />
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={saveActualCost}
+                    disabled={
+                      busy ||
+                      detailRow.status === "cancelled_by_patient" ||
+                      detailRow.status === "cancelled" ||
+                      detailRow.status === "completed"
+                    }
+                    className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-60"
+                  >
+                    Save actual cost
+                  </button>
+                </div>
+              </div>
+
+              {/* attachments */}
+              <div className="rounded-2xl border p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-900">Attachments</div>
+                  <button
+                    type="button"
+                    onClick={() => openAttachment(detailRow)}
+                    disabled={busy}
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    View attachments
+                  </button>
+                </div>
+
+                <div className="mt-2 text-xs text-slate-500">
+                  If this is a landing lead, lead images will be shown first.
+                </div>
               </div>
             </div>
           </div>
