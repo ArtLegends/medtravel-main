@@ -4,6 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 
+type ReferralBookingRow = {
+  program_key: string;
+  patient_public_id: number;
+  status: string;
+  pre_cost: number | null;
+  currency: string | null;
+  actual_cost: number | null;
+  created_at: string;
+};
+
 type ApprovedProgram = {
   program_key: string;
   ref_code: string;
@@ -24,6 +34,8 @@ export default function MyReferrals() {
   const [clicks, setClicks] = useState<ClickRow[]>([]);
   const [refs, setRefs] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [bookingRows, setBookingRows] = useState<ReferralBookingRow[]>([]);
 
   useEffect(() => {
     if (!supabase || !session) return;
@@ -55,16 +67,42 @@ export default function MyReferrals() {
         .order("created_at", { ascending: false })
         .limit(500);
 
+      const { data: bookingData } = await supabase
+        .rpc("partner_referral_bookings_list", { p_limit: 200, p_offset: 0 });  
+      
       if (cancelled) return;
 
       setApproved((programs ?? []) as any);
       setClicks((clickRows ?? []) as any);
       setRefs((refRows ?? []) as any);
+      setBookingRows((bookingData ?? []) as any);
       setLoading(false);
     })();
 
     return () => {
       cancelled = true;
+    };
+  }, [supabase, session]);
+
+  useEffect(() => {
+    if (!supabase || !session) return;
+
+    const channel = supabase
+      .channel("partner-referrals-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_bookings" }, () => {
+        (async () => {
+          try {
+            const { data } = await supabase.rpc("partner_referral_bookings_list", { p_limit: 200, p_offset: 0 });
+            setBookingRows((data ?? []) as any);
+          } catch {
+            // ignore
+          }
+        })();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [supabase, session]);
 
@@ -165,7 +203,7 @@ export default function MyReferrals() {
 
         {loading ? (
           <p className="mt-3 text-sm text-gray-500">Loading…</p>
-        ) : refs.length === 0 ? (
+        ) : bookingRows.length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">No referrals yet.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
@@ -173,22 +211,51 @@ export default function MyReferrals() {
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
                   <th className="px-3 py-2">Program</th>
-                  <th className="px-3 py-2">Ref code</th>
                   <th className="px-3 py-2">Patient</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Pre-cost</th>
+                  <th className="px-3 py-2">Actual</th>
                   <th className="px-3 py-2">Created</th>
                 </tr>
               </thead>
+
               <tbody>
-                {refs.map((r, i) => (
-                  <tr key={`${r.patient_user_id}_${i}`} className="border-b last:border-0">
+                {bookingRows.map((r, i) => (
+                  <tr key={`${r.program_key}_${r.patient_public_id}_${r.created_at}_${i}`} className="border-b last:border-0">
                     <td className="px-3 py-2">{r.program_key}</td>
-                    <td className="px-3 py-2">
-                      <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{r.ref_code}</code>
+
+                    <td className="px-3 py-2 font-mono text-xs">
+                      #{r.patient_public_id ?? 0}
                     </td>
+
                     <td className="px-3 py-2">
-                      <span className="font-mono text-xs">{r.patient_user_id}</span>
+                      <span
+                        className={[
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
+                          r.status === "confirmed"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : r.status === "completed"
+                              ? "bg-sky-50 text-sky-700"
+                              : r.status === "cancelled" || r.status === "cancelled_by_patient"
+                                ? "bg-rose-50 text-rose-700"
+                                : "bg-amber-50 text-amber-700",
+                        ].join(" ")}
+                      >
+                        {r.status}
+                      </span>
                     </td>
-                    <td className="px-3 py-2">{new Date(r.created_at).toLocaleString()}</td>
+
+                    <td className="px-3 py-2">
+                      {r.pre_cost == null ? "—" : `${r.pre_cost} ${r.currency ?? "USD"}`}
+                    </td>
+
+                    <td className="px-3 py-2">
+                      {r.actual_cost == null ? "—" : `${r.actual_cost} ${r.currency ?? "USD"}`}
+                    </td>
+
+                    <td className="px-3 py-2">
+                      {new Date(r.created_at).toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
