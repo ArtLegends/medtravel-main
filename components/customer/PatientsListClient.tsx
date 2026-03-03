@@ -394,6 +394,26 @@ export default function PatientsListClient() {
     };
   }, [attachOpen]);
 
+  useEffect(() => {
+    if (!detailOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDetailOpen(false);
+        setDetailRow(null);
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [detailOpen]);
+
   async function updateStatus(bookingId: string, next: Status) {
     setBusy(true);
     setErr(null);
@@ -611,7 +631,7 @@ export default function PatientsListClient() {
       {/* Attachments modal (admin-like) */}
       {attachOpen && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
           onMouseDown={() => {
             setAttachOpen(false);
             setAttachUrls([]);
@@ -776,10 +796,10 @@ export default function PatientsListClient() {
           }}
         >
           <div
-            className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl"
+            className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl max-h-[calc(100vh-2rem)]"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
               <div className="text-sm font-semibold text-gray-900">
                 Booking #{detailRow.patient_public_id ?? "—"}
               </div>
@@ -797,7 +817,7 @@ export default function PatientsListClient() {
               </button>
             </div>
 
-            <div className="space-y-4 p-4">
+            <div className="space-y-4 p-4 overflow-y-auto">
               {/* top meta */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border bg-slate-50 p-3">
