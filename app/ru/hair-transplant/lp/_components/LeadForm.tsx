@@ -303,18 +303,18 @@ export default function LeadForm({
     >
       <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
       <Input placeholder="Телефон* (напр. +705...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <Input placeholder="Email (опционально)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      {/* <Input placeholder="Email (опционально)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
 
       <div className="mt-4">
         <LeadImageUpload files={files} onFilesChange={setFiles} />
-      </div>
+      </div> */}
 
-      {patientEmailSent ? (
+      {/* {patientEmailSent ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           Мы также создали ваш личный кабинет пациента и отправили на email ссылку для входа.
         </div>
-      ) : null}
+      ) : null} */}
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
