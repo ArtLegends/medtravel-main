@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { autoAssignLead } from "@/lib/leads/autoAssign";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,10 @@ export async function POST(req: Request) {
   if (!isUuid(leadId)) return NextResponse.json({ error: "Invalid lead_id" }, { status: 400 });
 
   const sb = createServiceClient();
+
+  const origin =
+  req.headers.get("origin") ||
+  (req.headers.get("host") ? `https://${req.headers.get("host")}` : "");
 
   // 2) check lead exists
   const { data: lead, error: lErr } = await sb
@@ -96,6 +101,11 @@ export async function POST(req: Request) {
     .eq("id", leadId);
 
   if (updLeadErr) return NextResponse.json({ error: updLeadErr.message }, { status: 500 });
+
+  // ✅ now we can create booking (patient_id exists) and ensure lead is assigned
+  if (origin) {
+    await autoAssignLead({ leadId, origin });
+  }
 
   return NextResponse.json({ ok: true, patient_id: user.id });
 }

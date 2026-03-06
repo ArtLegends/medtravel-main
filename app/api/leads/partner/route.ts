@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { resendSend, patientMagicLinkTemplate } from "@/lib/mail/resend";
 import crypto from "crypto";
+import { autoAssignLead } from "@/lib/leads/autoAssign";
 
 export const runtime = "nodejs";
 
@@ -192,6 +193,9 @@ export async function POST(req: NextRequest) {
     }
 
     const origin = req.nextUrl.origin;
+
+    // ✅ AUTO-ASSIGN lead -> customer (and create booking if patient_id already resolvable)
+    await autoAssignLead({ leadId, origin });
 
     // ✅ создаём пациента и шлём письмо ТОЛЬКО если есть email
     if (email) {
