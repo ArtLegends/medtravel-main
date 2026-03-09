@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
   }
 
   // ─── 2. Extract phone & OTP ───
-  const phone = data.user.phone;
+  const phone = data.user.phone.startsWith("+") ? data.user.phone : `+${data.user.phone}`;
   const otp = data.sms.otp;
   const messageBody = `Your MedTravel verification code: ${otp}`;
 
