@@ -1,177 +1,141 @@
 // app/(partner)/partner/page.tsx
+"use client";
 
-type ProgramRow = {
-    id: string;
-    name: string;
-    impressions: number;
-    clicks: number;
-    pending: number;
-    cancelled: number;
-    paid: number;
-    payout: number;
-    potentialPayouts: number;
-  };
-  
-  // 👇 временные статичные данные; позже сюда подставим данные из Supabase
-  const PROGRAMS: ProgramRow[] = [
-    // {
-    //   id: "dentistry",
-    //   name: "Dentistry",
-    //   impressions: 0,
-    //   clicks: 0,
-    //   pending: 0,
-    //   cancelled: 0,
-    //   paid: 0,
-    //   payout: 0,
-    //   potentialPayouts: 0,
-    // },
-    // {
-    //   id: "hair-transplant",
-    //   name: "Hair Transplant",
-    //   impressions: 0,
-    //   clicks: 0,
-    //   pending: 0,
-    //   cancelled: 0,
-    //   paid: 0,
-    //   payout: 0,
-    //   potentialPayouts: 0,
-    // },
-    // {
-    //   id: "plastic-surgery",
-    //   name: "Plastic Surgery",
-    //   impressions: 0,
-    //   clicks: 0,
-    //   pending: 0,
-    //   cancelled: 0,
-    //   paid: 0,
-    //   payout: 0,
-    //   potentialPayouts: 0,
-    // },
-  ];
-  
-  // Подготовка функции для будущей агрегации (уже готова к реальным данным)
-  function getTotals(rows: ProgramRow[]): ProgramRow {
-    return rows.reduce<ProgramRow>(
-      (acc, row) => ({
-        ...acc,
-        impressions: acc.impressions + row.impressions,
-        clicks: acc.clicks + row.clicks,
-        pending: acc.pending + row.pending,
-        cancelled: acc.cancelled + row.cancelled,
-        paid: acc.paid + row.paid,
-        payout: acc.payout + row.payout,
-        potentialPayouts: acc.potentialPayouts + row.potentialPayouts,
-      }),
-      {
-        id: "total",
-        name: "Total",
-        impressions: 0,
-        clicks: 0,
-        pending: 0,
-        cancelled: 0,
-        paid: 0,
-        payout: 0,
-        potentialPayouts: 0,
+import { useEffect, useState } from "react";
+import { useSupabase } from "@/lib/supabase/supabase-provider";
+
+type BalanceData = {
+  total_earned: number;
+  available_for_withdrawal: number;
+  currency: string;
+};
+
+function StatCard({ title, value, color }: { title: string; value: string; color?: string }) {
+  return (
+    <div className="rounded-xl border bg-white px-4 py-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        {title}
+      </div>
+      <div className={`mt-2 text-2xl font-semibold ${color ?? "text-gray-900"}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function formatMonthYear(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+export default function PartnerDashboardPage() {
+  const { supabase, session } = useSupabase();
+  const [balance, setBalance] = useState<BalanceData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !session) return;
+
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase.rpc("partner_balance");
+      if (data && Array.isArray(data) && data.length > 0) {
+        setBalance(data[0] as BalanceData);
       }
-    );
-  }
-  
-  function StatCard({ title, value }: { title: string; value: string }) {
-    return (
-      <div className="rounded-xl border bg-white px-4 py-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          {title}
-        </div>
-        <div className="mt-2 text-2xl font-semibold text-gray-900">{value}</div>
+      setLoading(false);
+    })();
+  }, [supabase, session]);
+
+  const today = new Date();
+  const thisMonthLabel = formatMonthYear(today);
+  const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const lastMonthLabel = formatMonthYear(lastMonthDate);
+
+  const currency = balance?.currency ?? "USD";
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Welcome to Partner Panel!</h1>
+        <p className="text-gray-600">
+          Track your referral performance and payouts.
+        </p>
       </div>
-    );
-  }
-  
-  function formatMonthYear(date: Date) {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      year: "numeric",
-    }).format(date);
-  }
-  
-  export default function PartnerDashboardPage() {
-    const today = new Date();
-  
-    const thisMonthLabel = formatMonthYear(today);
-    const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const lastMonthLabel = formatMonthYear(lastMonthDate);
-  
-    const totals = getTotals(PROGRAMS);
-  
-    return (
-      <div className="space-y-6">
-        {/* Заголовок */}
-        <div>
-          <h1 className="text-2xl font-bold">Welcome to Partner Panel!</h1>
-          <p className="text-gray-600">
-            Track your referral performance and payouts.
-          </p>
-        </div>
-  
-        {/* Статистика: Today / Yesterday / This month / Last month */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Today" value="$0" />
-          <StatCard title="Yesterday" value="$0" />
-          <StatCard title={thisMonthLabel} value="$0" />
-          <StatCard title={lastMonthLabel} value="$0" />
-        </div>
-  
-        {/* Programs Performance */}
-        <div className="rounded-xl border bg-white p-4 space-y-4">
+
+      {/* Balance overview */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Earned"
+          value={loading ? "..." : `$${(balance?.total_earned ?? 0).toFixed(2)}`}
+        />
+        <StatCard
+          title="Available for Withdrawal"
+          value={loading ? "..." : `$${(balance?.available_for_withdrawal ?? 0).toFixed(2)}`}
+          color="text-emerald-600"
+        />
+        <StatCard title={thisMonthLabel} value="$0" />
+        <StatCard title={lastMonthLabel} value="$0" />
+      </div>
+
+      {/* Withdrawal info */}
+      {balance && balance.available_for_withdrawal > 0 && balance.available_for_withdrawal >= 300 && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Programs Performance</h2>
-          </div>
-  
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-                  <th className="px-3 py-2">Landing page</th>
-                  <th className="px-3 py-2">Impressions</th>
-                  <th className="px-3 py-2">Clicks</th>
-                  <th className="px-3 py-2">Pending</th>
-                  <th className="px-3 py-2">Cancelled</th>
-                  <th className="px-3 py-2">Paid</th>
-                  <th className="px-3 py-2">Payout</th>
-                  <th className="px-3 py-2">Potential payouts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Итоговая строка Total — всегда первая */}
-                <tr className="border-b bg-gray-50 font-semibold">
-                  <td className="px-3 py-2">Total</td>
-                  <td className="px-3 py-2">{totals.impressions}</td>
-                  <td className="px-3 py-2">{totals.clicks}</td>
-                  <td className="px-3 py-2">{totals.pending}</td>
-                  <td className="px-3 py-2">{totals.cancelled}</td>
-                  <td className="px-3 py-2">{totals.paid}</td>
-                  <td className="px-3 py-2">${totals.payout}</td>
-                  <td className="px-3 py-2">${totals.potentialPayouts}</td>
-                </tr>
-  
-                {/* Отдельные программы (пока всё по нулям) */}
-                {PROGRAMS.map((program) => (
-                  <tr key={program.id} className="border-b last:border-0">
-                    <td className="px-3 py-2">{program.name}</td>
-                    <td className="px-3 py-2">{program.impressions}</td>
-                    <td className="px-3 py-2">{program.clicks}</td>
-                    <td className="px-3 py-2">{program.pending}</td>
-                    <td className="px-3 py-2">{program.cancelled}</td>
-                    <td className="px-3 py-2">{program.paid}</td>
-                    <td className="px-3 py-2">${program.payout}</td>
-                    <td className="px-3 py-2">${program.potentialPayouts}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div>
+              <div className="font-semibold text-emerald-800">
+                You have ${balance.available_for_withdrawal.toFixed(2)} available for withdrawal
+              </div>
+              <div className="text-sm text-emerald-600 mt-1">
+                Contact support to arrange a payout.
+              </div>
+            </div>
           </div>
         </div>
+      )}
+
+      {balance && balance.total_earned > 0 && balance.available_for_withdrawal < 300 && (
+        <div className="rounded-xl border bg-gray-50 p-4 text-sm text-gray-600">
+          Minimum withdrawal amount is $300. Your available balance: ${balance.available_for_withdrawal.toFixed(2)} {currency}.
+        </div>
+      )}
+
+      {/* Programs Performance — placeholder for now */}
+      <div className="rounded-xl border bg-white p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Programs Performance</h2>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+                <th className="px-3 py-2">Landing page</th>
+                <th className="px-3 py-2">Clicks</th>
+                <th className="px-3 py-2">Registrations</th>
+                <th className="px-3 py-2">Pending</th>
+                <th className="px-3 py-2">Completed</th>
+                <th className="px-3 py-2">Payout</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b bg-gray-50 font-semibold">
+                <td className="px-3 py-2">Total</td>
+                <td className="px-3 py-2">0</td>
+                <td className="px-3 py-2">0</td>
+                <td className="px-3 py-2">0</td>
+                <td className="px-3 py-2">0</td>
+                <td className="px-3 py-2">${(balance?.total_earned ?? 0).toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-xs text-gray-400">
+          Detailed per-program stats coming soon.
+        </p>
       </div>
-    );
-  }
-  
+    </div>
+  );
+}

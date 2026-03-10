@@ -1,3 +1,4 @@
+// components/partner/MyReferrals.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -8,9 +9,9 @@ type ReferralBookingRow = {
   program_key: string;
   patient_public_id: number;
   status: string;
-  pre_cost: number | null;
+  partner_earning: number | null;
+  earning_status: string | null;
   currency: string | null;
-  actual_cost: number | null;
   created_at: string;
 };
 
@@ -23,8 +24,25 @@ type ApprovedProgram = {
 type ClickRow = { ref_code: string; program_key: string; created_at: string };
 type ReferralRow = { ref_code: string; program_key: string; patient_user_id: string; created_at: string };
 
+type BalanceData = {
+  total_earned: number;
+  available_for_withdrawal: number;
+  currency: string;
+};
+
 function siteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://medtravel.me").replace(/\/+$/, "");
+}
+
+function formatEarningStatus(status: string | null) {
+  if (!status) return null;
+  const map: Record<string, { label: string; className: string }> = {
+    pending: { label: "Pending", className: "bg-amber-50 text-amber-700" },
+    confirmed: { label: "Confirmed", className: "bg-emerald-50 text-emerald-700" },
+    paid: { label: "Paid", className: "bg-sky-50 text-sky-700" },
+    void: { label: "Void", className: "bg-gray-50 text-gray-500" },
+  };
+  return map[status] ?? { label: status, className: "bg-gray-50 text-gray-600" };
 }
 
 export default function MyReferrals() {
@@ -36,6 +54,7 @@ export default function MyReferrals() {
   const [loading, setLoading] = useState(true);
 
   const [bookingRows, setBookingRows] = useState<ReferralBookingRow[]>([]);
+  const [balance, setBalance] = useState<BalanceData | null>(null);
 
   useEffect(() => {
     if (!supabase || !session) return;
@@ -45,37 +64,45 @@ export default function MyReferrals() {
     (async () => {
       setLoading(true);
 
-      const { data: programs } = await supabase
-        .from("partner_program_requests")
-        .select("program_key, ref_code, created_at")
-        .eq("user_id", session.user.id)
-        .eq("status", "approved")
-        .not("ref_code", "is", null)
-        .order("created_at", { ascending: false });
+      const [programsRes, clicksRes, refsRes, bookingsRes, balanceRes] = await Promise.all([
+        supabase
+          .from("partner_program_requests")
+          .select("program_key, ref_code, created_at")
+          .eq("user_id", session.user.id)
+          .eq("status", "approved")
+          .not("ref_code", "is", null)
+          .order("created_at", { ascending: false }),
 
-      const { data: clickRows } = await supabase
-        .from("partner_referral_clicks")
-        .select("ref_code, program_key, created_at")
-        .eq("partner_user_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(500);
+        supabase
+          .from("partner_referral_clicks")
+          .select("ref_code, program_key, created_at")
+          .eq("partner_user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(500),
 
-      const { data: refRows } = await supabase
-        .from("partner_referrals")
-        .select("ref_code, program_key, patient_user_id, created_at")
-        .eq("partner_user_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(500);
+        supabase
+          .from("partner_referrals")
+          .select("ref_code, program_key, patient_user_id, created_at")
+          .eq("partner_user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(500),
 
-      const { data: bookingData } = await supabase
-        .rpc("partner_referral_bookings_list", { p_limit: 200, p_offset: 0 });  
-      
+        supabase.rpc("partner_referral_bookings_list", { p_limit: 200, p_offset: 0 }),
+
+        supabase.rpc("partner_balance"),
+      ]);
+
       if (cancelled) return;
 
-      setApproved((programs ?? []) as any);
-      setClicks((clickRows ?? []) as any);
-      setRefs((refRows ?? []) as any);
-      setBookingRows((bookingData ?? []) as any);
+      setApproved((programsRes.data ?? []) as any);
+      setClicks((clicksRes.data ?? []) as any);
+      setRefs((refsRes.data ?? []) as any);
+      setBookingRows((bookingsRes.data ?? []) as any);
+
+      if (balanceRes.data && Array.isArray(balanceRes.data) && balanceRes.data.length > 0) {
+        setBalance(balanceRes.data[0] as BalanceData);
+      }
+
       setLoading(false);
     })();
 
@@ -84,6 +111,7 @@ export default function MyReferrals() {
     };
   }, [supabase, session]);
 
+  // Realtime subscription for booking changes
   useEffect(() => {
     if (!supabase || !session) return;
 
@@ -92,8 +120,14 @@ export default function MyReferrals() {
       .on("postgres_changes", { event: "*", schema: "public", table: "patient_bookings" }, () => {
         (async () => {
           try {
-            const { data } = await supabase.rpc("partner_referral_bookings_list", { p_limit: 200, p_offset: 0 });
-            setBookingRows((data ?? []) as any);
+            const [bookingsRes, balanceRes] = await Promise.all([
+              supabase.rpc("partner_referral_bookings_list", { p_limit: 200, p_offset: 0 }),
+              supabase.rpc("partner_balance"),
+            ]);
+            setBookingRows((bookingsRes.data ?? []) as any);
+            if (balanceRes.data && Array.isArray(balanceRes.data) && balanceRes.data.length > 0) {
+              setBalance(balanceRes.data[0] as BalanceData);
+            }
           } catch {
             // ignore
           }
@@ -137,6 +171,28 @@ export default function MyReferrals() {
         <p className="text-gray-600">Referral links, clicks and registered patients.</p>
       </div>
 
+      {/* Balance card */}
+      {balance && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-xl border bg-white p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Total Earned</div>
+            <div className="mt-1 text-2xl font-bold">
+              ${balance.total_earned.toFixed(2)} {balance.currency}
+            </div>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Available for Withdrawal</div>
+            <div className="mt-1 text-2xl font-bold text-emerald-600">
+              ${balance.available_for_withdrawal.toFixed(2)} {balance.currency}
+            </div>
+            {balance.available_for_withdrawal < 300 && balance.total_earned > 0 && (
+              <div className="mt-1 text-xs text-gray-500">Minimum withdrawal: $300</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Referral links */}
       <section className="rounded-xl border bg-white p-4">
         <h2 className="text-lg font-semibold">Your referral links</h2>
 
@@ -151,7 +207,7 @@ export default function MyReferrals() {
               const link =
                 p.program_key === "hair-transplant"
                   ? `${siteUrl()}/ru/hair-transplant/lp/${code}`
-                  : `${siteUrl()}/ref/${code}`; // пока для dentistry оставим как есть
+                  : `${siteUrl()}/ref/${code}`;
               const key = `${p.program_key}__${code}`;
               const s = statsByCode.get(key) ?? { clicks: 0, signups: 0 };
               const conv = s.clicks > 0 ? Math.round((s.signups / s.clicks) * 1000) / 10 : 0;
@@ -166,7 +222,6 @@ export default function MyReferrals() {
                       </div>
                       <div className="mt-1 text-xs text-gray-500 break-all">{link}</div>
                     </div>
-
                     <div className="flex gap-2">
                       <button className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50" onClick={() => copy(code)}>
                         Copy code
@@ -198,6 +253,7 @@ export default function MyReferrals() {
         )}
       </section>
 
+      {/* Referral bookings table */}
       <section className="rounded-xl border bg-white p-4">
         <h2 className="text-lg font-semibold">Latest registered referrals</h2>
 
@@ -213,51 +269,63 @@ export default function MyReferrals() {
                   <th className="px-3 py-2">Program</th>
                   <th className="px-3 py-2">Patient</th>
                   <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Pre-cost</th>
-                  <th className="px-3 py-2">Actual</th>
+                  <th className="px-3 py-2">Your Earning</th>
                   <th className="px-3 py-2">Created</th>
                 </tr>
               </thead>
 
               <tbody>
-                {bookingRows.map((r, i) => (
-                  <tr key={`${r.program_key}_${r.patient_public_id}_${r.created_at}_${i}`} className="border-b last:border-0">
-                    <td className="px-3 py-2">{r.program_key}</td>
+                {bookingRows.map((r, i) => {
+                  const earningInfo = formatEarningStatus(r.earning_status);
 
-                    <td className="px-3 py-2 font-mono text-xs">
-                      #{r.patient_public_id ?? 0}
-                    </td>
+                  return (
+                    <tr key={`${r.program_key}_${r.patient_public_id}_${r.created_at}_${i}`} className="border-b last:border-0">
+                      <td className="px-3 py-2">{r.program_key}</td>
 
-                    <td className="px-3 py-2">
-                      <span
-                        className={[
-                          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
-                          r.status === "confirmed"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : r.status === "completed"
-                              ? "bg-sky-50 text-sky-700"
-                              : r.status === "cancelled" || r.status === "cancelled_by_patient"
-                                ? "bg-rose-50 text-rose-700"
-                                : "bg-amber-50 text-amber-700",
-                        ].join(" ")}
-                      >
-                        {r.status}
-                      </span>
-                    </td>
+                      <td className="px-3 py-2 font-mono text-xs">
+                        #{r.patient_public_id ?? 0}
+                      </td>
 
-                    <td className="px-3 py-2">
-                      {r.pre_cost == null ? "—" : `${r.pre_cost} ${r.currency ?? "USD"}`}
-                    </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={[
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
+                            r.status === "confirmed"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : r.status === "completed"
+                                ? "bg-sky-50 text-sky-700"
+                                : r.status === "cancelled" || r.status === "cancelled_by_patient"
+                                  ? "bg-rose-50 text-rose-700"
+                                  : "bg-amber-50 text-amber-700",
+                          ].join(" ")}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
 
-                    <td className="px-3 py-2">
-                      {r.actual_cost == null ? "—" : `${r.actual_cost} ${r.currency ?? "USD"}`}
-                    </td>
+                      <td className="px-3 py-2">
+                        {r.partner_earning != null ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">
+                              ${Number(r.partner_earning).toFixed(2)} {r.currency ?? "USD"}
+                            </span>
+                            {earningInfo && (
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${earningInfo.className}`}>
+                                {earningInfo.label}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
 
-                    <td className="px-3 py-2">
-                      {new Date(r.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-3 py-2">
+                        {new Date(r.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
