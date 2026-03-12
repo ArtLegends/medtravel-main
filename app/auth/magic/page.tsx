@@ -1,3 +1,4 @@
+// app/auth/magic/page.tsx
 "use client";
 
 import { useEffect } from "react";

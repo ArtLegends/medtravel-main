@@ -52,6 +52,11 @@ const ROLE_META: Record<
     subtitle: "Manage clinic profile, services, doctors and bookings",
     icon: "solar:hospital-linear",
   },
+  SUPERVISOR: {
+    title: "Supervisor",
+    subtitle: "Recruit partners, earn from their referrals",
+    icon: "solar:crown-linear",
+  },
   ADMIN: {
     title: "Admin",
     subtitle: "Administration panel",
@@ -60,7 +65,7 @@ const ROLE_META: Record<
 };
 
 function isAllowedRole(r: any): r is Exclude<UserRole, "ADMIN" | "GUEST"> {
-  return r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER";
+  return r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER" || r === "SUPERVISOR";
 }
 
 export default function UnifiedAuthModal({
@@ -156,7 +161,7 @@ export default function UnifiedAuthModal({
               {/* STEP: ROLE */}
               {step === "role" ? (
                 <div className="grid grid-cols-1 gap-3">
-                  {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
+                  {(["PATIENT", "PARTNER", "CUSTOMER", "SUPERVISOR"] as const).map((r) => (
                     <Card
                       key={r}
                       isPressable

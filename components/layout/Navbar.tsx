@@ -122,6 +122,7 @@ function ProfileDropdownAuth({
   const canAccessCustomer = hasAdmin || roles.includes("CUSTOMER");
   const canAccessPartner = hasAdmin || roles.includes("PARTNER");
   const canAccessPatient = hasAdmin || roles.includes("PATIENT");
+  const canAccessSupervisor = hasAdmin || roles.includes("SUPERVISOR");
 
   const goPortal = (role: UserRole) => {
     setActiveRole(role);
@@ -131,6 +132,7 @@ function ProfileDropdownAuth({
       PATIENT: "/patient",
       PARTNER: "/partner",
       CUSTOMER: "/customer",
+      SUPERVISOR: "/supervisor",
       ADMIN: "/admin",
     };
 
@@ -155,6 +157,12 @@ function ProfileDropdownAuth({
       label: "Clinic panel",
       icon: "solar:hospital-linear",
       show: canAccessCustomer,
+    },
+    {
+      role: "SUPERVISOR" as const,
+      label: "Supervisor panel",
+      icon: "solar:crown-linear",
+      show: canAccessSupervisor,
     },
     {
       role: "ADMIN" as const,
@@ -230,7 +238,7 @@ function ProfileDropdownAuth({
           </>
         ) : null}
 
-        {!hasAdmin && roles.length < 3 ? (
+        {!hasAdmin && roles.length < 4 ? (
           <DropdownItem
             key="add-role"
             onPress={onAddRole}

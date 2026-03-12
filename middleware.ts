@@ -187,6 +187,7 @@ export async function middleware(req: NextRequest) {
   const isCustomerRoute = pathname.startsWith("/customer");
   const isPartnerRoute = pathname.startsWith("/partner");
   const isPatientRoute = pathname.startsWith("/patient");
+  const isSupervisorRoute = pathname.startsWith("/supervisor");
 
   let isAdmin = false;
 
@@ -224,11 +225,13 @@ export async function middleware(req: NextRequest) {
         ? "/partner"
         : isPatientRoute
         ? "/patient"
+        : isSupervisorRoute
+        ? "/supervisor"
         : "/");
     return NextResponse.redirect(new URL(next, req.url));
   }
 
-  if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute || isPatientRoute)) {
+  if (!user && (isAdminRoute || isCustomerRoute || isPartnerRoute || isPatientRoute || isSupervisorRoute)) {
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
 
@@ -240,6 +243,8 @@ export async function middleware(req: NextRequest) {
       ? "CUSTOMER"
       : isPatientRoute
       ? "PATIENT"
+      : isSupervisorRoute
+      ? "SUPERVISOR"
       : "GUEST";
 
     loginUrl.searchParams.set("as", asParam);
@@ -260,6 +265,7 @@ export const config = {
     "/customer/:path*",
     "/partner/:path*",
     "/patient/:path*",
+    "/supervisor/:path*",
 
     // важно: чтобы наш "умный редирект" срабатывал
     "/(dentistry|plastic-surgery|hair-transplant|crowns|veneers|dental-implants)/:path*",

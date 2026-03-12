@@ -5,9 +5,9 @@ import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 
-export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
+export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "SUPERVISOR" | "ADMIN";
 
-const ROLE_SET = new Set<UserRole>(["GUEST", "PATIENT", "CUSTOMER", "PARTNER", "ADMIN"]);
+const ROLE_SET = new Set<UserRole>(["GUEST", "PATIENT", "CUSTOMER", "PARTNER", "SUPERVISOR", "ADMIN"]);
 
 const mapRole = (r?: string | null): UserRole => {
   const v = String(r || "guest").toUpperCase();

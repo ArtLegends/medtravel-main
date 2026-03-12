@@ -1,3 +1,5 @@
+// lib/mail/resend.ts
+
 export async function resendSend(params: { to: string; subject: string; html: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM ?? process.env.EMAIL_FROM;
@@ -147,6 +149,36 @@ export function partnerRejectedTemplate() {
       <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
         <h2 style="margin:0 0 12px">Request rejected</h2>
         <p style="margin:0 0 12px">Unfortunately, your request to access the Partner panel was rejected.</p>
+        <p style="margin:0;color:#71717a">If you think this is a mistake, please contact support.</p>
+      </div>
+    `,
+  };
+}
+
+export function supervisorApprovedTemplate(loginUrl: string) {
+  return {
+    subject: "Your MedTravel Supervisor account is approved",
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">Approved ✅</h2>
+        <p style="margin:0 0 12px">Your request to access the Supervisor panel has been approved.</p>
+        <p style="margin:0 0 12px">You can now sign in using the email and password you set during registration.</p>
+        <a href="${loginUrl}"
+           style="display:inline-block;margin-top:10px;padding:10px 14px;background:#10b981;color:white;text-decoration:none;border-radius:10px;font-weight:600">
+          Sign in to Supervisor panel
+        </a>
+      </div>
+    `,
+  };
+}
+
+export function supervisorRejectedTemplate() {
+  return {
+    subject: "Your MedTravel Supervisor request was rejected",
+    html: `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2 style="margin:0 0 12px">Request rejected</h2>
+        <p style="margin:0 0 12px">Unfortunately, your request to access the Supervisor panel was rejected.</p>
         <p style="margin:0;color:#71717a">If you think this is a mistake, please contact support.</p>
       </div>
     `,

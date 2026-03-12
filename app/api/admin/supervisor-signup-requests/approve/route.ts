@@ -1,0 +1,82 @@
+// ============================================================
+// FILE: app/api/admin/supervisor-signup-requests/approve/route.ts
+// ============================================================
+import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase/routeClient";
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { resendSend, supervisorApprovedTemplate } from "@/lib/mail/resend";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+async function isAdmin(supabase: any, userId: string) {
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const roles = (data ?? []).map((r: any) => String(r.role ?? "").toLowerCase());
+  return roles.includes("admin");
+}
+
+export async function POST(req: Request) {
+  const supabase = await createRouteClient();
+
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user;
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const ok = await isAdmin(supabase, me.id);
+  if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const id = String(body?.id || "");
+  const note = body?.note ? String(body.note).slice(0, 500) : null;
+
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const sb = createServiceClient();
+
+  const { data: row, error: selErr } = await sb
+    .from("supervisor_registration_requests")
+    .select("id,user_id,email,status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (row.status !== "pending") return NextResponse.json({ error: "Already processed" }, { status: 400 });
+
+  // 1) Grant supervisor role
+  await sb.from("user_roles").upsert(
+    { user_id: row.user_id, role: "supervisor" },
+    { onConflict: "user_id,role" }
+  );
+
+  await sb.from("profiles").upsert(
+    { id: row.user_id, email: row.email, role: "supervisor" },
+    { onConflict: "id" }
+  );
+
+  // 2) Generate ref_code and create supervisor_referrals entry placeholder
+  //    (The ref_code is generated, supervisor will use it to recruit partners)
+  const { data: refCodeData } = await sb.rpc("generate_supervisor_ref_code");
+  const refCode = refCodeData || `SV${Date.now().toString(36).toUpperCase()}`;
+
+  // Store the ref_code in a simple way — we'll use partner_program_requests pattern
+  // but for supervisor, the ref_code is stored on the registration request itself
+  await sb
+    .from("supervisor_registration_requests")
+    .update({
+      status: "approved",
+      decided_at: new Date().toISOString(),
+      decided_by: me.id,
+      admin_note: note ? `${note} | ref_code: ${refCode}` : `ref_code: ${refCode}`,
+    })
+    .eq("id", id);
+
+  // 3) Email
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://medtravel.me";
+  const loginUrl = `${origin}/auth/login?as=SUPERVISOR&next=%2Fsupervisor`;
+
+  const tpl = supervisorApprovedTemplate(loginUrl);
+  await resendSend({ to: String(row.email).toLowerCase(), subject: tpl.subject, html: tpl.html });
+
+  return NextResponse.json({ ok: true, ref_code: refCode });
+}

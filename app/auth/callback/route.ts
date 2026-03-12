@@ -7,13 +7,14 @@ import { createServiceClient } from "@/lib/supabase/serviceClient";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type RoleName = "CUSTOMER" | "PARTNER" | "PATIENT" | "ADMIN" | "GUEST";
+type RoleName = "CUSTOMER" | "PARTNER" | "PATIENT" | "SUPERVISOR" | "ADMIN" | "GUEST";
 
 function normalizeRole(asParam?: string | null): RoleName {
   const as = (asParam ?? "").toUpperCase();
   if (as === "CUSTOMER") return "CUSTOMER";
   if (as === "PARTNER") return "PARTNER";
   if (as === "PATIENT") return "PATIENT";
+  if (as === "SUPERVISOR") return "SUPERVISOR";
   if (as === "ADMIN") return "ADMIN";
   return "GUEST";
 }
@@ -81,7 +82,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
         .from("user_roles")
         .upsert({ user_id: userId, role: "customer" } as any, { onConflict: "user_id,role" } as any);
 
-      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" };
+      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" | "SUPERVISOR" };
     }
 
     await supabase
@@ -114,7 +115,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
         .from("user_roles")
         .upsert({ user_id: userId, role: "partner" } as any, { onConflict: "user_id,role" } as any);
 
-      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" };
+      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" | "SUPERVISOR" };
     }
 
     await supabase
@@ -124,6 +125,42 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
     await createPartnerRequestIfNeeded(userId, email);
 
     return { finalRole, pendingKind: "PARTNER" as const };
+  }
+
+  // ✅ SUPERVISOR gating
+  if (finalRole === "SUPERVISOR") {
+    const sb = createServiceClient();
+
+    const { data: reqRow, error: reqErr } = await sb
+      .from("supervisor_registration_requests")
+      .select("status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const st = String(reqRow?.status ?? "").toLowerCase();
+
+    if (!reqErr && st === "approved") {
+      await supabase
+        .from("profiles")
+        .upsert({ id: userId, email, role: "supervisor" }, { onConflict: "id" });
+
+      await supabase
+        .from("user_roles")
+        .upsert({ user_id: userId, role: "supervisor" } as any, { onConflict: "user_id,role" } as any);
+
+      return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" | "SUPERVISOR" };
+    }
+
+    await supabase
+      .from("profiles")
+      .upsert({ id: userId, email, role: "guest" }, { onConflict: "id" });
+
+    // Create supervisor request
+    await sb
+      .from("supervisor_registration_requests")
+      .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
+
+    return { finalRole, pendingKind: "SUPERVISOR" as const };
   }
 
   // ✅ остальные роли — как раньше
@@ -137,7 +174,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
       .upsert({ user_id: userId, role: finalRole.toLowerCase() } as any, { onConflict: "user_id,role" } as any);
   }
 
-  return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" };
+  return { finalRole, pendingKind: null as null | "CUSTOMER" | "PARTNER" | "SUPERVISOR" };
 }
 
 /**
@@ -204,6 +241,56 @@ async function attachReferralIfAny(
 
 type CookieToSet = { name: string; value: string; options?: any };
 
+async function attachSupervisorReferralIfAny(
+  res: NextResponse,
+  asParam: string | null,
+  store: Awaited<ReturnType<typeof cookies>>,
+  partnerUserId: string | null,
+) {
+  // Only for PARTNER registrations
+  if (normalizeRole(asParam) !== "PARTNER") return;
+
+  const svRefCode = normCode(store.get("mt_sv_ref_code")?.value ?? "");
+  if (!svRefCode) return;
+
+  const clear = () => {
+    res.cookies.set("mt_sv_ref_code", "", { path: "/", maxAge: 0 });
+  };
+
+  if (!partnerUserId) {
+    clear();
+    return;
+  }
+
+  const sb = createServiceClient();
+
+  // Find supervisor by ref_code in admin_note
+  const { data: svReq } = await sb
+    .from("supervisor_registration_requests")
+    .select("user_id")
+    .eq("status", "approved")
+    .like("admin_note", `%ref_code: ${svRefCode}%`)
+    .limit(1)
+    .maybeSingle();
+
+  if (!svReq?.user_id) {
+    clear();
+    return;
+  }
+
+  // Link partner to supervisor
+  await sb.from("supervisor_referrals").upsert(
+    {
+      supervisor_user_id: svReq.user_id,
+      partner_user_id: partnerUserId,
+      ref_code: svRefCode,
+    } as any,
+    { onConflict: "partner_user_id" },
+  );
+
+  clear();
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
@@ -240,10 +327,15 @@ export async function GET(req: NextRequest) {
     const pendingUrl = new URL("/auth/login", req.url);
     pendingUrl.searchParams.set("as", result.pendingKind);
     pendingUrl.searchParams.set("pending", "1");
-    pendingUrl.searchParams.set("next", result.pendingKind === "CUSTOMER" ? "/customer" : "/partner");
+    pendingUrl.searchParams.set("next", 
+      result.pendingKind === "CUSTOMER" ? "/customer" 
+      : result.pendingKind === "PARTNER" ? "/partner"
+      : "/supervisor"
+    );
     return NextResponse.redirect(pendingUrl);
   }
 
   await attachReferralIfAny(res, asParam, store, data?.user?.id ?? null);
+  await attachSupervisorReferralIfAny(res, asParam, store, data?.user?.id ?? null);
   return res;
 }

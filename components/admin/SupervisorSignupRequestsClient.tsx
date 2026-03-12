@@ -1,4 +1,4 @@
-// components/admin/PartnerSignupRequestsClient.tsx
+// components/admin/SupervisorSignupRequestsClient.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -22,7 +22,7 @@ function fmt(dt?: string | null) {
   }
 }
 
-export default function PartnerSignupRequestsClient() {
+export default function SupervisorSignupRequestsClient() {
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("all");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Row[]>([]);
@@ -44,7 +44,7 @@ export default function PartnerSignupRequestsClient() {
     if (q.trim()) sp.set("q", q.trim());
     sp.set("limit", String(limit));
     sp.set("offset", String(offset));
-    return `/api/admin/partner-signup-requests?${sp.toString()}`;
+    return `/api/admin/supervisor-signup-requests?${sp.toString()}`;
   }, [status, q, limit, offset]);
 
   async function load() {
@@ -69,12 +69,12 @@ export default function PartnerSignupRequestsClient() {
   }, [queryUrl]);
 
   async function approve(id: string) {
-    if (!confirm("Approve this partner request?")) return;
+    if (!confirm("Approve this supervisor request?")) return;
     setToast(null);
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/admin/partner-signup-requests/approve", {
+      const res = await fetch("/api/admin/supervisor-signup-requests/approve", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id }),
@@ -93,13 +93,13 @@ export default function PartnerSignupRequestsClient() {
 
   async function reject(id: string) {
     const note = prompt("Reject note (optional):", "") ?? "";
-    if (!confirm("Reject this partner request?")) return;
+    if (!confirm("Reject this supervisor request?")) return;
 
     setToast(null);
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/admin/partner-signup-requests/reject", {
+      const res = await fetch("/api/admin/supervisor-signup-requests/reject", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, note: note.trim() || null }),
@@ -120,8 +120,8 @@ export default function PartnerSignupRequestsClient() {
     <div className="p-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Partner signup requests</h1>
-          <p className="text-sm text-slate-500">Approve or reject partner registration requests</p>
+          <h1 className="text-xl font-semibold">Supervisor  signup requests</h1>
+          <p className="text-sm text-slate-500">Approve or reject supervisor registration requests</p>
         </div>
 
         <button

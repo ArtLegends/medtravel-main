@@ -1,5 +1,5 @@
 // config/nav.ts
-export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "ADMIN";
+export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "SUPERVISOR" | "ADMIN";
 
 export interface NavItem {
   key: string;
@@ -17,6 +17,7 @@ const roleHierarchy: Record<UserRole, number> = {
   PATIENT: 1,
   CUSTOMER: 1,
   PARTNER: 2,
+  SUPERVISOR: 2,
   ADMIN: 3,
 };
 

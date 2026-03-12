@@ -37,6 +37,11 @@ const ROLE_META: Record<
     subtitle: "Manage clinic profile and bookings",
     icon: "solar:hospital-linear",
   },
+  SUPERVISOR: {
+    title: "Supervisor",
+    subtitle: "Recruit partners, earn from their referrals",
+    icon: "solar:crown-linear",
+  },
   ADMIN: {
     title: "Admin",
     subtitle: "Administration panel",
@@ -48,7 +53,7 @@ type LoginRole = Exclude<UserRole, "GUEST" | "ADMIN">;
 
 function normalizeRole(v?: string): LoginRole | null {
   const r = String(v || "").trim().toUpperCase();
-  if (r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER") return r as LoginRole;
+  if (r === "PATIENT" || r === "PARTNER" || r === "CUSTOMER" || r === "SUPERVISOR") return r as LoginRole;
   return null;
 }
 
@@ -131,9 +136,9 @@ export default function AuthLoginClient({ as, next, pending }: Props) {
 
             <Divider />
 
-            {pending === "1" && (role === "CUSTOMER" || role === "PARTNER") ? (
+            {pending === "1" && (role === "CUSTOMER" || role === "PARTNER" || role === "SUPERVISOR") ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                Ваш email подтвержден. Заявка на доступ к {role === "CUSTOMER" ? "customer" : "partner"}-панели отправлена.
+                Ваш email подтвержден. Заявка на доступ к {role === "CUSTOMER" ? "customer" : role === "PARTNER" ? "partner" : "supervisor"}-панели отправлена.
                 Ожидайте письмо об одобрении.
               </div>
             ) : null}
@@ -141,7 +146,7 @@ export default function AuthLoginClient({ as, next, pending }: Props) {
             {/* STEP: role */}
             {step === "role" ? (
               <div className="grid grid-cols-1 gap-3">
-                {(["PATIENT", "PARTNER", "CUSTOMER"] as const).map((r) => (
+                {(["PATIENT", "PARTNER", "CUSTOMER", "SUPERVISOR"] as const).map((r) => (
                   <button
                     key={r}
                     className="w-full text-left rounded-xl border border-divider hover:border-primary transition-colors p-4 flex items-center gap-4"
