@@ -249,35 +249,35 @@ async function attachSupervisorReferralIfAny(
 ) {
   // Only for PARTNER registrations
   if (normalizeRole(asParam) !== "PARTNER") return;
-
+ 
   const svRefCode = normCode(store.get("mt_sv_ref_code")?.value ?? "");
   if (!svRefCode) return;
-
+ 
   const clear = () => {
     res.cookies.set("mt_sv_ref_code", "", { path: "/", maxAge: 0 });
   };
-
+ 
   if (!partnerUserId) {
     clear();
     return;
   }
-
+ 
   const sb = createServiceClient();
-
-  // Find supervisor by ref_code in admin_note
+ 
+  // Find supervisor by ref_code column (NOT admin_note LIKE)
   const { data: svReq } = await sb
     .from("supervisor_registration_requests")
     .select("user_id")
+    .eq("ref_code", svRefCode)
     .eq("status", "approved")
-    .like("admin_note", `%ref_code: ${svRefCode}%`)
     .limit(1)
     .maybeSingle();
-
+ 
   if (!svReq?.user_id) {
     clear();
     return;
   }
-
+ 
   // Link partner to supervisor
   await sb.from("supervisor_referrals").upsert(
     {
@@ -287,7 +287,7 @@ async function attachSupervisorReferralIfAny(
     } as any,
     { onConflict: "partner_user_id" },
   );
-
+ 
   clear();
 }
 

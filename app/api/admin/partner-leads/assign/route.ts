@@ -1,4 +1,5 @@
 // app/api/admin/partner-leads/assign/route.ts
+// UPDATED: Allows assigning leads to clinics even if patient has no account
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
@@ -30,7 +31,7 @@ export async function PATCH(req: NextRequest) {
   // 2) body
   const body = await req.json().catch(() => null);
   const lead_id = String(body?.lead_id ?? "").trim();
-  const partner_id = String(body?.partner_id ?? "").trim(); // (исторически) в UI поле называется partner_id, но это customer user_id
+  const partner_id = String(body?.partner_id ?? "").trim();
   const note = String(body?.note ?? "").trim().slice(0, 500);
 
   if (!isUuid(lead_id)) return NextResponse.json({ error: "Invalid lead_id" }, { status: 400 });
@@ -39,7 +40,7 @@ export async function PATCH(req: NextRequest) {
   // 3) service client
   const admin = createServiceClient();
 
-  // 3.1) убедимся что user реально customer
+  // 3.1) verify user is customer
   const { data: roleCheck, error: rcErr } = await admin
     .from("user_roles")
     .select("user_id")
@@ -50,7 +51,7 @@ export async function PATCH(req: NextRequest) {
   if (rcErr) return NextResponse.json({ error: rcErr.message }, { status: 500 });
   if (!roleCheck) return NextResponse.json({ error: "User is not a customer" }, { status: 400 });
 
-  // 4) прочитаем текущий lead (до обновления)
+  // 4) read lead
   const { data: before, error: beforeErr } = await admin
     .from("partner_leads")
     .select("id,assigned_partner_id,full_name,phone,email,patient_id,source,created_at")
@@ -63,7 +64,7 @@ export async function PATCH(req: NextRequest) {
   const prevCustomerId = before.assigned_partner_id ?? null;
   const customerChanged = prevCustomerId !== partner_id;
 
-  // 5) resolve clinic_id by customer user_id
+  // 5) resolve clinic_id
   const { data: mem, error: memErr } = await admin
     .from("customer_clinic_membership")
     .select("clinic_id")
@@ -75,7 +76,7 @@ export async function PATCH(req: NextRequest) {
 
   const clinicId = String(mem.clinic_id);
 
-  // ✅ resolve patient_id (email OR patient_id)
+  // ✅ UPDATED: resolve patient_id — allow NULL (no patient account required)
   let patientId: string | null = null;
 
   if (before.patient_id) {
@@ -83,58 +84,53 @@ export async function PATCH(req: NextRequest) {
   } else {
     const leadEmail = String(before.email ?? "").trim().toLowerCase();
     if (leadEmail) {
-      const { data: pat, error: patErr } = await admin
+      const { data: pat } = await admin
         .from("profiles")
         .select("id")
         .eq("email", leadEmail)
         .maybeSingle();
 
-      if (patErr) return NextResponse.json({ error: patErr.message }, { status: 500 });
       if (pat?.id) patientId = String(pat.id);
     }
   }
 
-  if (!patientId) {
-    return NextResponse.json(
-      { error: "Patient not found for lead (no email and not attached by phone OTP yet)" },
-      { status: 400 }
-    );
-  }
+  // ✅ NO LONGER BLOCKING — patientId can be null
 
-  // 7) create booking from lead (ТОЛЬКО если customerChanged)
-  //    + защита от дублей: ищем booking с таким lead маркером
+  // 7) create booking
   const leadMarker = `[lead:${lead_id}]`;
-
   let bookingId: string | null = null;
 
   if (customerChanged) {
-    // 7.1) check duplicate booking (same clinic + same patient + same marker in notes)
-    const { data: exists, error: exErr } = await admin
+    // Check for duplicate
+    const { data: exists } = await admin
       .from("patient_bookings")
       .select("id")
       .eq("clinic_id", clinicId)
-      .eq("patient_id", patientId)
       .ilike("notes", `%${leadMarker}%`)
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
-
     bookingId = exists?.[0]?.id ?? null;
 
     if (!bookingId) {
+      const insertData: any = {
+        clinic_id: clinicId,
+        service_id: 803, // Hair Transplant
+        booking_method: "automatic",
+        status: "pending",
+        full_name: before.full_name,
+        phone: before.phone,
+        notes: `${leadMarker} Landing lead (${before.source ?? "unknown"})${!patientId ? " [no patient account]" : ""}`,
+      };
+
+      // Only set patient_id if we have one
+      if (patientId) {
+        insertData.patient_id = patientId;
+      }
+
       const { data: booking, error: bookErr } = await admin
         .from("patient_bookings")
-        .insert({
-          patient_id: patientId,
-          clinic_id: clinicId,
-          service_id: 803, // Hair Transplant
-          booking_method: "automatic", // лид
-          status: "pending",
-          full_name: before.full_name,
-          phone: before.phone,
-          notes: `${leadMarker} Landing lead (${before.source ?? "unknown"})`,
-        })
+        .insert(insertData)
         .select("id")
         .single();
 
@@ -143,7 +139,7 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  // 8) update lead assignment
+  // 8) update lead
   const patch: any = {
     assigned_partner_id: partner_id,
     assigned_at: new Date().toISOString(),
@@ -163,7 +159,7 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // 9) email notify (best-effort: не ломаем assignment если email упал)
+  // 9) email (best-effort)
   let emailSent = false;
   let emailError: string | null = null;
 
@@ -177,7 +173,7 @@ export async function PATCH(req: NextRequest) {
 
       if (pErr) throw new Error(pErr.message);
       const customerEmail = customerProfile?.email?.trim();
-      if (!customerEmail) throw new Error("Customer email not found in profiles");
+      if (!customerEmail) throw new Error("Customer email not found");
 
       const customerName =
         `${customerProfile?.first_name ?? ""} ${customerProfile?.last_name ?? ""}`.trim() || null;
@@ -207,14 +203,7 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     item: data,
-    booking: {
-      attempted: customerChanged,
-      id: bookingId,
-    },
-    email: {
-      attempted: customerChanged,
-      sent: emailSent,
-      error: emailError,
-    },
+    booking: { attempted: customerChanged, id: bookingId, has_patient: !!patientId },
+    email: { attempted: customerChanged, sent: emailSent, error: emailError },
   });
 }

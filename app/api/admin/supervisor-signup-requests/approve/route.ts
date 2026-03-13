@@ -1,6 +1,4 @@
-// ============================================================
-// FILE: app/api/admin/supervisor-signup-requests/approve/route.ts
-// ============================================================
+// app/api/admin/supervisor-signup-requests/approve/route.ts
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
@@ -54,24 +52,23 @@ export async function POST(req: Request) {
     { onConflict: "id" }
   );
 
-  // 2) Generate ref_code and create supervisor_referrals entry placeholder
-  //    (The ref_code is generated, supervisor will use it to recruit partners)
+  // 2) Generate ref_code
   const { data: refCodeData } = await sb.rpc("generate_supervisor_ref_code");
   const refCode = refCodeData || `SV${Date.now().toString(36).toUpperCase()}`;
 
-  // Store the ref_code in a simple way — we'll use partner_program_requests pattern
-  // but for supervisor, the ref_code is stored on the registration request itself
+  // 3) Update request with ref_code in dedicated column
   await sb
     .from("supervisor_registration_requests")
     .update({
       status: "approved",
+      ref_code: refCode,
       decided_at: new Date().toISOString(),
       decided_by: me.id,
-      admin_note: note ? `${note} | ref_code: ${refCode}` : `ref_code: ${refCode}`,
+      admin_note: note,
     })
     .eq("id", id);
 
-  // 3) Email
+  // 4) Email
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://medtravel.me";
   const loginUrl = `${origin}/auth/login?as=SUPERVISOR&next=%2Fsupervisor`;
 

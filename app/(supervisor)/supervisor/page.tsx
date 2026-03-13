@@ -10,29 +10,30 @@ type BalanceData = {
   currency: string;
 };
 
+type StatsData = {
+  total_partners: number;
+  total_referrals: number;
+  pending_bookings: number;
+  completed_bookings: number;
+};
+
 function StatCard({ title, value, color }: { title: string; value: string; color?: string }) {
   return (
     <div className="rounded-xl border bg-white px-4 py-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-        {title}
-      </div>
-      <div className={`mt-2 text-2xl font-semibold ${color ?? "text-gray-900"}`}>
-        {value}
-      </div>
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{title}</div>
+      <div className={`mt-2 text-2xl font-semibold ${color ?? "text-gray-900"}`}>{value}</div>
     </div>
   );
 }
 
 function formatMonthYear(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
 }
 
-export default function PartnerDashboardPage() {
+export default function SupervisorDashboardPage() {
   const { supabase, session } = useSupabase();
   const [balance, setBalance] = useState<BalanceData | null>(null);
+  const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,10 +41,19 @@ export default function PartnerDashboardPage() {
 
     (async () => {
       setLoading(true);
-      const { data } = await supabase.rpc("supervisor_balance");
-      if (data && Array.isArray(data) && data.length > 0) {
-        setBalance(data[0] as BalanceData);
+
+      const [balRes, statsRes] = await Promise.all([
+        supabase.rpc("supervisor_balance"),
+        supabase.rpc("supervisor_stats"),
+      ]);
+
+      if (balRes.data && Array.isArray(balRes.data) && balRes.data.length > 0) {
+        setBalance(balRes.data[0] as BalanceData);
       }
+      if (statsRes.data && Array.isArray(statsRes.data) && statsRes.data.length > 0) {
+        setStats(statsRes.data[0] as StatsData);
+      }
+
       setLoading(false);
     })();
   }, [supabase, session]);
@@ -53,21 +63,17 @@ export default function PartnerDashboardPage() {
   const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   const lastMonthLabel = formatMonthYear(lastMonthDate);
 
-  const currency = balance?.currency ?? "USD";
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Welcome to Supervisor Panel!</h1>
-        <p className="text-gray-600">
-          Track your partners performance and payouts.
-        </p>
+        <p className="text-gray-600">Track your partners performance and payouts.</p>
       </div>
 
-      {/* Balance overview */}
+      {/* Earnings */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Earned"
+          title="Total Earned (1%)"
           value={loading ? "..." : `$${(balance?.total_earned ?? 0).toFixed(2)}`}
         />
         <StatCard
@@ -80,61 +86,52 @@ export default function PartnerDashboardPage() {
       </div>
 
       {/* Withdrawal info */}
-      {balance && balance.available_for_withdrawal > 0 && balance.available_for_withdrawal >= 300 && (
+      {balance && balance.available_for_withdrawal >= 500 && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-semibold text-emerald-800">
-                You have ${balance.available_for_withdrawal.toFixed(2)} available for withdrawal
-              </div>
-              <div className="text-sm text-emerald-600 mt-1">
-                Contact support to arrange a payout.
-              </div>
-            </div>
+          <div className="font-semibold text-emerald-800">
+            You have ${balance.available_for_withdrawal.toFixed(2)} available for withdrawal
           </div>
+          <div className="text-sm text-emerald-600 mt-1">Contact support to arrange a payout.</div>
         </div>
       )}
 
-      {balance && balance.total_earned > 0 && balance.available_for_withdrawal < 300 && (
+      {balance && balance.total_earned > 0 && balance.available_for_withdrawal < 500 && (
         <div className="rounded-xl border bg-gray-50 p-4 text-sm text-gray-600">
-          Minimum withdrawal amount is $300. Your available balance: ${balance.available_for_withdrawal.toFixed(2)} {currency}.
+          Minimum withdrawal amount is $500. Your available balance: ${balance.available_for_withdrawal.toFixed(2)}.
         </div>
       )}
 
-      {/* Programs Performance — placeholder for now */}
-      <div className="rounded-xl border bg-white p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Programs Performance</h2>
-        </div>
+      {/* Network stats */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Recruited Partners"
+          value={loading ? "..." : String(stats?.total_partners ?? 0)}
+        />
+        <StatCard
+          title="Their Referrals"
+          value={loading ? "..." : String(stats?.total_referrals ?? 0)}
+        />
+        <StatCard
+          title="Pending Bookings"
+          value={loading ? "..." : String(stats?.pending_bookings ?? 0)}
+          color="text-amber-600"
+        />
+        <StatCard
+          title="Completed Bookings"
+          value={loading ? "..." : String(stats?.completed_bookings ?? 0)}
+          color="text-sky-600"
+        />
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-                <th className="px-3 py-2">Landing page</th>
-                <th className="px-3 py-2">Clicks</th>
-                <th className="px-3 py-2">Registrations</th>
-                <th className="px-3 py-2">Pending</th>
-                <th className="px-3 py-2">Completed</th>
-                <th className="px-3 py-2">Payout</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b bg-gray-50 font-semibold">
-                <td className="px-3 py-2">Total</td>
-                <td className="px-3 py-2">0</td>
-                <td className="px-3 py-2">0</td>
-                <td className="px-3 py-2">0</td>
-                <td className="px-3 py-2">0</td>
-                <td className="px-3 py-2">${(balance?.total_earned ?? 0).toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
+      {/* How it works */}
+      <div className="rounded-xl border bg-white p-4 space-y-3">
+        <h2 className="text-lg font-semibold">How it works</h2>
+        <div className="text-sm text-gray-600 space-y-2">
+          <p>1. Share your recruitment link with potential affiliate partners</p>
+          <p>2. When they register and get approved, they appear in your "My Partners" section</p>
+          <p>3. When their referred patients complete procedures, you earn 1% of the procedure cost</p>
+          <p>4. Your earnings update automatically when bookings are marked as completed</p>
         </div>
-
-        <p className="text-xs text-gray-400">
-          Detailed per-program stats coming soon.
-        </p>
       </div>
     </div>
   );

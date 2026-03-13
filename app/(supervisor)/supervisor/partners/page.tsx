@@ -20,27 +20,21 @@ export default function SupervisorPartnersPage() {
 
   useEffect(() => {
     if (!supabase || !session) return;
-
     let cancelled = false;
 
     (async () => {
       setLoading(true);
 
-      // Get supervisor ref_code from registration request
+      // Get ref_code from dedicated column
       const { data: reqData } = await supabase
         .from("supervisor_registration_requests")
-        .select("admin_note")
+        .select("ref_code")
         .eq("user_id", session.user.id)
         .eq("status", "approved")
         .maybeSingle();
 
-      // Extract ref_code from admin_note (format: "... | ref_code: SVXXXXXXXX")
-      if (reqData?.admin_note) {
-        const match = String(reqData.admin_note).match(/ref_code:\s*(\S+)/);
-        if (match) setRefCode(match[1]);
-      }
+      if (reqData?.ref_code) setRefCode(reqData.ref_code);
 
-      // Get recruited partners
       const { data: partnersData } = await supabase
         .rpc("supervisor_partners_list", { p_limit: 100, p_offset: 0 });
 
@@ -67,13 +61,13 @@ export default function SupervisorPartnersPage() {
         <p className="text-gray-600">Partners you recruited and their performance.</p>
       </div>
 
-      {/* Referral link card */}
+      {/* Referral link */}
       <div className="rounded-xl border bg-white p-4">
         <h2 className="text-lg font-semibold mb-3">Your Recruitment Link</h2>
         {refCode ? (
           <div className="flex flex-col gap-2">
             <div className="text-sm text-gray-500">
-              Share this link with potential affiliate partners. When they register using your link, they'll be linked to your account.
+              Share this link with potential affiliate partners. They will be redirected to register as a Partner and linked to your account.
             </div>
             <div className="flex items-center gap-2 mt-2">
               <code className="flex-1 rounded-md border bg-gray-50 px-3 py-2 text-sm break-all">
@@ -125,8 +119,8 @@ export default function SupervisorPartnersPage() {
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
                   <th className="px-3 py-2">Partner Email</th>
-                  <th className="px-3 py-2">Referrals</th>
-                  <th className="px-3 py-2">Your Earnings</th>
+                  <th className="px-3 py-2">Their Referrals</th>
+                  <th className="px-3 py-2">Your Earnings (1%)</th>
                   <th className="px-3 py-2">Joined</th>
                 </tr>
               </thead>
