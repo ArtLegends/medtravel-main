@@ -1,3 +1,4 @@
+// app/api/customer/patients/route.ts
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 

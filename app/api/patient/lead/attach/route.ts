@@ -1,3 +1,4 @@
+// app/api/patient/lead/attach/route.ts
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 import { createServiceClient } from "@/lib/supabase/serviceClient";

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { clinicPath } from "@/lib/clinic-url";
 import ClinicDraftEditor from "@/components/admin/ClinicDraftEditor";
+import ClinicOwnerManager from "@/components/admin/ClinicOwnerManager";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,9 +24,9 @@ type ClinicRow = {
   status: string | null;
   moderation_status: string | null;
   is_published: boolean | null;
+  owner_id: string | null;
   created_at: string;
   updated_at: string | null;
-  // jsonb поля (из старого импорта / драфтов)
   services?: any;
   doctors?: any;
   hours?: any;
@@ -33,8 +34,6 @@ type ClinicRow = {
   gallery?: any;
   amenities?: any;
   payments?: any;
-  // в clinics такой колонки нет, но тип оставляем как optional,
-  // чтобы не падать, если позже появится
   accreditations?: any;
   map_embed_url?: string | null;
   directions?: string | null;
@@ -52,13 +51,10 @@ type DraftRow = {
   location: any | null;
   status: string | null;
   updated_at: string | null;
-  // на всякий случай – если есть колонка accreditations в drafts
   accreditations?: any[] | null;
 };
 
-type SearchParams = {
-  id?: string;
-};
+type SearchParams = { id?: string };
 
 /* ---------- helpers ---------- */
 
@@ -66,41 +62,15 @@ function randomKey() {
   return Math.random().toString(36).slice(2);
 }
 
-async function uploadImageToClinicsBucket(
-  sb: ReturnType<typeof createServiceClient>,
-  file: File,
-  pathPrefix: string,
-) {
-  if (!file || file.size === 0) return null;
-
-  const extFromName = () => {
-    const parts = file.name.split(".");
-    if (parts.length < 2) return "jpg";
-    const ext = parts.pop()!;
-    return ext.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-  };
-
-  const ext = extFromName();
-  const filePath = `${pathPrefix}/${Date.now()}-${randomKey()}.${ext}`;
-
-  const { error: uploadError } = await sb.storage
-    .from(CLINIC_BUCKET)
-    .upload(filePath, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || "image/jpeg",
-    });
-
-  if (uploadError) {
-    console.error("storage upload error", uploadError);
-    throw new Error("Failed to upload image");
-  }
-
-  const { data } = sb.storage.from(CLINIC_BUCKET).getPublicUrl(filePath);
-  return data.publicUrl;
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 }
 
-/** Нормализуем массив в массив строк (label/name/title/method/value → string) */
 function normalizeStringList(value: any): string[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -118,31 +88,13 @@ function normalizeStringList(value: any): string[] {
     .filter((v: string | null): v is string => !!v && v.length > 0);
 }
 
-/* ---------- server action: сохранить клинику + драфт ---------- */
-
-function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-}
-
 const WEEKDAY_MAP: Record<string, number> = {
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-  sunday: 7,
+  monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7,
 };
 
 function dayNameToWeekday(day: string | undefined | null): number | null {
   if (!day) return null;
-  const key = day.trim().toLowerCase();
-  return WEEKDAY_MAP[key] ?? null;
+  return WEEKDAY_MAP[day.trim().toLowerCase()] ?? null;
 }
 
 function toTime(value: string | null | undefined): string | null {
@@ -155,49 +107,30 @@ function toTime(value: string | null | undefined): string | null {
   return `${hh}:${mm}:00`;
 }
 
-/** локальная версия parseTimeSpan для часов из draft: "9:00-18:00", "Closed" и т.п. */
-function parseTimeSpanDraft(
-  s?: string,
-): { open: string | null; close: string | null; is_closed: boolean } {
+function parseTimeSpanDraft(s?: string) {
   const text = (s || "").trim();
-  if (!text) return { open: null, close: null, is_closed: false };
-  if (/^closed$/i.test(text)) return { open: null, close: null, is_closed: true };
-
-  const m = text.match(
-    /^\s*([0-9: ]+(?:am|pm)?)\s*[-–—]\s*([0-9: ]+(?:am|pm)?)\s*$/i,
-  );
-  if (!m) return { open: null, close: null, is_closed: false };
-
+  if (!text) return { open: null as string | null, close: null as string | null, is_closed: false };
+  if (/^closed$/i.test(text)) return { open: null as string | null, close: null as string | null, is_closed: true };
+  const m = text.match(/^\s*([0-9: ]+(?:am|pm)?)\s*[-–—]\s*([0-9: ]+(?:am|pm)?)\s*$/i);
+  if (!m) return { open: null as string | null, close: null as string | null, is_closed: false };
   const to24 = (v: string) => {
     const t = v.trim().toLowerCase();
     const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
     if (ampm) {
       let hh = Number(ampm[1]);
       const mm = Number(ampm[2] ?? 0);
-      const ap = ampm[3].toLowerCase();
-      if (ap === "pm" && hh !== 12) hh += 12;
-      if (ap === "am" && hh === 12) hh = 0;
-      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(
-        2,
-        "0",
-      )}:00`;
+      if (ampm[3].toLowerCase() === "pm" && hh !== 12) hh += 12;
+      if (ampm[3].toLowerCase() === "am" && hh === 12) hh = 0;
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`;
     }
     const hhmm = t.match(/^(\d{1,2})(?::(\d{2}))?$/);
-    if (hhmm) {
-      const hh = Number(hhmm[1]);
-      const mm = Number(hhmm[2] ?? 0);
-      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(
-        2,
-        "0",
-      )}:00`;
-    }
+    if (hhmm) return `${String(Number(hhmm[1])).padStart(2, "0")}:${String(Number(hhmm[2] ?? 0)).padStart(2, "0")}:00`;
     return null;
   };
-
-  const open = to24(m[1]) as string | null;
-  const close = to24(m[2]) as string | null;
-  return { open, close, is_closed: false };
+  return { open: to24(m[1]), close: to24(m[2]), is_closed: false };
 }
+
+/* ---------- server action ---------- */
 
 async function saveClinic(formData: FormData) {
   "use server";
@@ -206,19 +139,13 @@ async function saveClinic(formData: FormData) {
   if (!id) return;
 
   const sb = createServiceClient();
-
   const str = (name: string) => String(formData.get(name) ?? "").trim();
   const parseJson = (field: string) => {
     const raw = formData.get(field);
     if (!raw) return null;
-    try {
-      return JSON.parse(String(raw));
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(String(raw)); } catch { return null; }
   };
 
-  // --- basic info / location ---
   const basic_info = {
     name: str("clinic_name") || null,
     slug: str("clinic_slug") || null,
@@ -240,124 +167,55 @@ async function saveClinic(formData: FormData) {
   const moderationStatus = str("clinic_moderation_status") || null;
   const draftStatus = str("draft_status") || null;
 
-  // --- СЫРОЙ JSON из формы (то, что уйдёт в clinic_profile_drafts) ---
   const rawServices = (parseJson("draft_services") ?? []) as any[];
   const rawDoctors = (parseJson("draft_doctors") ?? []) as any[];
   const rawHours = (parseJson("draft_hours") ?? []) as any[];
   const rawGallery = (parseJson("draft_gallery") ?? []) as any[];
   const rawFacilities = (parseJson("draft_facilities") ?? {}) as any;
   const rawPricing = (parseJson("draft_pricing") ?? []) as any[];
-  const rawAccreditations = (parseJson("clinic_accreditations") ??
-    []) as any[];
-
-  // --- НОРМАЛИЗОВАННЫЕ структуры ДЛЯ ТАБЛИЦ / JSON клиники ---
+  const rawAccreditations = (parseJson("clinic_accreditations") ?? []) as any[];
 
   const servicesForDb = Array.isArray(rawServices) ? rawServices : [];
-
   const doctorsForDb = Array.isArray(rawDoctors)
-    ? rawDoctors.map((d) => {
-        const name = (d.fullName ?? d.name ?? "").trim();
-        const title = (d.title ?? "").trim();
-        const spec = (d.specialty ?? d.spec ?? "").trim();
-
-        let langs: string[] = [];
-        if (Array.isArray(d.languages)) {
-          langs = d.languages
-            .filter(
-              (x: unknown): x is string =>
-                typeof x === "string" && x.trim().length > 0,
-            )
-            .map((x: string) => x.trim());
-        } else if (typeof d.languages === "string") {
-          langs = d.languages
-            .split(",")
-            .map((x: string) => x.trim())
-            .filter(Boolean);
-        }
-
-        return {
-          name,
-          title: title || null,
-          position: spec || title || null,
-          bio:
-            typeof d.bio === "string" && d.bio.trim().length
-              ? d.bio.trim()
-              : null,
-          photo_url:
-            (d.photoUrl ?? d.photo_url ?? d.photo ?? "").trim() || null,
-          languages: langs,
-        };
-      })
+    ? rawDoctors.map((d) => ({
+        name: (d.fullName ?? d.name ?? "").trim(),
+        title: (d.title ?? "").trim() || null,
+        position: (d.specialty ?? d.spec ?? d.title ?? "").trim() || null,
+        bio: typeof d.bio === "string" && d.bio.trim().length ? d.bio.trim() : null,
+        photo_url: (d.photoUrl ?? d.photo_url ?? d.photo ?? d.image_url ?? "").trim() || null,
+        languages: Array.isArray(d.languages) ? d.languages.filter((x: any) => typeof x === "string" && x.trim()) : [],
+      }))
     : [];
 
   const hoursForDb = Array.isArray(rawHours)
-    ? rawHours
-        .map((h) => {
-          const day = h.day ?? h.weekday ?? "";
-          const weekday = dayNameToWeekday(day);
-          if (!weekday) return null;
-
-          let status: string = h.status ?? "open";
-          let isClosed = status === "closed";
-
-          let openStr: string | null = h.start ?? h.open ?? null;
-          let closeStr: string | null = h.end ?? h.close ?? null;
-          const timeText: string | null = h.time ?? null;
-
-          let open: string | null = null;
-          let close: string | null = null;
-          let hoursText: string | null = null;
-
-          if (timeText && !openStr && !closeStr) {
-            const parsed = parseTimeSpanDraft(timeText);
-            open = parsed.open;
-            close = parsed.close;
-            isClosed = parsed.is_closed;
-            hoursText = timeText;
-            if (parsed.is_closed) status = "closed";
-          } else {
-            open = isClosed ? null : toTime(openStr);
-            close = isClosed ? null : toTime(closeStr);
-            if (isClosed) hoursText = "closed";
-            else if (status === "by_appointment") hoursText = "by appointment";
-            else if (openStr && closeStr) hoursText = `${openStr} - ${closeStr}`;
-          }
-
-          return {
-            clinic_id: id,
-            weekday,
-            open,
-            close,
-            is_closed: isClosed,
-            dow: weekday,
-            hours_text: hoursText,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null)
+    ? rawHours.map((h) => {
+        const weekday = dayNameToWeekday(h.day ?? h.weekday ?? "");
+        if (!weekday) return null;
+        let isClosed = (h.status ?? "open") === "closed";
+        let open: string | null = null;
+        let close: string | null = null;
+        let hoursText: string | null = null;
+        const timeText: string | null = h.time ?? null;
+        if (timeText && !h.start && !h.end) {
+          const parsed = parseTimeSpanDraft(timeText);
+          open = parsed.open; close = parsed.close; isClosed = parsed.is_closed;
+          hoursText = timeText; if (parsed.is_closed) h.status = "closed";
+        } else {
+          open = isClosed ? null : toTime(h.start ?? h.open ?? null);
+          close = isClosed ? null : toTime(h.end ?? h.close ?? null);
+          if (isClosed) hoursText = "closed";
+          else if (h.start && h.end) hoursText = `${h.start} - ${h.end}`;
+        }
+        return { clinic_id: id, weekday, open, close, is_closed: isClosed, dow: weekday, hours_text: hoursText };
+      }).filter(Boolean)
     : [];
 
-  const galleryRawArray = Array.isArray(rawGallery) ? rawGallery : [];
-  const galleryForClinic = galleryRawArray
-    .map((g, index) => {
-      const url = (
-        g?.url ??
-        g?.src ??
-        g?.imageUrl ??
-        g?.image_url ??
-        g?.logo_url ??
-        ""
-      )
-        .toString()
-        .trim();
+  const galleryForClinic = (Array.isArray(rawGallery) ? rawGallery : [])
+    .map((g, i) => {
+      const url = (g?.url ?? g?.src ?? g?.imageUrl ?? g?.image_url ?? "").toString().trim();
       if (!url) return null;
-      const title = (g?.title ?? g?.alt ?? g?.caption ?? null) as
-        | string
-        | null;
-      return { url, title, sort: index };
-    })
-    .filter(
-      (x): x is { url: string; title: string | null; sort: number } => !!x,
-    );
+      return { url, title: g?.title ?? g?.alt ?? null, sort: i };
+    }).filter(Boolean) as { url: string; title: string | null; sort: number }[];
 
   const amenitiesForClinic = {
     premises: normalizeStringList(rawFacilities.premises),
@@ -366,609 +224,213 @@ async function saveClinic(formData: FormData) {
     languages_spoken: normalizeStringList(rawFacilities.languages_spoken),
   };
 
-  const paymentNames = normalizeStringList(rawPricing);
-  const paymentsForClinic = paymentNames.map((method) => ({ method }));
+  const paymentsForClinic = normalizeStringList(rawPricing).map((method) => ({ method }));
 
-  const accreditationsRaw = Array.isArray(rawAccreditations)
-    ? rawAccreditations
-    : [];
-  const accreditationsForClinic = accreditationsRaw
+  const accreditationsForClinic = (Array.isArray(rawAccreditations) ? rawAccreditations : [])
     .map((a) => {
       const name = (a?.name ?? "").trim();
       if (!name) return null;
-      const logo_url =
-        (a?.logo_url ?? a?.logoUrl ?? a?.url ?? "").trim() || null;
-      const desc =
-        typeof a?.description === "string" && a.description.trim().length
-          ? a.description.trim()
-          : null;
-      return { name, logo_url, description: desc };
-    })
-    .filter(
-      (
-        x,
-      ): x is {
-        name: string;
-        logo_url: string | null;
-        description: string | null;
-      } => !!x,
-    );
+      return { name, logo_url: (a?.logo_url ?? "").trim() || null, description: (a?.description ?? "").trim() || null };
+    }).filter(Boolean) as { name: string; logo_url: string | null; description: string | null }[];
 
-  // --- 1) clinics ---
-
+  // 1) clinics
   const clinicUpdate: any = {
-    name: basic_info.name,
-    slug: basic_info.slug,
-    about: basic_info.description,
-    country: basic_info.country,
-    city: basic_info.city,
-    province: basic_info.province,
-    district: basic_info.district,
-    address,
-    status: clinicStatus || null,
+    name: basic_info.name, slug: basic_info.slug, about: basic_info.description,
+    country: basic_info.country, city: basic_info.city, province: basic_info.province,
+    district: basic_info.district, address, status: clinicStatus || null,
     moderation_status: moderationStatus || "draft",
     is_published: formData.get("clinic_is_published") === "on",
-    map_embed_url: location.mapUrl,
-    amenities: amenitiesForClinic,
-    payments: paymentsForClinic,
+    map_embed_url: location.mapUrl, amenities: amenitiesForClinic, payments: paymentsForClinic,
   };
+  const { error: clinicError } = await sb.from("clinics").update(clinicUpdate).eq("id", id);
+  if (clinicError) throw new Error("Failed to update clinic: " + clinicError.message);
 
-  const { error: clinicError } = await sb
-    .from("clinics")
-    .update(clinicUpdate)
-    .eq("id", id);
-
-  if (clinicError) {
-    console.error("clinics update error", clinicError);
-    throw new Error("Failed to update clinic");
-  }
-
-  // --- 2) categories + clinic_categories (по specialty) ---
-
+  // 2) categories
   if (basic_info.specialty) {
     try {
       const catSlug = slugify(basic_info.specialty);
-      let categoryId: number | null = null;
-
-      const { data: existing, error: catSelErr } = await sb
-        .from("categories")
-        .select("id")
-        .eq("slug", catSlug)
-        .maybeSingle();
-
-      if (catSelErr) throw catSelErr;
-
-      if (existing?.id) {
-        categoryId = existing.id as number;
-      } else {
-        const { data: created, error: catInsErr } = await sb
-          .from("categories")
-          .insert({ name: basic_info.specialty, slug: catSlug } as any)
-          .select("id")
-          .single();
-
-        if (catInsErr) throw catInsErr;
-        categoryId = created.id as number;
+      const { data: existing } = await sb.from("categories").select("id").eq("slug", catSlug).maybeSingle();
+      let categoryId = existing?.id as number | null;
+      if (!categoryId) {
+        const { data: created } = await sb.from("categories").insert({ name: basic_info.specialty, slug: catSlug } as any).select("id").single();
+        categoryId = created?.id as number;
       }
-
-      if (categoryId != null) {
-        const { error: delCcErr } = await sb
-          .from("clinic_categories")
-          .delete()
-          .eq("clinic_id", id);
-        if (delCcErr) throw delCcErr;
-
-        const { error: insCcErr } = await sb
-          .from("clinic_categories")
-          .insert({ clinic_id: id, category_id: categoryId } as any);
-        if (insCcErr) throw insCcErr;
+      if (categoryId) {
+        await sb.from("clinic_categories").delete().eq("clinic_id", id);
+        await sb.from("clinic_categories").insert({ clinic_id: id, category_id: categoryId } as any);
       }
-    } catch (err) {
-      console.error("clinic category sync error", err);
-    }
+    } catch (e) { console.error("category sync error", e); }
   }
 
-  // --- 3) services + clinic_services ---
-
+  // 3) services
   try {
-    const { error: delLinksErr } = await sb
-      .from("clinic_services")
-      .delete()
-      .eq("clinic_id", id);
-    if (delLinksErr) throw delLinksErr;
-
+    await sb.from("clinic_services").delete().eq("clinic_id", id);
     for (const s of servicesForDb) {
-      const name = (s?.name ?? "").trim();
-      if (!name) continue;
-
-      const desc = s?.description ?? s?.desc ?? null;
+      const name = (s?.name ?? "").trim(); if (!name) continue;
+      const desc = s?.description ?? null;
       const currency = (s?.currency ?? "USD").trim() || "USD";
-
       let priceNum: number | null = null;
-      const p = s?.price;
-      if (typeof p === "number") {
-        priceNum = p;
-      } else if (typeof p === "string" && p.trim() !== "") {
-        const parsed = Number(p.replace(",", "."));
-        if (!Number.isNaN(parsed)) priceNum = parsed;
-      }
-
-      const { data: existingSvc, error: svcSelErr } = await sb
-        .from("services")
-        .select("id")
-        .eq("name", name)
-        .maybeSingle();
-
-      if (svcSelErr) throw svcSelErr;
-
+      if (typeof s?.price === "number") priceNum = s.price;
+      else if (typeof s?.price === "string" && s.price.trim()) { const p = Number(s.price.replace(",", ".")); if (!Number.isNaN(p)) priceNum = p; }
+      const { data: existingSvc } = await sb.from("services").select("id").eq("name", name).maybeSingle();
       let serviceId: number;
-      if (existingSvc?.id) {
-        serviceId = existingSvc.id as number;
-        await sb
-          .from("services")
-          .update({ description: desc, slug: slugify(name) } as any)
-          .eq("id", serviceId);
-      } else {
-        const { data: createdSvc, error: svcInsErr } = await sb
-          .from("services")
-          .insert(
-            {
-              name,
-              slug: slugify(name),
-              description: desc,
-            } as any,
-          )
-          .select("id")
-          .single();
-
-        if (svcInsErr || !createdSvc)
-          throw svcInsErr || new Error("Service insert failed");
-        serviceId = createdSvc.id as number;
+      if (existingSvc?.id) { serviceId = existingSvc.id as number; } else {
+        const { data: c } = await sb.from("services").insert({ name, slug: slugify(name), description: desc } as any).select("id").single();
+        serviceId = c?.id as number;
       }
-
-      const { error: linkErr } = await sb.from("clinic_services").insert({
-        clinic_id: id,
-        service_id: serviceId,
-        price: priceNum,
-        currency,
-      } as any);
-
-      if (linkErr) throw linkErr;
+      await sb.from("clinic_services").insert({ clinic_id: id, service_id: serviceId, price: priceNum, currency } as any);
     }
-  } catch (err) {
-    console.error("services sync error", err);
-    throw new Error("Failed to update clinic services");
-  }
+  } catch (e) { console.error("services sync error", e); throw new Error("Failed to update services"); }
 
-  // --- 4) clinic_images ---
-
+  // 4) images
   try {
-    const { error: delImgErr } = await sb
-      .from("clinic_images")
-      .delete()
-      .eq("clinic_id", id);
-    if (delImgErr) throw delImgErr;
+    await sb.from("clinic_images").delete().eq("clinic_id", id);
+    if (galleryForClinic.length) {
+      await sb.from("clinic_images").insert(galleryForClinic.map((g) => ({ clinic_id: id, url: g.url, title: g.title, sort: g.sort, created_at: new Date().toISOString() })) as any);
+    }
+  } catch (e) { throw new Error("Failed to update images"); }
 
-    const imageRows = galleryForClinic.map((g) => ({
-      clinic_id: id,
-      url: g.url,
-      title: g.title,
-      sort: g.sort,
-      created_at: new Date().toISOString(),
+  // 5) staff
+  try {
+    await sb.from("clinic_staff").delete().eq("clinic_id", id);
+    const staffRows = doctorsForDb.filter((d) => d.name.length > 0).map((d) => ({
+      clinic_id: id, name: d.name, title: d.title, position: d.position,
+      bio: d.bio, languages: d.languages, photo_url: d.photo_url, created_at: new Date().toISOString(),
     }));
+    if (staffRows.length) await sb.from("clinic_staff").insert(staffRows as any);
+  } catch (e) { throw new Error("Failed to update staff"); }
 
-    if (imageRows.length) {
-      const { error: insImgErr } = await sb
-        .from("clinic_images")
-        .insert(imageRows as any);
-      if (insImgErr) throw insImgErr;
-    }
-  } catch (err) {
-    console.error("clinic_images sync error", err);
-    throw new Error("Failed to update clinic images");
-  }
-
-  // --- 5) clinic_staff ---
-
+  // 6) hours
   try {
-    const { error: delStaffErr } = await sb
-      .from("clinic_staff")
-      .delete()
-      .eq("clinic_id", id);
-    if (delStaffErr) throw delStaffErr;
+    await sb.from("clinic_hours").delete().eq("clinic_id", id);
+    if (hoursForDb.length) await sb.from("clinic_hours").insert(hoursForDb as any);
+  } catch (e) { throw new Error("Failed to update hours"); }
 
-    const staffRows = doctorsForDb
-      .filter((d) => (d.name ?? "").trim().length > 0)
-      .map((d) => ({
-        clinic_id: id,
-        name: d.name,
-        title: d.title,
-        position: d.position,
-        bio: d.bio,
-        languages: d.languages ?? [],
-        photo_url: d.photo_url ?? null,
-        created_at: new Date().toISOString(),
-      }));
-
-    if (staffRows.length) {
-      const { error: insStaffErr } = await sb
-        .from("clinic_staff")
-        .insert(staffRows as any);
-      if (insStaffErr) throw insStaffErr;
-    }
-  } catch (err) {
-    console.error("clinic_staff sync error", err);
-    throw new Error("Failed to update clinic staff");
-  }
-
-  // --- 6) clinic_hours ---
-
+  // 7) accreditations
   try {
-    const { error: delHoursErr } = await sb
-      .from("clinic_hours")
-      .delete()
-      .eq("clinic_id", id);
-    if (delHoursErr) throw delHoursErr;
-
-    if (hoursForDb.length) {
-      const { error: insHoursErr } = await sb
-        .from("clinic_hours")
-        .insert(hoursForDb as any);
-      if (insHoursErr) throw insHoursErr;
-    }
-  } catch (err) {
-    console.error("clinic_hours sync error", err);
-    throw new Error("Failed to update clinic hours");
-  }
-
-  // --- 7) accreditations + clinic_accreditations ---
-
-  try {
-    const { error: delLinksErr } = await sb
-      .from("clinic_accreditations")
-      .delete()
-      .eq("clinic_id", id);
-    if (delLinksErr) throw delLinksErr;
-
+    await sb.from("clinic_accreditations").delete().eq("clinic_id", id);
     for (const item of accreditationsForClinic) {
-      const { name, logo_url, description } = item;
-
-      const { data: existingAcc, error: accSelErr } = await sb
-        .from("accreditations")
-        .select("id")
-        .eq("name", name)
-        .maybeSingle();
-
-      if (accSelErr) throw accSelErr;
-
-      let accreditationId: number;
-      if (existingAcc?.id) {
-        accreditationId = existingAcc.id as number;
-        await sb
-          .from("accreditations")
-          .update({ logo_url, description } as any)
-          .eq("id", accreditationId);
-      } else {
-        const { data: createdAcc, error: accInsErr } = await sb
-          .from("accreditations")
-          .insert(
-            {
-              name,
-              logo_url,
-              description,
-              slug: slugify(name),
-            } as any,
-          )
-          .select("id")
-          .single();
-
-        if (accInsErr || !createdAcc)
-          throw accInsErr || new Error("Accreditation insert failed");
-        accreditationId = createdAcc.id as number;
-      }
-
-      const { error: linkErr } = await sb
-        .from("clinic_accreditations")
-        .insert({
-          clinic_id: id,
-          accreditation_id: accreditationId,
-        } as any);
-
-      if (linkErr) throw linkErr;
+      const { data: existing } = await sb.from("accreditations").select("id").eq("name", item.name).maybeSingle();
+      let accId: number;
+      if (existing?.id) { accId = existing.id as number; await sb.from("accreditations").update({ logo_url: item.logo_url, description: item.description } as any).eq("id", accId); }
+      else { const { data: c } = await sb.from("accreditations").insert({ name: item.name, logo_url: item.logo_url, description: item.description, slug: slugify(item.name) } as any).select("id").single(); accId = c?.id as number; }
+      await sb.from("clinic_accreditations").insert({ clinic_id: id, accreditation_id: accId } as any);
     }
-  } catch (err) {
-    console.error("clinic_accreditations sync error", err);
-    throw new Error("Failed to update clinic accreditations");
-  }
+  } catch (e) { throw new Error("Failed to update accreditations"); }
 
-  // --- 8) clinic_profile_drafts (сырые данные формы) ---
+  // 8) draft
+  await sb.from("clinic_profile_drafts").upsert({
+    clinic_id: id, basic_info, location,
+    services: rawServices, doctors: rawDoctors, hours: rawHours, gallery: rawGallery,
+    facilities: rawFacilities ?? {}, pricing: rawPricing, status: draftStatus || "draft",
+    updated_at: new Date().toISOString(),
+  } as any, { onConflict: "clinic_id" } as any);
 
-  const { error: draftError } = await sb
-    .from("clinic_profile_drafts")
-    .upsert(
-      {
-        clinic_id: id,
-        basic_info,
-        location,
-        services: Array.isArray(rawServices) ? rawServices : [],
-        doctors: Array.isArray(rawDoctors) ? rawDoctors : [],
-        hours: Array.isArray(rawHours) ? rawHours : [],
-        gallery: Array.isArray(rawGallery) ? rawGallery : [],
-        facilities: rawFacilities ?? {},
-        pricing: Array.isArray(rawPricing) ? rawPricing : [],
-        status: draftStatus || "draft",
-        updated_at: new Date().toISOString(),
-        // сюда НЕ пишем accreditations, чтобы не триггерить ошибку,
-        // если колонки нет
-      } as any,
-      { onConflict: "clinic_id" } as any,
-    );
-
-  if (draftError) {
-    console.error("clinic_profile_drafts upsert error", draftError);
-    throw new Error("Failed to update clinic draft");
-  }
-
-  // Перегенерируем админку + список клиник
   revalidatePath(`/admin/clinics/detail?id=${id}`);
   revalidatePath("/admin/clinics");
-
-  // И публичную страницу клиники
   if (basic_info.slug) {
-    const publicPath =
-      clinicPath({
-        slug: basic_info.slug,
-        country: basic_info.country ?? undefined,
-        province: basic_info.province ?? undefined,
-        city: basic_info.city ?? undefined,
-        district: basic_info.district ?? undefined,
-      }) || `/clinic/${basic_info.slug}`;
-    if (publicPath) {
-      revalidatePath(publicPath);
-    }
+    const pp = clinicPath({ slug: basic_info.slug, country: basic_info.country ?? undefined, province: basic_info.province ?? undefined, city: basic_info.city ?? undefined, district: basic_info.district ?? undefined }) || `/clinic/${basic_info.slug}`;
+    revalidatePath(pp);
   }
 }
 
-/* ---------- сама страница ---------- */
+/* ---------- PAGE ---------- */
 
-export default async function ClinicEditorPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
+function normalizeAmenityArray(value: any): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item: any) => {
+    if (typeof item === "string") return item.trim();
+    if (item && typeof item === "object") {
+      if (typeof item.label === "string") return item.label.trim();
+      if (typeof item.name === "string") return item.name.trim();
+    }
+    return null;
+  }).filter((v: string | null): v is string => !!v);
+}
+
+export default async function ClinicEditorPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const id = sp.id;
 
-  if (!id) {
-    return (
-      <div className="space-y-4 p-6">
-        <h1 className="text-xl font-semibold">Clinic editor</h1>
-        <p className="text-sm text-gray-600">
-          Missing <code className="font-mono">id</code> query parameter.
-        </p>
-        <Link
-          href="/admin/clinics"
-          className="text-sm text-blue-600 hover:underline"
-        >
-          ← Back to list
-        </Link>
-      </div>
-    );
-  }
+  if (!id) return (
+    <div className="p-6 space-y-4">
+      <h1 className="text-xl font-semibold">Clinic editor</h1>
+      <p className="text-sm text-gray-600">Missing <code>id</code> query parameter.</p>
+      <Link href="/admin/clinics" className="text-sm text-blue-600 hover:underline">← Back to list</Link>
+    </div>
+  );
 
   const sb = createServiceClient();
-
-  const [
-    { data: clinic, error: clinicError },
-    { data: draft, error: draftError },
-  ] = await Promise.all([
+  const [{ data: clinic, error: clinicError }, { data: draft, error: draftError }] = await Promise.all([
     sb.from("clinics").select("*").eq("id", id).maybeSingle<ClinicRow>(),
-    sb
-      .from("clinic_profile_drafts")
-      .select("*")
-      .eq("clinic_id", id)
-      .maybeSingle<DraftRow>(),
+    sb.from("clinic_profile_drafts").select("*").eq("clinic_id", id).maybeSingle<DraftRow>(),
   ]);
 
-  if (clinicError || draftError) {
-    return (
-      <div className="space-y-4 p-6">
-        <h1 className="text-xl font-semibold">Clinic editor error</h1>
-        <pre className="whitespace-pre-wrap rounded-lg bg-red-50 p-4 text-xs text-red-700">
-          {clinicError && `clinics error: ${clinicError.message}\n\n`}
-          {draftError && `drafts error: ${draftError.message}\n\n`}
-        </pre>
-        <Link
-          href="/admin/clinics"
-          className="text-sm text-blue-600 hover:underline"
-        >
-          ← Back to list
-        </Link>
-      </div>
-    );
+  if (clinicError || draftError) return (
+    <div className="p-6 space-y-4">
+      <pre className="bg-red-50 rounded-lg p-4 text-xs text-red-700">{clinicError?.message} {draftError?.message}</pre>
+      <Link href="/admin/clinics" className="text-sm text-blue-600 hover:underline">← Back to list</Link>
+    </div>
+  );
+
+  if (!clinic) return (
+    <div className="p-6 space-y-4">
+      <h1 className="text-xl font-semibold">Clinic not found</h1>
+      <Link href="/admin/clinics" className="text-sm text-blue-600 hover:underline">← Back to list</Link>
+    </div>
+  );
+
+  // Owner info
+  let ownerEmail: string | null = null;
+  if (clinic.owner_id) {
+    const { data: ownerProfile } = await sb.from("profiles").select("email").eq("id", clinic.owner_id).maybeSingle();
+    ownerEmail = ownerProfile?.email ?? null;
   }
 
-  if (!clinic) {
-    return (
-      <div className="space-y-4 p-6">
-        <h1 className="text-xl font-semibold">Clinic not found</h1>
-        <p className="text-sm text-gray-600">
-          We could not find a clinic with id:{" "}
-          <code className="font-mono">{id}</code>
-        </p>
-        <Link
-          href="/admin/clinics"
-          className="text-sm text-blue-600 hover:underline"
-        >
-          ← Back to list
-        </Link>
-      </div>
-    );
-  }
-
-  // ---- подгружаем аккредитации через join таблицы ----
+  // Accreditations
   let accreditationsFromJoin: any[] = [];
   try {
-    const { data: linkRows, error: linksErr } = await sb
-      .from("clinic_accreditations")
-      .select("accreditation_id")
-      .eq("clinic_id", id);
-
-    if (!linksErr && Array.isArray(linkRows) && linkRows.length) {
+    const { data: linkRows } = await sb.from("clinic_accreditations").select("accreditation_id").eq("clinic_id", id);
+    if (Array.isArray(linkRows) && linkRows.length) {
       const ids = linkRows.map((r: any) => r.accreditation_id);
-      const { data: accRows, error: accErr } = await sb
-        .from("accreditations")
-        .select("id, name, logo_url, description")
-        .in("id", ids);
-
-      if (!accErr && Array.isArray(accRows)) {
-        accreditationsFromJoin = accRows;
-      }
+      const { data: accRows } = await sb.from("accreditations").select("id, name, logo_url, description").in("id", ids);
+      if (Array.isArray(accRows)) accreditationsFromJoin = accRows;
     }
-  } catch (e) {
-    console.error("load accreditations join error", e);
-  }
+  } catch {}
 
-  // ---- нормализация initial-данных из draft + clinics ----
-
+  // Normalize data
   const rawBasic = (draft?.basic_info ?? {}) as any;
   const basic = {
-    name: rawBasic.name ?? clinic.name,
-    slug: rawBasic.slug ?? clinic.slug ?? "",
-    specialty: rawBasic.specialty ?? (clinic as any).specialty ?? "",
-    country: rawBasic.country ?? clinic.country ?? "",
-    city: rawBasic.city ?? clinic.city ?? "",
-    province: rawBasic.province ?? clinic.province ?? "",
+    name: rawBasic.name ?? clinic.name, slug: rawBasic.slug ?? clinic.slug ?? "",
+    specialty: rawBasic.specialty ?? "", country: rawBasic.country ?? clinic.country ?? "",
+    city: rawBasic.city ?? clinic.city ?? "", province: rawBasic.province ?? clinic.province ?? "",
     district: rawBasic.district ?? clinic.district ?? "",
     description: rawBasic.description ?? (clinic as any).about ?? "",
   };
-
-  const rawLocationDraft = (draft?.location ?? {}) as any;
-  const location = {
-    mapUrl: rawLocationDraft.mapUrl ?? (clinic as any).map_embed_url ?? "",
-    directions:
-      rawLocationDraft.directions ?? (clinic as any).directions ?? "",
-  };
-
-  const services = (Array.isArray(draft?.services)
-    ? (draft!.services as any[])
-    : Array.isArray((clinic as any).services)
-    ? ((clinic as any).services as any[])
-    : []) as any[];
-
-  const doctors = (Array.isArray(draft?.doctors)
-    ? (draft!.doctors as any[])
-    : Array.isArray((clinic as any).doctors)
-    ? ((clinic as any).doctors as any[])
-    : []) as any[];
-
-  const hours = (Array.isArray(draft?.hours)
-    ? (draft!.hours as any[])
-    : Array.isArray((clinic as any).hours)
-    ? ((clinic as any).hours as any[])
-    : []) as any[];
-
-  const gallery = (Array.isArray(draft?.gallery)
-    ? (draft!.gallery as any[])
-    : Array.isArray((clinic as any).images)
-    ? ((clinic as any).images as any[])
-    : Array.isArray((clinic as any).gallery)
-    ? ((clinic as any).gallery as any[])
-    : []) as any[];
-
-  const rawFacilitiesDraft = (draft?.facilities ?? {}) as any;
-  const rawAmenitiesClinic = ((clinic as any).amenities ?? {}) as any;
-
-  function normalizeAmenityArray(value: any): string[] {
-    if (!Array.isArray(value)) return [];
-    return value
-      .map((item: any) => {
-        if (typeof item === "string") return item.trim();
-        if (item && typeof item === "object") {
-          if (typeof item.label === "string") return item.label.trim();
-          if (typeof item.name === "string") return item.name.trim();
-          if (typeof item.title === "string") return item.title.trim();
-        }
-        return null;
-      })
-      .filter((v: string | null): v is string => !!v && v.length > 0);
-  }
-
+  const rawLoc = (draft?.location ?? {}) as any;
+  const location = { mapUrl: rawLoc.mapUrl ?? (clinic as any).map_embed_url ?? "", directions: rawLoc.directions ?? (clinic as any).directions ?? "" };
+  const services = (draft?.services ?? (clinic as any).services ?? []) as any[];
+  const doctors = (draft?.doctors ?? (clinic as any).doctors ?? []) as any[];
+  const hours = (draft?.hours ?? (clinic as any).hours ?? []) as any[];
+  const gallery = (draft?.gallery ?? (clinic as any).images ?? (clinic as any).gallery ?? []) as any[];
+  const rawFac = (draft?.facilities ?? {}) as any;
+  const rawAm = ((clinic as any).amenities ?? {}) as any;
   const facilities = {
-    premises: normalizeAmenityArray(
-      Array.isArray(rawFacilitiesDraft.premises)
-        ? rawFacilitiesDraft.premises
-        : rawAmenitiesClinic.premises,
-    ),
-    clinic_services: normalizeAmenityArray(
-      Array.isArray(rawFacilitiesDraft.clinic_services)
-        ? rawFacilitiesDraft.clinic_services
-        : rawAmenitiesClinic.clinic_services,
-    ),
-    travel_services: normalizeAmenityArray(
-      Array.isArray(rawFacilitiesDraft.travel_services)
-        ? rawFacilitiesDraft.travel_services
-        : rawAmenitiesClinic.travel_services,
-    ),
-    languages_spoken: normalizeAmenityArray(
-      Array.isArray(rawFacilitiesDraft.languages_spoken)
-        ? rawFacilitiesDraft.languages_spoken
-        : rawAmenitiesClinic.languages_spoken,
-    ),
+    premises: normalizeAmenityArray(rawFac.premises ?? rawAm.premises),
+    clinic_services: normalizeAmenityArray(rawFac.clinic_services ?? rawAm.clinic_services),
+    travel_services: normalizeAmenityArray(rawFac.travel_services ?? rawAm.travel_services),
+    languages_spoken: normalizeAmenityArray(rawFac.languages_spoken ?? rawAm.languages_spoken),
   };
-
   const payments: string[] = (() => {
-    if (Array.isArray(draft?.pricing)) {
-      return (draft!.pricing as any[])
-        .map((x) => {
-          if (typeof x === "string") return x;
-          if (x && typeof x.method === "string") return x.method;
-          if (x && typeof x.name === "string") return x.name;
-          if (x && typeof x.label === "string") return x.label;
-          return null;
-        })
-        .filter(
-          (v: unknown): v is string =>
-            typeof v === "string" && v.trim().length > 0,
-        );
-    }
-
-    const raw = (clinic as any).payments;
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .map((x: any) => {
-        if (typeof x === "string") return x;
-        if (x && typeof x.method === "string") return x.method;
-        if (x && typeof x.name === "string") return x.name;
-        if (x && typeof x.label === "string") return x.label;
-        return null;
-      })
-      .filter(
-        (v: unknown): v is string =>
-          typeof v === "string" && v.trim().length > 0,
-      );
+    const src = draft?.pricing ?? (clinic as any).payments;
+    if (!Array.isArray(src)) return [];
+    return src.map((x: any) => typeof x === "string" ? x : x?.method ?? x?.name ?? x?.label ?? null).filter(Boolean);
   })();
+  const accreditations = accreditationsFromJoin.length ? accreditationsFromJoin : ((draft as any)?.accreditations ?? []);
 
-  const accreditations: any[] = accreditationsFromJoin.length
-    ? accreditationsFromJoin
-    : Array.isArray((draft as any)?.accreditations)
-    ? ((draft as any).accreditations as any[])
-    : Array.isArray((clinic as any).accreditations)
-    ? ((clinic as any).accreditations as any[])
-    : [];
-
-  const formatDate = (v?: string | null) =>
-    v ? new Date(v).toLocaleString() : "-";
-
-  const publicPath =
-    clinic.slug &&
-    (clinicPath({
-      slug: clinic.slug,
-      country: clinic.country ?? undefined,
-      province: clinic.province ?? undefined,
-      city: clinic.city ?? undefined,
-      district: clinic.district ?? undefined,
-    }) || `/clinic/${clinic.slug}`);
+  const formatDate = (v?: string | null) => v ? new Date(v).toLocaleString() : "—";
+  const publicPath = clinic.slug && (clinicPath({ slug: clinic.slug, country: clinic.country ?? undefined, province: clinic.province ?? undefined, city: clinic.city ?? undefined, district: clinic.district ?? undefined }) || `/clinic/${clinic.slug}`);
+  const isPublished = !!clinic.is_published && clinic.status === "published";
 
   return (
     <form className="mx-auto max-w-6xl space-y-6 p-6" action={saveClinic}>
@@ -977,248 +439,106 @@ export default async function ClinicEditorPage({
       {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">
-            {clinic.name || "(no name)"}
-          </h1>
-          <p className="text-sm text-gray-500">
-            Admin view &amp; full edit for clinic
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{clinic.name || "(unnamed)"}</h1>
+          <p className="text-sm text-slate-500 mt-1">Full admin editor for clinic profile</p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-3 text-sm">
+        <div className="flex items-center gap-3">
           {publicPath && (
-            <Link
-              href={publicPath}
-              className="rounded-full border border-gray-200 px-3 py-1 text-gray-700 hover:bg-gray-50"
-              target="_blank"
-            >
-              Open public page →
+            <Link href={publicPath} className="rounded-lg border px-4 py-2 text-sm hover:bg-slate-50" target="_blank">
+              View public page ↗
             </Link>
           )}
-          <Link
-            href="/admin/clinics"
-            className="rounded-full border border-gray-200 px-3 py-1 text-blue-600 hover:bg-gray-50"
-          >
+          <Link href="/admin/clinics" className="rounded-lg border px-4 py-2 text-sm text-blue-600 hover:bg-blue-50">
             ← Back to list
           </Link>
+          <button type="submit" className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700">
+            Save changes
+          </button>
         </div>
       </div>
 
-      {/* SUMMARY CARD */}
-      <div className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Clinic
-            </div>
-            <div className="text-lg font-semibold">{clinic.name}</div>
-            <div className="text-xs text-gray-500">{clinic.slug}</div>
-          </div>
-
-          <div className="space-y-1 text-sm">
-            <div>
-              <span className="text-xs uppercase tracking-wide text-gray-500">
-                Status:&nbsp;
-              </span>
-              <span>
-                {(clinic.moderation_status ?? "pending") +
-                  " / " +
-                  (clinic.status ?? "draft")}
-              </span>
-            </div>
-            <div>
-              <span className="text-xs uppercase tracking-wide text-gray-500">
-                Published:&nbsp;
-              </span>
-              <span>{clinic.is_published ? "Yes" : "No"}</span>
-            </div>
-            <div className="text-xs text-gray-500">
-              Created: {formatDate(clinic.created_at)}
-              <br />
-              Updated: {formatDate(clinic.updated_at as any)}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Location
-            </div>
-            <div className="text-sm text-gray-800">
-              {[clinic.city, clinic.country].filter(Boolean).join(", ") ||
-                "—"}
-            </div>
-            <div className="mt-1 text-xs text-gray-500">
-              {clinic.address || "-"}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Draft status
-            </div>
-            <select
-              name="draft_status"
-              defaultValue={draft?.status ?? ""}
-              className="mt-1 w-full rounded border px-2 py-1 text-sm"
-            >
-              <option value="">—</option>
-              <option value="draft">draft</option>
-              <option value="pending">pending</option>
-              <option value="published">published</option>
-            </select>
-            <div className="mt-2 text-xs text-gray-500">
-              Updated: {formatDate(draft?.updated_at as any)}
-            </div>
-          </div>
-
-          <div className="space-y-2 text-xs text-gray-500">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Admin meta
-            </div>
-            <div className="space-y-1">
-              <label className="flex flex-col gap-1 text-xs">
-                <span>Clinic status</span>
-                <select
-                  name="clinic_status"
-                  defaultValue={clinic.status ?? "draft"}
-                  className="rounded border px-2 py-1 text-sm"
-                >
-                  <option value="">—</option>
-                  <option value="draft">draft</option>
-                  <option value="published">published</option>
-                  <option value="hidden">hidden</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs">
-                <span>Moderation status</span>
-                <select
-                  name="clinic_moderation_status"
-                  defaultValue={clinic.moderation_status ?? "pending"}
-                  className="rounded border px-2 py-1 text-sm"
-                >
-                  <option value="">—</option>
-                  <option value="pending">pending</option>
-                  <option value="approved">approved</option>
-                  <option value="rejected">rejected</option>
-                </select>
-              </label>
-              <label className="mt-1 flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  name="clinic_is_published"
-                  defaultChecked={!!clinic.is_published}
-                  className="h-4 w-4"
-                />
+      {/* STATUS + OWNER CARD */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Status card */}
+        <div className="rounded-2xl border bg-white p-5 space-y-4">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Publication & Status</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="space-y-1">
+              <span className="text-xs text-slate-500">Clinic status</span>
+              <select name="clinic_status" defaultValue={clinic.status ?? "draft"} className="w-full rounded-lg border px-3 py-2 text-sm">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="hidden">Hidden</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-slate-500">Moderation</span>
+              <select name="clinic_moderation_status" defaultValue={clinic.moderation_status ?? "pending"} className="w-full rounded-lg border px-3 py-2 text-sm">
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-slate-500">Draft status</span>
+              <select name="draft_status" defaultValue={draft?.status ?? ""} className="w-full rounded-lg border px-3 py-2 text-sm">
+                <option value="">—</option>
+                <option value="draft">draft</option>
+                <option value="pending">pending</option>
+                <option value="published">published</option>
+              </select>
+            </label>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" name="clinic_is_published" defaultChecked={!!clinic.is_published} className="h-4 w-4 rounded border-slate-300" />
                 <span>Published on site</span>
               </label>
             </div>
           </div>
+          <div className="flex gap-4 text-xs text-slate-400">
+            <span>Created: {formatDate(clinic.created_at)}</span>
+            <span>Updated: {formatDate(clinic.updated_at)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+              {isPublished ? "Live" : "Not live"}
+            </span>
+            <span className="text-xs text-slate-400">{clinic.slug}</span>
+          </div>
+        </div>
+
+        {/* Owner card */}
+        <div className="rounded-2xl border bg-white p-5">
+          <ClinicOwnerManager
+            clinicId={clinic.id}
+            currentOwnerId={clinic.owner_id}
+            currentOwnerEmail={ownerEmail}
+          />
         </div>
       </div>
 
-      {/* BASIC INFO + EDITOR */}
-      <div className="space-y-8 rounded-2xl border bg-white p-6 shadow-sm">
-        {/* BASIC */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Basic information
-            </h2>
+      {/* BASIC INFO */}
+      <div className="rounded-2xl border bg-white p-6 space-y-6">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Basic Information</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          <Field label="Name"><input name="clinic_name" defaultValue={basic.name ?? ""} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="Slug"><input name="clinic_slug" defaultValue={basic.slug} className="w-full rounded-lg border px-3 py-2 text-sm font-mono" placeholder="clinic-slug" /></Field>
+          <Field label="Specialty"><input name="clinic_specialty" defaultValue={basic.specialty} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="Country"><input name="clinic_country" defaultValue={basic.country} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="City"><input name="clinic_city" defaultValue={basic.city} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="Province"><input name="clinic_province" defaultValue={basic.province} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="District"><input name="clinic_district" defaultValue={basic.district} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="Address"><input name="clinic_address" defaultValue={clinic.address ?? ""} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <Field label="Google Maps URL"><input name="clinic_mapUrl" defaultValue={location.mapUrl} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="https://maps.google.com/..." /></Field>
+          <Field label="Directions"><textarea name="clinic_directions" defaultValue={location.directions} rows={2} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
+          <div className="md:col-span-2">
+            <Field label="Description"><textarea name="clinic_description" defaultValue={basic.description} rows={4} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
           </div>
+        </div>
+      </div>
 
-          <div className="grid gap-6 text-sm md:grid-cols-2">
-            <div className="space-y-2">
-              <Field label="Name">
-                <input
-                  name="clinic_name"
-                  defaultValue={basic.name ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="Slug">
-                <input
-                  name="clinic_slug"
-                  defaultValue={basic.slug ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                  placeholder="new-clinic"
-                />
-              </Field>
-              <Field label="Specialty">
-                <input
-                  name="clinic_specialty"
-                  defaultValue={basic.specialty ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="Country">
-                <input
-                  name="clinic_country"
-                  defaultValue={basic.country ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="City">
-                <input
-                  name="clinic_city"
-                  defaultValue={basic.city ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="Province">
-                <input
-                  name="clinic_province"
-                  defaultValue={basic.province ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="District">
-                <input
-                  name="clinic_district"
-                  defaultValue={basic.district ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="Address (string)">
-                <input
-                  name="clinic_address"
-                  defaultValue={clinic.address ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                />
-              </Field>
-            </div>
-
-            <div className="space-y-3">
-              <Field label="Google Maps URL">
-                <input
-                  name="clinic_mapUrl"
-                  defaultValue={location.mapUrl ?? ""}
-                  className="w-full rounded border px-2 py-1.5 text-sm"
-                  placeholder="https://maps.google.com/..."
-                />
-              </Field>
-              <Field label="Description">
-                <textarea
-                  name="clinic_description"
-                  defaultValue={basic.description ?? ""}
-                  rows={4}
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </Field>
-              <Field label="Directions">
-                <textarea
-                  name="clinic_directions"
-                  defaultValue={location.directions ?? ""}
-                  rows={3}
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </Field>
-            </div>
-          </div>
-        </section>
-
-        {/* SERVICES / DOCTORS / HOURS / GALLERY / FACILITIES / PAYMENTS / ACCREDITATIONS */}
+      {/* DYNAMIC EDITOR */}
+      <div className="rounded-2xl border bg-white p-6 space-y-8">
         <ClinicDraftEditor
           initialServices={services}
           initialDoctors={doctors}
@@ -1230,16 +550,10 @@ export default async function ClinicEditorPage({
         />
       </div>
 
-      {/* ACTIONS */}
-      <div className="flex items-center justify-between border-t pt-4">
-        <div className="text-xs text-gray-500">
-          Press &ldquo;Save changes&rdquo; to update clinic and draft in
-          Supabase. Changes apply immediately.
-        </div>
-        <button
-          type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
-        >
+      {/* BOTTOM ACTIONS */}
+      <div className="flex items-center justify-between rounded-2xl border bg-white px-6 py-4">
+        <span className="text-xs text-slate-400">Changes apply immediately on save.</span>
+        <button type="submit" className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700">
           Save changes
         </button>
       </div>
@@ -1247,20 +561,10 @@ export default async function ClinicEditorPage({
   );
 }
 
-/* ---------- UI helper ---------- */
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-        {label}
-      </div>
+      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
       {children}
     </div>
   );

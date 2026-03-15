@@ -1,3 +1,4 @@
+// app/api/leads/partner/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { resendSend, patientMagicLinkTemplate } from "@/lib/mail/resend";

@@ -1,3 +1,4 @@
+// app/api/admin/partner-leads/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 
