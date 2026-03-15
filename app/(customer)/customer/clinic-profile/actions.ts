@@ -1,3 +1,4 @@
+// app/(customer)/customer/clinic-profile/actions.ts
 "use server";
 
 import { createServerClient } from "@/lib/supabase/serverClient";
@@ -16,50 +17,87 @@ function makeSlug(base = "dev-draft-clinic") {
 export async function ensureClinicForOwner(): Promise<string> {
   const sb = await createServerClient();
   const { data: userRes } = await sb.auth.getUser();
-
+ 
   if (!userRes?.user) {
     throw new Error("Not authenticated");
   }
-
+ 
   const user = userRes.user;
-
-  // 1) ищем существующее членство
+ 
+  // 1) Check clinic_members first (existing flow)
   const { data: membership } = await sb
     .from("clinic_members")
     .select("clinic_id, role")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
-
+ 
   if (membership?.clinic_id) return membership.clinic_id;
-
-  // 2) создаём новую клинику-чёрновик
+ 
+  // 2) Check if user is owner_id on any clinic (admin-assigned)
+  const { data: ownedClinic } = await sb
+    .from("clinics")
+    .select("id")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+ 
+  if (ownedClinic?.id) {
+    // Ensure clinic_members entry exists
+    const { error: iErr } = await sb.from("clinic_members").insert({
+      clinic_id: ownedClinic.id,
+      user_id: user.id,
+      role: "owner",
+    });
+    // Ignore duplicate key errors
+    if (iErr && !iErr.message.includes("duplicate")) throw iErr;
+ 
+    return ownedClinic.id;
+  }
+ 
+  // 3) Check customer_clinic_membership (from assign-owner)
+  const { data: ccm } = await sb
+    .from("customer_clinic_membership")
+    .select("clinic_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+ 
+  if (ccm?.clinic_id) {
+    // Ensure clinic_members entry exists
+    const { error: iErr } = await sb.from("clinic_members").insert({
+      clinic_id: ccm.clinic_id,
+      user_id: user.id,
+      role: "owner",
+    });
+    if (iErr && !iErr.message.includes("duplicate")) throw iErr;
+ 
+    return ccm.clinic_id;
+  }
+ 
+  // 4) No clinic found — create a new draft clinic
   const { data: clinic, error: cErr } = await sb
     .from("clinics")
     .insert({
       owner_id: user.id,
       is_published: false,
-
-      // до ревью: draft (а pending — только после submit)
       moderation_status: "draft",
-
-      // “пользовательский” статус
       status: "not_published",
-
       name: "Draft Clinic",
       slug: makeSlug("draft-clinic"),
     })
     .select("id")
     .single();
   if (cErr) throw cErr;
-
+ 
   const { error: iErr } = await sb.from("clinic_members").insert({
     clinic_id: clinic.id,
     user_id: user.id,
     role: "owner",
   });
   if (iErr) throw iErr;
-
+ 
   return clinic.id;
 }
 

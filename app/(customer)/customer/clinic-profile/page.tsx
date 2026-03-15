@@ -1,3 +1,4 @@
+// app/(customer)/customer/clinic-profile/page.tsx
 "use client";
 
 import React, {
