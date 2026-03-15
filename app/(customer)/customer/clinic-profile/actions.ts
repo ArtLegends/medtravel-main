@@ -17,24 +17,10 @@ function makeSlug(base = "dev-draft-clinic") {
 export async function ensureClinicForOwner(): Promise<string> {
   const sb = await createServerClient();
   const { data: userRes } = await sb.auth.getUser();
- 
-  if (!userRes?.user) {
-    throw new Error("Not authenticated");
-  }
- 
+  if (!userRes?.user) throw new Error("Not authenticated");
   const user = userRes.user;
- 
-  // 1) Check clinic_members first (existing flow)
-  const { data: membership } = await sb
-    .from("clinic_members")
-    .select("clinic_id, role")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
- 
-  if (membership?.clinic_id) return membership.clinic_id;
- 
-  // 2) Check if user is owner_id on any clinic (admin-assigned)
+
+  // Priority 1: clinics.owner_id (admin-assigned)
   const { data: ownedClinic } = await sb
     .from("clinics")
     .select("id")
@@ -42,41 +28,45 @@ export async function ensureClinicForOwner(): Promise<string> {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
- 
+
   if (ownedClinic?.id) {
-    // Ensure clinic_members entry exists
-    const { error: iErr } = await sb.from("clinic_members").insert({
-      clinic_id: ownedClinic.id,
-      user_id: user.id,
-      role: "owner",
-    });
-    // Ignore duplicate key errors
-    if (iErr && !iErr.message.includes("duplicate")) throw iErr;
- 
+    // Ensure clinic_members
+    try {
+    await sb.from("clinic_members").upsert(
+      { clinic_id: ownedClinic.id, user_id: user.id, role: "owner" },
+      { onConflict: "clinic_id,user_id" } as any
+    );
+  } catch {}
     return ownedClinic.id;
   }
- 
-  // 3) Check customer_clinic_membership (from assign-owner)
+
+  // Priority 2: clinic_members
+  const { data: membership } = await sb
+    .from("clinic_members")
+    .select("clinic_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (membership?.clinic_id) return membership.clinic_id;
+
+  // Priority 3: customer_clinic_membership
   const { data: ccm } = await sb
     .from("customer_clinic_membership")
     .select("clinic_id")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
- 
   if (ccm?.clinic_id) {
-    // Ensure clinic_members entry exists
-    const { error: iErr } = await sb.from("clinic_members").insert({
-      clinic_id: ccm.clinic_id,
-      user_id: user.id,
-      role: "owner",
-    });
-    if (iErr && !iErr.message.includes("duplicate")) throw iErr;
- 
+    try {
+    await sb.from("clinic_members").upsert(
+      { clinic_id: ccm.clinic_id, user_id: user.id, role: "owner" },
+      { onConflict: "clinic_id,user_id" } as any
+    );
+  } catch {}
     return ccm.clinic_id;
   }
- 
-  // 4) No clinic found — create a new draft clinic
+
+  // Priority 4: Create Draft Clinic
   const { data: clinic, error: cErr } = await sb
     .from("clinics")
     .insert({
@@ -90,14 +80,11 @@ export async function ensureClinicForOwner(): Promise<string> {
     .select("id")
     .single();
   if (cErr) throw cErr;
- 
-  const { error: iErr } = await sb.from("clinic_members").insert({
-    clinic_id: clinic.id,
-    user_id: user.id,
-    role: "owner",
+
+  await sb.from("clinic_members").insert({
+    clinic_id: clinic.id, user_id: user.id, role: "owner",
   });
-  if (iErr) throw iErr;
- 
+
   return clinic.id;
 }
 
@@ -133,6 +120,139 @@ export async function getDraft() {
       .single();
     if (insErr) throw insErr;
     draft = created;
+  }
+
+  // If draft is empty but clinic has real data (admin-assigned clinic),
+  // populate draft from existing clinic tables
+  if (draft && !draft.basic_info?.name && clinic) {
+    const clinicId = clinic.id;
+
+    // Load clinic basic data
+    const { data: fullClinic } = await client
+      .from("clinics")
+      .select("name, slug, about, country, city, province, district, address, map_embed_url, amenities, payments")
+      .eq("id", clinicId)
+      .maybeSingle();
+
+    if (fullClinic && fullClinic.name && fullClinic.name !== "Draft Clinic") {
+      // Load services
+      const { data: svcRows } = await client
+        .from("clinic_services")
+        .select("service_id, price, currency, services(name, description)")
+        .eq("clinic_id", clinicId);
+
+      const services = (svcRows ?? []).map((s: any) => ({
+        name: s.services?.name ?? "",
+        price: s.price ? String(s.price) : "",
+        currency: s.currency ?? "USD",
+        description: s.services?.description ?? "",
+      }));
+
+      // Load doctors
+      const { data: staffRows } = await client
+        .from("clinic_staff")
+        .select("name, title, position, bio, photo_url")
+        .eq("clinic_id", clinicId);
+
+      const doctors = (staffRows ?? []).map((d: any) => ({
+        fullName: d.name ?? "",
+        title: d.title ?? "",
+        specialty: d.position ?? "",
+        description: d.bio ?? "",
+        photo: d.photo_url ?? "",
+      }));
+
+      // Load hours
+      const { data: hoursRows } = await client
+        .from("clinic_hours")
+        .select("weekday, open, close, is_closed")
+        .eq("clinic_id", clinicId)
+        .order("weekday");
+
+      const dayNames = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      const hours = (hoursRows ?? []).map((h: any) => ({
+        day: dayNames[h.weekday] ?? "",
+        status: h.is_closed ? "Closed" : "Open",
+        start: h.open ? String(h.open).slice(0, 5) : undefined,
+        end: h.close ? String(h.close).slice(0, 5) : undefined,
+      }));
+
+      // Load gallery
+      const { data: imgRows } = await client
+        .from("clinic_images")
+        .select("url, title")
+        .eq("clinic_id", clinicId)
+        .order("sort");
+
+      const gallery = (imgRows ?? []).map((g: any) => ({
+        url: g.url ?? "",
+        title: g.title ?? "",
+      }));
+
+      // Build facilities from amenities jsonb
+      const am = fullClinic.amenities ?? {};
+      const facilities = {
+        premises: Array.isArray(am.premises) ? am.premises : [],
+        clinic_services: Array.isArray(am.clinic_services) ? am.clinic_services : [],
+        travel_services: Array.isArray(am.travel_services) ? am.travel_services : [],
+        languages_spoken: Array.isArray(am.languages_spoken) ? am.languages_spoken : [],
+      };
+
+      // Build payments
+      const pricing = Array.isArray(fullClinic.payments)
+        ? fullClinic.payments.map((p: any) => typeof p === "string" ? p : p?.method ?? "").filter(Boolean)
+        : [];
+
+      // Determine specialty from categories
+      const { data: catLink } = await client
+        .from("clinic_categories")
+        .select("category_id, categories(slug)")
+        .eq("clinic_id", clinicId)
+        .limit(1)
+        .maybeSingle();
+
+      const specialty = (catLink as any)?.categories?.slug ?? "";
+
+      // Build basic_info
+      const basic_info = {
+        name: fullClinic.name ?? "",
+        slug: fullClinic.slug ?? "",
+        specialty,
+        country: fullClinic.country ?? "",
+        city: fullClinic.city ?? "",
+        province: fullClinic.province ?? "",
+        district: fullClinic.district ?? "",
+        address: fullClinic.address ?? "",
+        description: fullClinic.about ?? "",
+      };
+
+      const location = {
+        mapUrl: fullClinic.map_embed_url ?? "",
+        directions: fullClinic.address ?? "",
+      };
+
+      // Save populated draft
+      await client.from("clinic_profile_drafts").update({
+        basic_info,
+        services,
+        doctors,
+        hours: hours.length ? hours : undefined,
+        gallery,
+        facilities,
+        location,
+        pricing,
+        updated_at: new Date().toISOString(),
+      }).eq("clinic_id", clinicId);
+
+      // Re-fetch draft
+      const { data: refreshedDraft } = await client
+        .from("clinic_profile_drafts")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .maybeSingle();
+
+      if (refreshedDraft) draft = refreshedDraft;
+    }
   }
 
   return { clinicId, draft, clinic };

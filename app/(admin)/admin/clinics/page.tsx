@@ -39,6 +39,9 @@ async function getRows(searchParams: Search) {
     .select("id,name,country,city,created_at,status", { count: "exact" })
     .order("created_at", { ascending: false });
 
+  // Hide empty draft clinics from admin list
+  q = q.not("name", "eq", "Draft Clinic");
+
   if (from) q = q.gte("created_at", from);
   if (to) q = q.lte("created_at", to);
 
