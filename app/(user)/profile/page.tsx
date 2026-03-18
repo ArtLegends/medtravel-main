@@ -8,7 +8,6 @@ import { useSupabase } from "@/lib/supabase/supabase-provider";
 type FormState = {
   firstName: string;
   lastName: string;
-  displayName: string;
   secondaryEmail: string;
   timeZone: string;
   phone: string;
@@ -31,7 +30,6 @@ export default function ProfilePage() {
   const [state, setState] = useState<FormState>({
     firstName: "",
     lastName: "",
-    displayName: "",
     secondaryEmail: "",
     timeZone: browserTz,
     phone: "",
@@ -72,8 +70,6 @@ export default function ProfilePage() {
       ...prev,
       firstName: meta.first_name ?? meta.given_name ?? "",
       lastName: meta.last_name ?? meta.family_name ?? "",
-      displayName:
-        meta.display_name ?? meta.name ?? (user.email ? user.email.split("@")[0] : ""),
       secondaryEmail: meta.secondary_email ?? "",
       timeZone: meta.time_zone ?? prev.timeZone ?? browserTz,
       phone: meta.phone ?? "",
@@ -105,7 +101,6 @@ export default function ProfilePage() {
       data: {
         first_name: state.firstName || null,
         last_name: state.lastName || null,
-        display_name: state.displayName || null,
         secondary_email: state.secondaryEmail || null,
         time_zone: state.timeZone || null,
         phone: state.phone || null,
@@ -176,17 +171,6 @@ export default function ProfilePage() {
                 value={state.lastName}
                 onChange={handleChange("lastName")}
                 autoComplete="family-name"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="text-sm text-gray-600">
-                Display name <span className="ml-1 text-xs text-gray-400">(shown in UI)</span>
-              </label>
-              <input
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                value={state.displayName}
-                onChange={handleChange("displayName")}
               />
             </div>
 

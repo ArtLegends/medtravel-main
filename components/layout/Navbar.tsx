@@ -195,12 +195,21 @@ function ProfileDropdownAuth({
       </DropdownTrigger>
 
       <DropdownMenu aria-label="Profile Actions" variant="flat">
-        <DropdownItem key="profile" className="h-14 gap-2 cursor-default">
+        <DropdownItem key="user-info" className="h-14 gap-2 cursor-default">
           <p className="font-semibold text-small">
-            {tSafe(t, "navbar.signedInAs", "Signed in as")}
+            {(() => {
+              const meta: any = session?.user?.user_metadata ?? {};
+              const firstName = meta.first_name ?? meta.given_name ?? "";
+              const lastName = meta.last_name ?? meta.family_name ?? "";
+              const fullName = [firstName, lastName].filter(Boolean).join(" ");
+              if (fullName) return fullName;
+              if (session?.user?.email) return session.user.email;
+              if (session?.user?.phone) return session.user.phone;
+              return "Account";
+            })()}
           </p>
           <p className="font-medium text-tiny text-default-500">
-            {session?.user?.email ?? ""}
+            {session?.user?.email ?? session?.user?.phone ?? ""}
           </p>
         </DropdownItem>
 
