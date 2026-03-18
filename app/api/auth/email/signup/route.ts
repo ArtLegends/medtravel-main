@@ -1,3 +1,4 @@
+// app/api/auth/email/signup/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (!["PATIENT", "PARTNER", "CUSTOMER"].includes(as)) {
+    if (!["PATIENT", "PARTNER", "CUSTOMER", "SUPERVISOR"].includes(as)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
@@ -84,25 +85,22 @@ export async function POST(req: Request) {
     }
 
     // 2) profiles (+ user_roles только для PATIENT сразу)
-    if (as === "CUSTOMER" || as === "PARTNER") {
-      // customer/partner: НЕ выдаём роль сразу
+    if (as === "CUSTOMER" || as === "PARTNER" || as === "SUPERVISOR") {
       await supabase.from("profiles").upsert(
         { id: userId, email, role: "guest", email_verified: false },
         { onConflict: "id" }
       );
 
-      // ✅ создаём pending request
       if (as === "CUSTOMER") {
-        await supabase
-          .from("customer_registration_requests")
+        await supabase.from("customer_registration_requests")
           .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
-      } else {
-        await supabase
-          .from("partner_registration_requests")
+      } else if (as === "PARTNER") {
+        await supabase.from("partner_registration_requests")
+          .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
+      } else if (as === "SUPERVISOR") {
+        await supabase.from("supervisor_registration_requests")
           .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
       }
-
-      // ❌ НЕ вставляем user_roles здесь
     } else {
       // PATIENT: как раньше
       await supabase.from("profiles").upsert(

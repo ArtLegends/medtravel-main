@@ -113,11 +113,12 @@ export default function OtpForm({
       // успех verify otp
       const roleUpper = String(as).toUpperCase();
 
-      if (roleUpper === "CUSTOMER" || roleUpper === "PARTNER") {
-        const endpoint =
-          roleUpper === "CUSTOMER"
-            ? "/api/customer/registration/request"
-            : "/api/partner/registration/request";
+      if (roleUpper === "CUSTOMER" || roleUpper === "PARTNER" || roleUpper === "SUPERVISOR") {
+        const endpoint = roleUpper === "CUSTOMER"
+          ? "/api/customer/registration/request"
+          : roleUpper === "PARTNER"
+          ? "/api/partner/registration/request"
+          : "/api/supervisor/registration/request";
 
         const r2 = await fetch(endpoint, {
           method: "POST",

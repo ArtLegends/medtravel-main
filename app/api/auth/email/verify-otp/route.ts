@@ -1,3 +1,4 @@
+// app/api/auth/email/verify-otp/route.ts
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";

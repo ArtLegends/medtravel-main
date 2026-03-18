@@ -160,6 +160,41 @@ export default function CredentialsForm({
           return;
         }
 
+        if (roleUpper === "SUPERVISOR") {
+          await refreshRoles();
+
+          const { data: ur } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId)
+            .eq("role", "supervisor")
+            .maybeSingle();
+
+          if (!ur) {
+            const { data: reqRow } = await supabase
+              .from("supervisor_registration_requests")
+              .select("status")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            const st = String(reqRow?.status ?? "pending");
+
+            await supabase.auth.signOut();
+
+            if (st === "rejected") {
+              setErrorMsg("Your supervisor request was rejected. Contact support.");
+            } else {
+              setErrorMsg("Your supervisor request is still being reviewed. Wait for approval email.");
+            }
+            return;
+          }
+
+          setActiveRole("SUPERVISOR" as any);
+          await refreshRoles();
+          onSignedIn?.();
+          return;
+        }
+
         // ✅ PATIENT: можно оставить как было
         if (roleUpper === "PATIENT") {
           const roleSlug = "patient";

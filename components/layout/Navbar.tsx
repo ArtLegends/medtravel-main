@@ -33,6 +33,7 @@ import {
 } from "@/config/nav";
 import UnifiedAuthModal from "@/components/auth/UnifiedAuthModal";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
+import AddRoleModal from "@/components/auth/AddRoleModal";
 
 // безопасный текст без жёсткой завязки на i18n
 const tSafe = (t: any, key: string, fallback: string) => {
@@ -270,6 +271,8 @@ export const Navbar = React.memo(() => {
   const [authOpen, setAuthOpen] = React.useState(false);
   const [authRole, setAuthRole] = React.useState<"CUSTOMER" | "PARTNER" | "PATIENT" | null>(null);
 
+  const [addRoleOpen, setAddRoleOpen] = React.useState(false);
+
   const navItems = useMemo(() => getAccessibleNavItems(activeRole), [activeRole]);
 
   const isAuth = useMemo(
@@ -363,7 +366,7 @@ export const Navbar = React.memo(() => {
                 setActiveRole={setActiveRole}
                 supabase={supabase}
                 t={t}
-                onAddRole={() => { setAuthRole(null); setAuthOpen(true); }}
+                onAddRole={() => { setAddRoleOpen(true); }}
                 />
             ) : (
                 <Button
@@ -417,6 +420,11 @@ export const Navbar = React.memo(() => {
         onClose={() => setAuthOpen(false)}
         initialRole={authRole}
         next={pathname || "/"}
+      />
+
+      <AddRoleModal
+        open={addRoleOpen}
+        onClose={() => setAddRoleOpen(false)}
       />
     </>
   );
