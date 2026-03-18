@@ -1,3 +1,4 @@
+// app/[category]/[[...filters]]/page.tsx
 import type { Metadata } from "next";
 
 import CategoryHero from "@/components/category/CategoryHero";

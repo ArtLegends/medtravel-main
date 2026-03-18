@@ -798,19 +798,13 @@ export default function CategoryGridClient({
                   className="rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md"
                 >
                   <div className="flex flex-col gap-4 md:flex-row">
-                    <Link href={clinicUrl} className="md:w-48 md:min-w-[12rem]">
-                      <div className="h-40 w-full overflow-hidden rounded-xl bg-gray-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={
-                            c.image_url ??
-                            ""
-                          }
-                          alt={c.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    </Link>
+                    {c.image_url && (
+                      <Link href={clinicUrl} className="md:w-48 md:min-w-[12rem]">
+                        <div className="h-40 w-full overflow-hidden rounded-xl">
+                          <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" />
+                        </div>
+                      </Link>
+                    )}
 
                     <div className="flex-1 space-y-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">

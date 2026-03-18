@@ -24,9 +24,6 @@ interface Props {
   placeholder?: string;
 }
 
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1584982751601-97dcc0972d8f?q=80&w=800&auto=format&fit=crop';
-
 export default function SearchBar({
   value,
   onChangeAction,
@@ -171,17 +168,15 @@ export default function SearchBar({
                   onClick={() => setOpen(false)}
                 >
                   {/* thumb */}
-                  <div className="flex h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={it.image_url || FALLBACK_IMG}
-                      alt={it.name}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
-                      }}
-                    />
-                  </div>
+                  {it.image_url && (
+                    <div className="flex h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg">
+                      <img
+                        src={it.image_url}
+                        alt={it.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
 
                   {/* text + badge */}
                   <div className="min-w-0 flex-1">

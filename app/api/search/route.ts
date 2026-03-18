@@ -70,7 +70,7 @@ export async function GET(req: Request) {
         name: row.name,
         slug: row.slug,
         category: row.category ?? null,
-        image_url: row.image_url, // если null – SearchBar подставит FALLBACK_IMG
+        image_url: row.image_url ?? null,
         href: clinicHref({
           slug: row.slug,
           country,
