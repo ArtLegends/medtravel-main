@@ -12,9 +12,6 @@ import {
   NavbarBrand,
   NavbarContent,
   NavbarItem,
-  NavbarMenu,
-  NavbarMenuItem,
-  NavbarMenuToggle,
   Link,
   Dropdown,
   DropdownTrigger,
@@ -63,35 +60,6 @@ const NavItemLink = React.memo(
   ),
 );
 NavItemLink.displayName = "NavItemLink";
-
-/** Mobile item */
-const MobileNavItem = React.memo(
-  ({
-    item,
-    active,
-    t,
-    onClose,
-  }: {
-    item: any;
-    active: boolean;
-    t: any;
-    onClose: () => void;
-  }) => (
-    <NavbarMenuItem isActive={active}>
-      <Link
-        prefetch
-        as={NextLink}
-        className="w-full flex items-center gap-4 font-medium text-lg py-2 px-2 justify-center"
-        color={active ? "primary" : "foreground"}
-        href={item.href}
-        onPress={onClose}
-      >
-        {tSafe(t, item.label, String(item.key ?? item.label))}
-      </Link>
-    </NavbarMenuItem>
-  ),
-);
-MobileNavItem.displayName = "MobileNavItem";
 
 /** Дропдаун авторизованного */
 function ProfileDropdownAuth({
@@ -276,7 +244,6 @@ export const Navbar = React.memo(() => {
   const { supabase, session, roles, activeRole, setActiveRole } = useSupabase();
 
   const pathname = usePathname() ?? "";
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [authOpen, setAuthOpen] = React.useState(false);
   const [authRole, setAuthRole] = React.useState<"CUSTOMER" | "PARTNER" | "PATIENT" | null>(null);
 
@@ -316,11 +283,8 @@ export const Navbar = React.memo(() => {
         height="64px"
         maxWidth="xl"
         shouldHideOnScroll
-        isMenuOpen={isMenuOpen}
-        onMenuOpenChange={setIsMenuOpen}
       >
         <NavbarBrand className="gap-2">
-          <NavbarMenuToggle className="mr-1 h-6 sm:hidden" />
           <NextLink
             prefetch
             className="font-bold text-xl text-inherit hover:text-primary transition-colors"
@@ -329,25 +293,6 @@ export const Navbar = React.memo(() => {
             MedTravel
           </NextLink>
         </NavbarBrand>
-
-        <NavbarContent
-          className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-6"
-          justify="center"
-        >
-          {navItems.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
-            return (
-              <NavItemLink
-                key={item.key}
-                active={active}
-                item={item}
-                t={t}
-              />
-            );
-          })}
-        </NavbarContent>
 
         <NavbarContent
           className="ml-auto flex h-12 max-w-fit items-center gap-1 rounded-full p-0"
@@ -405,23 +350,6 @@ export const Navbar = React.memo(() => {
           </NavbarItem>
         </NavbarContent>
 
-        <NavbarMenu className="flex justify-center pt-6">
-          <div className="w-full max-w-screen-md mx-auto space-y-2">
-            {navItems.map((item) => (
-              <MobileNavItem
-                key={item.key}
-                active={
-                  pathname === item.href ||
-                  (item.href !== "/" &&
-                    pathname.startsWith(item.href))
-                }
-                item={item}
-                t={t}
-                onClose={() => setIsMenuOpen(false)}
-              />
-            ))}
-          </div>
-        </NavbarMenu>
       </HeroUINavbar>
 
       <UnifiedAuthModal

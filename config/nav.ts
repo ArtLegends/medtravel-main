@@ -27,28 +27,7 @@ const roleHierarchy: Record<UserRole, number> = {
  * Оставим пусто — верхнее меню не будет показываться.
  * Когда понадобится, добавим, например: Categories, Clinics, About, Contact.
  */
-export const navigationConfig: NavItem[] = [
-  {
-    key: "home",
-    label: "Home",
-    href: "/",
-  },
-  {
-    key: "dentistry",
-    label: "Dentistry",
-    href: "/dentistry",
-  },
-  {
-    key: "hair-transplant",
-    label: "Hair Transplant",
-    href: "/hair-transplant",
-  },
-  {
-    key: "contact",
-    label: "Contact",
-    href: "/contact",
-  },
-];
+export const navigationConfig: NavItem[] = [];
 
 // Мобильное меню — то же самое
 export const mobileNavigationConfig: NavItem[] = navigationConfig;

@@ -14,10 +14,10 @@ export default function AdminTopbar({
   const { toggle } = useSidebar();
 
   return (
-    <header className="flex items-center gap-3 border-b bg-white px-4 lg:px-6 py-4">
+    <header className="flex items-center border-b bg-white px-4 lg:px-6 py-4">
       <button
         onClick={toggle}
-        className="lg:hidden rounded-md p-2 text-slate-600 hover:bg-slate-200"
+        className="lg:hidden mr-3 rounded-md p-2 text-slate-600 hover:bg-slate-200"
         aria-label="Toggle menu"
       >
         <Menu className="h-5 w-5" />
