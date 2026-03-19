@@ -1,8 +1,9 @@
+// components/admin/AdminSidebar.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import {
   LayoutGrid,
   CalendarCheck2,
@@ -16,19 +17,24 @@ import {
   UserPlus,
   Home,
   FolderTree,
+  X,
 } from "lucide-react";
 
-type Item = {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-};
+// ── Context for mobile toggle ──
+type SidebarCtx = { open: boolean; toggle: () => void; close: () => void };
+const SidebarContext = createContext<SidebarCtx>({ open: false, toggle: () => {}, close: () => {} });
+export const useSidebar = () => useContext(SidebarContext);
 
-type Group = {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  items: Item[];
-};
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((v) => !v), []);
+  const close = useCallback(() => setOpen(false), []);
+  return <SidebarContext.Provider value={{ open, toggle, close }}>{children}</SidebarContext.Provider>;
+}
+
+// ── Nav structure ──
+type Item = { label: string; href: string; icon: React.ComponentType<{ className?: string }> };
+type Group = { label: string; icon: React.ComponentType<{ className?: string }>; items: Item[] };
 
 const GROUPS: Group[] = [
   {
@@ -87,11 +93,12 @@ function isGroupActive(pathname: string | null, group: Group) {
   return group.items.some((it) => pathname === it.href || (it.href !== "/admin" && pathname.startsWith(it.href)));
 }
 
-export default function AdminSidebar() {
+// ── Sidebar content (shared between desktop and mobile) ──
+function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen flex-col bg-slate-800">
+    <div className="flex h-full flex-col bg-slate-800">
       {/* Brand */}
       <div className="px-6 pt-6 pb-4">
         <div className="text-2xl font-extrabold">
@@ -110,38 +117,26 @@ export default function AdminSidebar() {
         {GROUPS.map((g) => {
           const open = isGroupActive(pathname, g);
           const GIcon = g.icon;
-
           return (
             <details key={g.label} open={open} className="rounded-md">
-              <summary
-                className={[
-                  "list-none cursor-pointer select-none rounded-md px-3 py-2 text-sm flex items-center gap-2",
-                  open ? "bg-slate-900/40 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
-                ].join(" ")}
-              >
+              <summary className={[
+                "list-none cursor-pointer select-none rounded-md px-3 py-2 text-sm flex items-center gap-2",
+                open ? "bg-slate-900/40 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+              ].join(" ")}>
                 <GIcon className="h-4 w-4 opacity-90" />
                 <span className="font-semibold">{g.label}</span>
                 <span className="ml-auto text-slate-400">▾</span>
               </summary>
-
               <div className="mt-1 space-y-1 pl-2">
                 {g.items.map((it) => {
-                  const active =
-                    pathname === it.href ||
-                    (it.href !== "/admin" && pathname && pathname.startsWith(it.href));
+                  const active = pathname === it.href || (it.href !== "/admin" && pathname && pathname.startsWith(it.href));
                   const Icon = it.icon;
-
                   return (
-                    <Link
-                      key={it.href}
-                      href={it.href}
+                    <Link key={it.href} href={it.href} onClick={onNavClick}
                       className={[
                         "group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition",
-                        active
-                          ? "bg-slate-800 text-white"
-                          : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
-                      ].join(" ")}
-                    >
+                        active ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+                      ].join(" ")}>
                       <Icon className="h-4 w-4 opacity-90" />
                       <span>{it.label}</span>
                     </Link>
@@ -153,21 +148,44 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* Back to home */}
       <div className="mt-2 px-2">
-        <Link
-          href="/"
-          className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition
-                     text-slate-300 hover:bg-slate-800/60 hover:text-white"
-        >
+        <Link href="/" onClick={onNavClick}
+          className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition text-slate-300 hover:bg-slate-800/60 hover:text-white">
           <Home className="h-4 w-4 opacity-90" />
           <span>Back to home</span>
         </Link>
       </div>
-
-      <div className="px-4 py-4 text-xs text-slate-500 border-t border-slate-800">
-        © 2025 MedTravel
-      </div>
+      <div className="px-4 py-4 text-xs text-slate-500 border-t border-slate-800">© 2025 MedTravel</div>
     </div>
+  );
+}
+
+// ── Main export ──
+export default function AdminSidebar() {
+  const { open, close } = useSidebar();
+
+  return (
+    <>
+      {/* Desktop sidebar — hidden on mobile */}
+      <div className="hidden lg:flex lg:w-64 lg:flex-shrink-0">
+        <SidebarContent />
+      </div>
+
+      {/* Mobile overlay */}
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* backdrop */}
+          <div className="absolute inset-0 bg-black/50" onClick={close} />
+          {/* drawer */}
+          <div className="relative w-72 h-full">
+            <button onClick={close}
+              className="absolute top-4 right-4 z-10 rounded-full bg-slate-700 p-1 text-slate-300 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+            <SidebarContent onNavClick={close} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
