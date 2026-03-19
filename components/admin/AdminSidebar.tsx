@@ -167,7 +167,7 @@ export default function AdminSidebar() {
   return (
     <>
       {/* Desktop sidebar — hidden on mobile */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-shrink-0">
+      <div className="hidden lg:flex">
         <SidebarContent />
       </div>
 

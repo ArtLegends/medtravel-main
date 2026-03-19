@@ -493,7 +493,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
   }, [primaryCategory, categoryLocChain, clinic.name]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-10">
+    <div className="mx-auto max-w-6xl px-4 pb-10 lg:pb-10">
       {/* ===== HERO ===== */}
       <HeroGallery name={clinic.name} images={imgs} />
 
@@ -509,7 +509,9 @@ export default function ClinicDetailPage({ clinic }: Props) {
       {/* ===== BREADCRUMBS (под навбаром клиники) ===== */}
       <div className="relative inset-x-0 z-[50] pt-3">
         <div className="mx-auto max-w-6xl px-4">
-          <Breadcrumbs items={breadcrumbsItems} />
+          <div className="overflow-x-auto whitespace-nowrap text-sm" style={{ scrollbarWidth: "none" }}>
+            <Breadcrumbs items={breadcrumbsItems} />
+          </div>
         </div>
       </div>
 
@@ -548,13 +550,13 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {/* Treatments & Prices */}
           <section id="treatments" className="space-y-3 pt-10">
             <h2 className="text-2xl font-semibold">Treatments & Prices</h2>
-            <div className="overflow-x-auto rounded-xl border">
-              <table className="min-w-full divide-y">
+            <div className="-mx-4 sm:mx-0 overflow-x-auto rounded-none sm:rounded-xl border-y sm:border">
+              <table className="w-full divide-y text-sm">
                 <thead className="bg-gray-50 text-left text-sm">
                   <tr>
                     <th className="p-3">Procedure</th>
                     {hasPrice && <th className="p-3">Price</th>}
-                    {hasDesc && <th className="p-3">Description</th>}
+                    {hasDesc && <th className="p-3 hidden sm:table-cell">Description</th>}
                     <th className="p-3" />
                   </tr>
                 </thead>
@@ -568,7 +570,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                         <td className="p-3 align-top">{s.name}</td>
                         {hasPrice && <td className="p-3 align-top">{priceText}</td>}
                         {hasDesc && (
-                          <td className="p-3 align-top">
+                          <td className="p-3 align-top hidden sm:table-cell">
                             {desc
                               ? <ClampText text={desc} lines={3} minCharsToToggle={120} />
                               : '—'}
@@ -576,7 +578,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                         )}
                         <td className="p-3 align-top">
                           <button
-                            className="rounded-md bg-primary px-3 py-2 text-white"
+                            className="rounded-md bg-primary px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm text-white whitespace-nowrap"
                             onClick={() => { setClickedService(s.name); setOpen(true); }}
                           >
                             Request
@@ -681,7 +683,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
                       {hasPhoto && (
                         <div className="sm:justify-self-end">
-                          <div className="aspect-square w-[140px] overflow-hidden rounded-lg bg-gray-100 sm:w-[180px]">
+                          <div className="aspect-square w-[100px] overflow-hidden rounded-lg bg-gray-100 sm:w-[140px] md:w-[180px]">
                             <Image
                               src={d.photo}
                               alt={d.name}
@@ -948,7 +950,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
         </main>
 
         {/* ---------- SIDEBAR ---------- */}
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto">
+        <aside className="hidden lg:block space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto">
           <div className="rounded-2xl border p-4">
             <div className="mb-3 w-full rounded-md px-4 py-3 text-primary text-center font-semibold text-lg">
               Start Your<br /> Personalized Treatment Plan Today
@@ -977,6 +979,18 @@ export default function ClinicDetailPage({ clinic }: Props) {
         clinicId={clinic.id}
       />
 
+      {/* Mobile sticky CTA */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white p-3 shadow-lg lg:hidden">
+        <Link
+          href={clinicHref(clinic, 'inquiry')}
+          className="block w-full rounded-lg bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white shadow hover:bg-emerald-700"
+        >
+          Claim Your Free Quote
+        </Link>
+      </div>
+
+      {/* Spacer for mobile sticky CTA */}
+      <div className="h-16 lg:hidden" />
     </div>
   );
 }
@@ -987,7 +1001,7 @@ function HeroGallery({ images, name }: { images: string[]; name: string }) {
   if (list.length === 0) return null;
 
   return (
-    <div className="relative z-0 grid grid-cols-12 gap-3 pt-6">
+    <div className="relative z-0 grid grid-cols-1 md:grid-cols-12 gap-3 pt-4 sm:pt-6">
       {/* big */}
       <div className="col-span-12 md:col-span-8">
         <div className="relative overflow-hidden rounded-2xl">
@@ -997,13 +1011,13 @@ function HeroGallery({ images, name }: { images: string[]; name: string }) {
             width={1600}
             height={900}
             priority
-            className="block w-full h-[340px] md:h-[420px] object-cover"
+            className="block w-full h-[220px] sm:h-[340px] md:h-[420px] object-cover"
           />
         </div>
       </div>
 
       {/* right column - up to 2 thumbs */}
-      <div className="col-span-12 grid gap-3 md:col-span-4">
+      <div className="hidden md:grid col-span-12 gap-3 md:col-span-4">
         {list.slice(1).map((src) => (
           <div key={src} className="relative overflow-hidden rounded-2xl">
             <Image
