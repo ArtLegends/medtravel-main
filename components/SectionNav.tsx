@@ -6,8 +6,9 @@ type Section = { id: string; label: string };
 export default function SectionNav({ sections }: { sections: Section[] }) {
   return (
     <nav aria-label="Clinic sections">
-      <div className="flex gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-xl border bg-white px-2 py-2 shadow-sm"
-        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+      <div
+        className="flex gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-xl border bg-white px-2 py-2 shadow-sm"
+        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as any}
       >
         {sections.map((s) => (
           <a

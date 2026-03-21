@@ -493,30 +493,22 @@ export default function ClinicDetailPage({ clinic }: Props) {
   }, [primaryCategory, categoryLocChain, clinic.name]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-10 lg:pb-10">
+    <div className="mx-auto max-w-6xl px-4 pb-20 lg:pb-10 overflow-x-hidden">
       {/* ===== HERO ===== */}
       <HeroGallery name={clinic.name} images={imgs} />
 
       {/* ===== NAVBAR СЕКЦИЙ ===== */}
-      <div className="relative inset-x-0 pt-2 z-[60]">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="rounded-xl border bg-white/95 shadow-sm backdrop-blur pointer-events-auto">
-            <SectionNav sections={sections} />
-          </div>
-        </div>
+      <div className="pt-2">
+        <SectionNav sections={sections} />
       </div>
 
       {/* ===== BREADCRUMBS (под навбаром клиники) ===== */}
-      <div className="relative inset-x-0 z-[50] pt-3">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="overflow-x-auto whitespace-nowrap text-sm" style={{ scrollbarWidth: "none" }}>
-            <Breadcrumbs items={breadcrumbsItems} />
-          </div>
-        </div>
+      <div className="pt-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        <Breadcrumbs items={breadcrumbsItems} />
       </div>
 
       {/* ===== GRID ===== */}
-      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_360px] min-w-0">
         {/* ---------- MAIN ---------- */}
         <main className="min-w-0">
           {/* About */}
@@ -526,7 +518,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                 {[clinic.country, clinic.city, clinic.district].filter(Boolean).join(', ')}
               </div>
 
-              <h1 className="flex flex-wrap items-center gap-3 text-3xl font-semibold">
+              <h1 className="flex flex-wrap items-center gap-3 text-2xl sm:text-3xl font-semibold">
                 {clinic.name}
               </h1>
 
@@ -549,7 +541,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
           {/* Treatments & Prices */}
           <section id="treatments" className="space-y-3 pt-10">
-            <h2 className="text-2xl font-semibold">Treatments & Prices</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold">Treatments & Prices</h2>
             <div className="-mx-4 sm:mx-0 overflow-x-auto rounded-none sm:rounded-xl border-y sm:border">
               <table className="w-full divide-y text-sm">
                 <thead className="bg-gray-50 text-left text-sm">
@@ -636,7 +628,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
           {/* Doctors */}
           <section id="staff" className="space-y-4 pt-10">
-            <h2 className="text-2xl font-semibold">Doctors</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold">Doctors</h2>
             {doctors.length === 0 ? (
               <div className="rounded-xl border p-6 text-sm text-gray-500">No staff listed</div>
             ) : (
@@ -715,7 +707,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {/* Photos */}
           {hasPhotos && (
             <section id="photos" className="space-y-4 pt-10">
-              <h2 className="text-2xl font-semibold">Transformation photos</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold">Transformation photos</h2>
 
               <div className="relative">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -744,7 +736,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                           (prev - 1 + imgs.length) % imgs.length
                         )
                       }
-                      className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full bg-white/80 px-2 py-1 text-xl leading-none shadow hover:bg-white"
+                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
                     >
                       ‹
                     </button>
@@ -753,7 +745,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
                       onClick={() =>
                         setPhotoOffset((prev) => (prev + 1) % imgs.length)
                       }
-                      className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full bg-white/80 px-2 py-1 text-xl leading-none shadow hover:bg-white"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
                     >
                       ›
                     </button>
@@ -815,7 +807,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {/* Accreditations */}
           {hasAccreditations && (
             <section id="accreditations" className="space-y-4 pt-10">
-              <h2 className="text-2xl font-semibold">Accreditations</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold">Accreditations</h2>
               <ul className="divide-y rounded-xl border">
                 {accs.map((a, i) => (
                   <li key={`${a.name}-${i}`} className="flex items-center gap-4 p-4">
@@ -845,7 +837,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {/* Hours */}
           {hasHours && (
             <section id="hours" className="space-y-4 pt-10">
-              <h2 className="text-2xl font-semibold">Operation Hours</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold">Operation Hours</h2>
               <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {(clinic.hours ?? []).map((h: any, idx: number) => {
                   const isClosed = !h.open && !h.close;
@@ -865,7 +857,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {/* Location */}
           {hasLocation && (
             <section id="location" className="space-y-3 pt-10">
-              <h2 className="text-2xl font-semibold">Location</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold">Location</h2>
               {address && <div className="text-sm">{address}</div>}
               {mapSrc ? (
                 <div className="overflow-hidden rounded-lg border">
@@ -989,8 +981,6 @@ export default function ClinicDetailPage({ clinic }: Props) {
         </Link>
       </div>
 
-      {/* Spacer for mobile sticky CTA */}
-      <div className="h-16 lg:hidden" />
     </div>
   );
 }
