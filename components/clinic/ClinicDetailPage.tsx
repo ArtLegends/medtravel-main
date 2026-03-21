@@ -861,10 +861,10 @@ export default function ClinicDetailPage({ clinic }: Props) {
               {address && <div className="text-sm">{address}</div>}
               {mapSrc ? (
                 <div className="overflow-hidden rounded-lg border">
-                  <div className="aspect-[16/9]">
+                  <div className="aspect-[16/9] w-full">
                     <iframe
                       src={mapSrc!}
-                      className="h-full w-full"
+                      className="h-full w-full border-0"
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
                     />
@@ -994,14 +994,14 @@ function HeroGallery({ images, name }: { images: string[]; name: string }) {
     <div className="relative z-0 grid grid-cols-1 md:grid-cols-12 gap-3 pt-4 sm:pt-6">
       {/* big */}
       <div className="col-span-12 md:col-span-8">
-        <div className="relative overflow-hidden rounded-2xl">
+        <div className="relative overflow-hidden rounded-2xl h-[220px] sm:h-[340px] md:h-[420px]">
           <Image
             src={list[0]}
             alt={`${name} main photo`}
-            width={1600}
-            height={900}
+            fill
             priority
-            className="block w-full h-[220px] sm:h-[340px] md:h-[420px] object-cover"
+            sizes="(max-width: 768px) 100vw, 66vw"
+            className="object-cover"
           />
         </div>
       </div>
