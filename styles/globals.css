@@ -2,11 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Mobile overflow prevention — on app-root wrapper, NOT on html/body */
-#app-root {
-  overflow-x: clip;
-}
-
 /* Ensure images and iframes never exceed their container */
 img, iframe, video, svg, canvas {
   max-width: 100%;
