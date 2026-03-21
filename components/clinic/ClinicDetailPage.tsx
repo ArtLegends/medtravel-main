@@ -1029,6 +1029,9 @@ function PhotoCarousel({ images }: { images: string[] }) {
     });
   };
 
+  const prev = () => scrollTo(Math.max(current - 1, 0));
+  const next = () => scrollTo(Math.min(current + 1, total - 1));
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -1036,94 +1039,87 @@ function PhotoCarousel({ images }: { images: string[] }) {
     return () => el.removeEventListener('scroll', updateCurrent);
   }, [updateCurrent]);
 
+  if (total === 0) return null;
+
   return (
-    <div className="relative">
-      {/* Mobile: horizontal scroll carousel */}
-      <div className="sm:hidden">
-        <div
-          ref={scrollRef}
-          className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2"
-          style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as any}
-        >
-          {images.map((src, i) => (
-            <div
-              key={`${src}-${i}`}
-              className="flex-shrink-0 w-[85vw] snap-start"
-            >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-                <Image
-                  src={src}
-                  alt={`Photo ${i + 1}`}
-                  fill
-                  sizes="85vw"
-                  className="object-cover"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Dots indicator */}
-        {total > 1 && (
-          <div className="flex justify-center gap-1.5 pt-2">
-            {images.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => scrollTo(i)}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === current
-                    ? 'w-4 bg-emerald-600'
-                    : 'w-1.5 bg-gray-300'
-                }`}
-                aria-label={`Go to photo ${i + 1}`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Arrow buttons */}
-        {total > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={() => scrollTo(Math.max(current - 1, 0))}
-              className="absolute left-1 top-[calc(50%-20px)] -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
-              aria-label="Previous photo"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollTo(Math.min(current + 1, total - 1))}
-              className="absolute right-1 top-[calc(50%-20px)] -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
-              aria-label="Next photo"
-            >
-              ›
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Desktop: grid layout (unchanged) */}
-      <div className="hidden sm:block">
-        <div className="grid sm:grid-cols-2 gap-3 md:grid-cols-3">
-          {images.slice(0, 6).map((src, i) => (
-            <div
-              key={`${src}-${i}`}
-              className="relative aspect-[4/3] overflow-hidden rounded-lg"
-            >
+    <div className="relative group">
+      {/* Scrollable container — works on all screen sizes */}
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as any}
+      >
+        {images.map((src, i) => (
+          <div
+            key={`${src}-${i}`}
+            className="flex-shrink-0 w-[85vw] sm:w-[calc(50%-6px)] md:w-[calc(33.333%-8px)] snap-start"
+          >
+            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
               <Image
                 src={src}
                 alt={`Photo ${i + 1}`}
                 fill
-                sizes="(min-width:1024px) 33vw, 50vw"
+                sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 85vw"
                 className="object-cover"
               />
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Arrow buttons — always visible on mobile, hover on desktop */}
+      {total > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={prev}
+            disabled={current === 0}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 shadow-md p-2 text-gray-700 hover:bg-white disabled:opacity-30 disabled:cursor-default transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+            aria-label="Previous photo"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={next}
+            disabled={current >= total - 1}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 shadow-md p-2 text-gray-700 hover:bg-white disabled:opacity-30 disabled:cursor-default transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+            aria-label="Next photo"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
+
+      {/* Dots indicator */}
+      {total > 1 && (
+        <div className="flex justify-center gap-1.5 pt-3">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => scrollTo(i)}
+              className={`h-1.5 rounded-full transition-all ${
+                i === current
+                  ? 'w-5 bg-emerald-600'
+                  : 'w-1.5 bg-gray-300 hover:bg-gray-400'
+              }`}
+              aria-label={`Go to photo ${i + 1}`}
+            />
           ))}
         </div>
-      </div>
+      )}
+
+      {/* Counter badge */}
+      {total > 1 && (
+        <div className="absolute top-3 right-3 z-10 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white">
+          {current + 1} / {total}
+        </div>
+      )}
     </div>
   );
 }
