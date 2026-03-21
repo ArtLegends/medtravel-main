@@ -493,7 +493,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
   }, [primaryCategory, categoryLocChain, clinic.name]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-20 lg:pb-10 overflow-x-hidden">
+    <div className="mx-auto max-w-6xl px-4 pb-20 lg:pb-10">
       {/* ===== HERO ===== */}
       <HeroGallery name={clinic.name} images={imgs} />
 
@@ -710,7 +710,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
               <h2 className="text-xl sm:text-2xl font-semibold">Transformation photos</h2>
 
               <div className="relative">
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
                   {visiblePhotos.map((src) => (
                     <div
                       key={src}
@@ -942,7 +942,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
         </main>
 
         {/* ---------- SIDEBAR ---------- */}
-        <aside className="hidden lg:block space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto">
+        <aside className="hidden lg:block space-y-4 sticky top-20 self-start">
           <div className="rounded-2xl border p-4">
             <div className="mb-3 w-full rounded-md px-4 py-3 text-primary text-center font-semibold text-lg">
               Start Your<br /> Personalized Treatment Plan Today

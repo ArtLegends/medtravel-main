@@ -2,10 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Prevent any element from exceeding viewport width on mobile */
-html, body {
-  overflow-x: hidden;
-  max-width: 100vw;
+/* Mobile overflow prevention — on app-root wrapper, NOT on html/body */
+#app-root {
+  overflow-x: clip;
 }
 
 /* Ensure images and iframes never exceed their container */
