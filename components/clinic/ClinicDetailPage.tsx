@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image';
 import ConsultationModal from '@/components/clinic/ConsultationModal';
 import ReportModal from '@/components/clinic/ReportModal';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import SectionNav from '@/components/SectionNav';
 import type { Clinic } from '@/lib/db/clinics';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -437,18 +437,6 @@ export default function ClinicDetailPage({ clinic }: Props) {
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllDoctors, setShowAllDoctors] = useState(false);
 
-  // offset для карусели фоток
-  const [photoOffset, setPhotoOffset] = useState(0);
-
-  const visiblePhotos = useMemo(() => {
-    if (imgs.length <= 3) return imgs;
-    const res: string[] = [];
-    for (let i = 0; i < 3; i += 1) {
-      res.push(imgs[(photoOffset + i) % imgs.length]);
-    }
-    return res;
-  }, [imgs, photoOffset]);
-
   const visibleServices = showAllServices ? allServices : allServices.slice(0, 5);
   const hasPrice = allServices.some(s => String(s?.price ?? '').trim() !== '');
   const hasDesc = allServices.some(s => String(s?.description ?? s?.duration ?? '').trim() !== '');
@@ -708,50 +696,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {hasPhotos && (
             <section id="photos" className="space-y-4 pt-10">
               <h2 className="text-xl sm:text-2xl font-semibold">Transformation photos</h2>
-
-              <div className="relative">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
-                  {visiblePhotos.map((src) => (
-                    <div
-                      key={src}
-                      className="relative aspect-[4/3] overflow-hidden rounded-lg"
-                    >
-                      <Image
-                        src={src}
-                        alt="Clinic photo"
-                        fill
-                        sizes="(min-width:1024px) 33vw, 50vw"
-                        className="object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {imgs.length > 3 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPhotoOffset((prev) =>
-                          (prev - 1 + imgs.length) % imgs.length
-                        )
-                      }
-                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPhotoOffset((prev) => (prev + 1) % imgs.length)
-                      }
-                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
-                    >
-                      ›
-                    </button>
-                  </>
-                )}
-              </div>
+              <PhotoCarousel images={imgs} />
             </section>
           )}
 
@@ -1054,6 +999,131 @@ function Stars({ value }: { value: number }) {
           <path d="M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 14.9 4.7 17.6l1-5.8L1.5 7.7l5.9-.9L10 1.5z" />
         </svg>
       ))}
+    </div>
+  );
+}
+
+/* ---------- PHOTO CAROUSEL ---------- */
+function PhotoCarousel({ images }: { images: string[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState(0);
+  const total = images.length;
+
+  const updateCurrent = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !el.children.length) return;
+    const child = el.children[0] as HTMLElement;
+    if (!child) return;
+    const itemW = child.offsetWidth + 12; // gap-3 = 12px
+    const idx = Math.round(el.scrollLeft / itemW);
+    setCurrent(Math.min(Math.max(idx, 0), total - 1));
+  }, [total]);
+
+  const scrollTo = (idx: number) => {
+    const el = scrollRef.current;
+    if (!el || !el.children[idx]) return;
+    (el.children[idx] as HTMLElement).scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'start',
+    });
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateCurrent, { passive: true });
+    return () => el.removeEventListener('scroll', updateCurrent);
+  }, [updateCurrent]);
+
+  return (
+    <div className="relative">
+      {/* Mobile: horizontal scroll carousel */}
+      <div className="sm:hidden">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2"
+          style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as any}
+        >
+          {images.map((src, i) => (
+            <div
+              key={`${src}-${i}`}
+              className="flex-shrink-0 w-[85vw] snap-start"
+            >
+              <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
+                <Image
+                  src={src}
+                  alt={`Photo ${i + 1}`}
+                  fill
+                  sizes="85vw"
+                  className="object-cover"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Dots indicator */}
+        {total > 1 && (
+          <div className="flex justify-center gap-1.5 pt-2">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => scrollTo(i)}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === current
+                    ? 'w-4 bg-emerald-600'
+                    : 'w-1.5 bg-gray-300'
+                }`}
+                aria-label={`Go to photo ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Arrow buttons */}
+        {total > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => scrollTo(Math.max(current - 1, 0))}
+              className="absolute left-1 top-[calc(50%-20px)] -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
+              aria-label="Previous photo"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTo(Math.min(current + 1, total - 1))}
+              className="absolute right-1 top-[calc(50%-20px)] -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-lg leading-none shadow hover:bg-white z-10"
+              aria-label="Next photo"
+            >
+              ›
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Desktop: grid layout (unchanged) */}
+      <div className="hidden sm:block">
+        <div className="grid sm:grid-cols-2 gap-3 md:grid-cols-3">
+          {images.slice(0, 6).map((src, i) => (
+            <div
+              key={`${src}-${i}`}
+              className="relative aspect-[4/3] overflow-hidden rounded-lg"
+            >
+              <Image
+                src={src}
+                alt={`Photo ${i + 1}`}
+                fill
+                sizes="(min-width:1024px) 33vw, 50vw"
+                className="object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
