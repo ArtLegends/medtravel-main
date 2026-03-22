@@ -21,7 +21,7 @@ function StatCard({ title, value, color }: { title: string; value: string; color
   return (
     <div className="rounded-xl border bg-white px-4 py-4">
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{title}</div>
-      <div className={`mt-2 text-2xl font-semibold ${color ?? "text-gray-900"}`}>{value}</div>
+      <div className={`mt-2 text-xl sm:text-2xl font-semibold ${color ?? "text-gray-900"}`}>{value}</div>
     </div>
   );
 }
@@ -66,12 +66,12 @@ export default function SupervisorDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Welcome to Supervisor Panel!</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Welcome to Supervisor Panel!</h1>
         <p className="text-gray-600">Track your partners performance and payouts.</p>
       </div>
 
       {/* Earnings */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Earned (1%)"
           value={loading ? "..." : `$${(balance?.total_earned ?? 0).toFixed(2)}`}
@@ -102,7 +102,7 @@ export default function SupervisorDashboardPage() {
       )}
 
       {/* Network stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Recruited Partners"
           value={loading ? "..." : String(stats?.total_partners ?? 0)}
