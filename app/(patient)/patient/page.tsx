@@ -1,6 +1,5 @@
-"use client";
-
 // app/(patient)/patient/page.tsx
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -213,7 +212,7 @@ export default function PatientDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Welcome to Patient Panel!</h1>
           <p className="mt-1 text-sm text-gray-500">
             Overview of your upcoming appointments and medical visits.
           </p>
@@ -226,7 +225,7 @@ export default function PatientDashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Upcoming Appointments"
           value={stats.upcomingAppointments}
@@ -253,7 +252,7 @@ export default function PatientDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Recent Activity */}
         <section className="lg:col-span-2 rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">Recent Activity</h2>
@@ -336,7 +335,7 @@ function StatCard(props: {
         {label}
       </div>
 
-      <div className="mt-3 text-2xl font-semibold text-gray-900">
+      <div className="mt-3 text-xl sm:text-2xl font-semibold text-gray-900">
         {loading ? (
           <span className="inline-block h-7 w-10 animate-pulse rounded bg-gray-200" />
         ) : (
