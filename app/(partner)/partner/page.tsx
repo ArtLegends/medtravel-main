@@ -16,7 +16,7 @@ function StatCard({ title, value, color }: { title: string; value: string; color
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {title}
       </div>
-      <div className={`mt-2 text-2xl font-semibold ${color ?? "text-gray-900"}`}>
+      <div className={`mt-2 text-xl sm:text-2xl font-semibold ${color ?? "text-gray-900"}`}>
         {value}
       </div>
     </div>
@@ -58,14 +58,14 @@ export default function PartnerDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Welcome to Partner Panel!</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Welcome to Partner Panel!</h1>
         <p className="text-gray-600">
           Track your referral performance and payouts.
         </p>
       </div>
 
       {/* Balance overview */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Earned"
           value={loading ? "..." : `$${(balance?.total_earned ?? 0).toFixed(2)}`}
@@ -112,19 +112,19 @@ export default function PartnerDashboardPage() {
             <thead>
               <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
                 <th className="px-3 py-2">Landing page</th>
-                <th className="px-3 py-2">Clicks</th>
-                <th className="px-3 py-2">Registrations</th>
-                <th className="px-3 py-2">Pending</th>
-                <th className="px-3 py-2">Completed</th>
-                <th className="px-3 py-2">Payout</th>
+                <th className="px-2 sm:px-3 py-2">Clicks</th>
+                <th className="px-2 sm:px-3 py-2 hidden sm:table-cell">Registrations</th>
+                <th className="px-2 sm:px-3 py-2 hidden sm:table-cell">Pending</th>
+                <th className="px-2 sm:px-3 py-2">Completed</th>
+                <th className="px-2 sm:px-3 py-2">Payout</th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b bg-gray-50 font-semibold">
                 <td className="px-3 py-2">Total</td>
                 <td className="px-3 py-2">0</td>
-                <td className="px-3 py-2">0</td>
-                <td className="px-3 py-2">0</td>
+                <td className="px-2 sm:px-3 py-2 hidden sm:table-cell">0</td>
+                <td className="px-2 sm:px-3 py-2 hidden sm:table-cell">0</td>
                 <td className="px-3 py-2">0</td>
                 <td className="px-3 py-2">${(balance?.total_earned ?? 0).toFixed(2)}</td>
               </tr>
