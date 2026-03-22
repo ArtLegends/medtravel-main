@@ -266,7 +266,7 @@ export default function CustomerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Welcome to Customer Panel!</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Welcome to Customer Panel!</h1>
         <p className="text-gray-600">Manage your medical practice efficiently</p>
       </div>
 
@@ -276,14 +276,14 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <CustomerStat title="Doctors" value={doctorsCount} loading={loading} />
         <CustomerStat title="Patients" value={patientsCount} loading={loading} />
         <CustomerStat title="Bookings" value={bookingsCount} loading={loading} />
         <CustomerStat title="Revenue" value={"$0"} loading={loading} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <MiniLineChart title="Revenue" />
 
         <div className="rounded-xl border bg-white p-4 space-y-4">
@@ -344,7 +344,7 @@ export default function CustomerDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* DOCTORS LIST */}
         <div className="rounded-xl border bg-white p-4">
           <div className="mb-4 flex items-center justify-between">
@@ -402,11 +402,11 @@ export default function CustomerDashboard() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase">
-                    <th className="px-3 py-2">Patient ID</th>
-                    <th className="px-3 py-2">Patient Name</th>
-                    <th className="px-3 py-2">Phone</th>
-                    <th className="px-3 py-2">Treatment</th>
-                    <th className="px-3 py-2">Status</th>
+                    <th className="px-2 sm:px-3 py-2 whitespace-nowrap">ID</th>
+                    <th className="px-2 sm:px-3 py-2 whitespace-nowrap">Name</th>
+                    <th className="px-2 sm:px-3 py-2 whitespace-nowrap hidden sm:table-cell">Phone</th>
+                    <th className="px-2 sm:px-3 py-2 whitespace-nowrap">Treatment</th>
+                    <th className="px-2 sm:px-3 py-2 whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -414,13 +414,13 @@ export default function CustomerDashboard() {
                     const key = p.booking_id ?? p.patient_id ?? `p-${idx}`;
                     return (
                       <tr key={key} className="border-b last:border-0">
-                        <td className="px-3 py-2">
+                        <td className="px-2 sm:px-3 py-2">
                           {p.patient_public_id ? `#${p.patient_public_id}` : "—"}
                         </td>
-                        <td className="px-3 py-2">{p.patient_name || "—"}</td>
-                        <td className="px-3 py-2">{p.phone || "—"}</td>
-                        <td className="px-3 py-2">{p.service_name || "—"}</td>
-                        <td className="px-3 py-2">{p.status || "—"}</td>
+                        <td className="px-2 sm:px-3 py-2">{p.patient_name || "—"}</td>
+                        <td className="px-2 sm:px-3 py-2 hidden sm:table-cell">{p.phone || "—"}</td>
+                        <td className="px-2 sm:px-3 py-2">{p.service_name || "—"}</td>
+                        <td className="px-2 sm:px-3 py-2">{p.status || "—"}</td>
                       </tr>
                     );
                   })}
