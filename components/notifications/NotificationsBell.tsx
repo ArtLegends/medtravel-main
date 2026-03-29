@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Icon } from "@iconify/react";
+import { Badge, Button } from "@heroui/react";
 import { useRouter } from "next/navigation";
 
 import { useSupabase } from "@/lib/supabase/supabase-provider";
@@ -16,105 +17,85 @@ type NotificationRow = {
   created_at: string;
 };
 
-// ── Notification type config ──
-const NOTIF_CONFIG: Record<
-  string,
-  { icon: string; color: string; title: (d: any) => string; body?: (d: any) => string }
-> = {
-  booking_confirmed: {
-    icon: "solar:check-circle-bold",
-    color: "text-emerald-600",
-    title: (d) => `Booking confirmed`,
-    body: (d) => `${d.service_name || "Your appointment"} at ${d.clinic_name || "clinic"} has been confirmed.`,
-  },
-  booking_completed: {
-    icon: "solar:verified-check-bold",
-    color: "text-blue-600",
-    title: () => `Treatment completed`,
-    body: (d) => `Your treatment at ${d.clinic_name || "clinic"} has been marked as completed.`,
-  },
-  booking_canceled: {
-    icon: "solar:close-circle-bold",
-    color: "text-red-500",
-    title: () => `Booking canceled`,
-    body: (d) => `Your booking at ${d.clinic_name || "clinic"} has been canceled.`,
-  },
-  new_booking: {
-    icon: "solar:calendar-add-bold",
-    color: "text-blue-600",
-    title: () => `New booking received`,
-    body: (d) => `${d.patient_name || "A patient"} booked ${d.service_name || "a service"}.`,
-  },
-  new_review: {
-    icon: "solar:star-bold",
-    color: "text-amber-500",
-    title: () => `New review`,
-    body: (d) => `${d.reviewer_name || "Someone"} left a ${d.rating || ""}/10 review for ${d.clinic_name || "your clinic"}.`,
-  },
-  new_referral: {
-    icon: "solar:user-plus-bold",
-    color: "text-emerald-600",
-    title: () => `New referral`,
-    body: (d) => `A new patient signed up via your referral link${d.program_key ? ` (${d.program_key})` : ""}.`,
-  },
-  new_partner_recruited: {
-    icon: "solar:users-group-two-rounded-bold",
-    color: "text-purple-600",
-    title: () => `New partner recruited`,
-    body: () => `A new partner registered through your recruitment link.`,
-  },
-  new_inquiry: {
-    icon: "solar:letter-bold",
-    color: "text-sky-600",
-    title: () => `New inquiry`,
-    body: (d) => `${d.sender_name || "Someone"} sent an inquiry about ${d.clinic_name || "your clinic"}.`,
-  },
-  clinic_approved: {
-    icon: "solar:shield-check-bold",
-    color: "text-emerald-600",
-    title: () => `Clinic approved`,
-    body: (d) => `${d.name || "Your clinic"} has been published on MedTravel.`,
-  },
-  clinic_rejected: {
-    icon: "solar:shield-cross-bold",
-    color: "text-red-500",
-    title: () => `Clinic not approved`,
-    body: (d) => `${d.name || "Your clinic"} application was not approved.`,
-  },
-  partner_program_approved: {
-    icon: "solar:verified-check-bold",
-    color: "text-emerald-600",
-    title: (d) => `Program approved`,
-    body: (d) => {
-      const parts: string[] = [];
-      parts.push(`Your request for ${d.program_key || "program"} has been approved.`);
-      if (d.ref_code) parts.push(`Code: ${d.ref_code}`);
-      return parts.join(" ");
-    },
-  },
-  set_password: {
-    icon: "solar:lock-keyhole-bold",
-    color: "text-amber-600",
-    title: () => `Set your password`,
-    body: () => `Set a password in Settings for faster sign-in.`,
-  },
-};
+// ── Short, clear notification text per type ──
+function notifTitle(type: string, d: any): string {
+  switch (type) {
+    case "booking_confirmed":
+      return "Booking confirmed";
+    case "booking_completed":
+      return "Treatment completed";
+    case "booking_canceled":
+      return "Booking canceled";
+    case "new_booking":
+      return "New booking received";
+    case "new_review":
+      return "New review received";
+    case "new_referral":
+      return "New referral";
+    case "new_partner_recruited":
+      return "New partner recruited";
+    case "new_inquiry":
+      return "New clinic inquiry";
+    case "clinic_approved":
+      return "Clinic published";
+    case "clinic_rejected":
+      return "Clinic not approved";
+    case "partner_program_approved":
+      return "Program approved";
+    case "set_password":
+      return "Set your password";
+    default:
+      return "Notification";
+  }
+}
 
-const BELL_LIMIT = 5;
+function notifBody(type: string, d: any): string {
+  switch (type) {
+    case "booking_confirmed":
+      return `${d.service_name || "Appointment"} at ${d.clinic_name || "clinic"}`;
+    case "booking_completed":
+      return `Treatment at ${d.clinic_name || "clinic"} completed`;
+    case "booking_canceled":
+      return `Booking at ${d.clinic_name || "clinic"} was canceled`;
+    case "new_booking":
+      return `${d.patient_name || "Patient"} — ${d.service_name || "service"}`;
+    case "new_review":
+      return `${d.reviewer_name || "Someone"} rated ${d.clinic_name || "clinic"} ${d.rating || ""}/10`;
+    case "new_referral":
+      return `New patient via ${d.program_key || "referral"} program`;
+    case "new_partner_recruited":
+      return "A new partner joined your network";
+    case "new_inquiry":
+      return `${d.sender_name || "Someone"} — ${d.clinic_name || "clinic"}`;
+    case "clinic_approved":
+      return `${d.name || "Your clinic"} is now live on MedTravel`;
+    case "clinic_rejected":
+      return `${d.name || "Your clinic"} was not approved`;
+    case "partner_program_approved": {
+      let text = `${d.program_key || "Program"} approved`;
+      if (d.ref_code) text += `. Code: ${d.ref_code}`;
+      return text;
+    }
+    case "set_password":
+      return "Set a password for faster sign-in";
+    default:
+      return d?.message || "";
+  }
+}
 
 function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = Math.max(0, now - then);
+  const diff = Math.max(0, Date.now() - new Date(dateStr).getTime());
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return `${hrs}h`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${days}d`;
   return new Date(dateStr).toLocaleDateString();
 }
+
+const BELL_LIMIT = 5;
 
 export default function NotificationsBell() {
   const { supabase, session } = useSupabase() as SupabaseContextType;
@@ -136,7 +117,6 @@ export default function NotificationsBell() {
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false })
       .limit(BELL_LIMIT);
-
     if (!error && data) setItems(data as NotificationRow[]);
     setLoading(false);
   }, [supabase, session]);
@@ -176,49 +156,44 @@ export default function NotificationsBell() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell button */}
-      <button
-        onClick={handleBellClick}
-        className="relative rounded-md p-1.5 text-default-500 hover:text-default-700 transition"
-        aria-label="Notifications"
+      {/* Bell button — keeps HeroUI Button with border */}
+      <Button
+        className="h-8 w-8 min-w-0 p-0"
+        size="sm"
+        variant="ghost"
+        onPress={handleBellClick}
       >
-        <Icon icon="solar:bell-linear" width={22} />
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-            {Math.min(unreadCount, 9)}
-          </span>
-        )}
-      </button>
+        <Badge
+          color={unreadCount > 0 ? "danger" : "default"}
+          content={unreadCount > 0 ? String(Math.min(unreadCount, 9)) : ""}
+          isInvisible={unreadCount === 0}
+          placement="top-right"
+          shape="circle"
+          size="sm"
+        >
+          <Icon className="text-default-500" icon="solar:bell-linear" width={22} />
+        </Badge>
+      </Button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-[360px] max-w-[calc(100vw-32px)] rounded-xl border border-gray-200 bg-white shadow-lg">
+        <div className="absolute right-0 top-full mt-2 z-50 w-[340px] max-w-[calc(100vw-32px)] rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center justify-between border-b px-4 py-2.5">
             <span className="text-sm font-semibold text-gray-900">
               Notifications
             </span>
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Mark all read
-                </button>
-              )}
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-                aria-label="Close notifications"
-              >
-                <Icon icon="solar:close-circle-linear" width={18} />
-              </button>
-            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-md p-1 text-gray-400 hover:text-gray-600 transition"
+              aria-label="Close"
+            >
+              <Icon icon="solar:close-circle-linear" width={18} />
+            </button>
           </div>
 
           {/* Items */}
-          <div className="max-h-[380px] overflow-y-auto">
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-100">
             {loading && items.length === 0 && (
               <div className="px-4 py-8 text-center text-sm text-gray-400">
                 Loading…
@@ -226,57 +201,31 @@ export default function NotificationsBell() {
             )}
 
             {!loading && items.length === 0 && (
-              <div className="px-4 py-8 text-center">
-                <Icon
-                  icon="solar:bell-off-linear"
-                  width={32}
-                  className="mx-auto text-gray-300 mb-2"
-                />
-                <div className="text-sm text-gray-500">
-                  No notifications yet
-                </div>
+              <div className="px-4 py-8 text-center text-sm text-gray-500">
+                No notifications yet
               </div>
             )}
 
-            {items.map((n) => {
-              const cfg = NOTIF_CONFIG[n.type] ?? {
-                icon: "solar:info-circle-bold",
-                color: "text-gray-500",
-                title: () => "Notification",
-                body: (d: any) => d?.message || "",
-              };
-
-              return (
-                <div
-                  key={n.id}
-                  className={`flex gap-3 px-4 py-3 border-b last:border-0 transition ${
-                    !n.is_read ? "bg-blue-50/40" : ""
-                  }`}
-                >
-                  <div className={`mt-0.5 shrink-0 ${cfg.color}`}>
-                    <Icon icon={cfg.icon} width={20} />
-                  </div>
+            {items.map((n) => (
+              <div
+                key={n.id}
+                className={`px-4 py-3 ${!n.is_read ? "bg-blue-50/30" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-900">
-                      {cfg.title(n.data)}
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {notifTitle(n.type, n.data)}
                     </div>
-                    {cfg.body && (
-                      <div className="mt-0.5 text-xs text-gray-500 line-clamp-2">
-                        {cfg.body(n.data)}
-                      </div>
-                    )}
-                    <div className="mt-1 text-[11px] text-gray-400">
-                      {timeAgo(n.created_at)}
+                    <div className="mt-0.5 text-xs text-gray-500 line-clamp-2 break-words">
+                      {notifBody(n.type, n.data)}
                     </div>
                   </div>
-                  {!n.is_read && (
-                    <div className="mt-2 shrink-0">
-                      <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
-                    </div>
-                  )}
+                  <span className="shrink-0 text-[11px] text-gray-400 mt-0.5">
+                    {timeAgo(n.created_at)}
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
           {/* Footer */}
