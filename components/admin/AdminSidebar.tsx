@@ -18,6 +18,7 @@ import {
   Home,
   FolderTree,
   X,
+  Percent,
 } from "lucide-react";
 
 // ── Context for mobile toggle ──
@@ -61,6 +62,13 @@ const GROUPS: Group[] = [
     items: [
       { label: "All Clinics", href: "/admin/clinics", icon: Building2 },
       { label: "Add New Clinic", href: "/admin/clinics/new", icon: Building2 },
+    ],
+  },
+  {
+    label: "Finance",
+    icon: Percent,
+    items: [
+      { label: "Commissions", href: "/admin/commissions", icon: Percent },
     ],
   },
   {
