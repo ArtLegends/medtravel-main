@@ -1,7 +1,8 @@
 // app/(admin)/admin/commissions/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { createClient } from "@/lib/supabase/browserClient";
 
 // ── Types ──
 type Clinic = {
@@ -71,12 +72,13 @@ function simulateCommission(
     }
   }
 
-  // Default 10%
   return { amount: Math.round(cost * 10) / 100, rule: null, isDefault: true };
 }
 
 // ── Main Page ──
 export default function CommissionsPage() {
+  const supabase = useMemo(() => createClient(), []);
+
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,46 +88,37 @@ export default function CommissionsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  // Simulation
   const [simCost, setSimCost] = useState<number>(1500);
 
-  // Load clinics + rules
+  // ── Load data directly from Supabase ──
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [clinicsRes, rulesRes] = await Promise.all([
-        fetch("/api/admin/clinics-list"),
-        fetch("/api/admin/commission-rules"),
-      ]);
-
-      // clinics-list might not exist — fallback to using supabase directly
-      let clinicsData: Clinic[] = [];
-      if (clinicsRes.ok) {
-        clinicsData = await clinicsRes.json();
-      } else {
-        // Fallback: fetch from Supabase client
-        const { createClient } = await import("@/lib/supabase/browserClient");
-        const sb = createClient();
-        const { data } = await sb
+        supabase
           .from("clinics")
           .select("id, name, slug, status")
           .not("owner_id", "is", null)
-          .order("name");
-        clinicsData = (data ?? []) as Clinic[];
-      }
+          .order("name"),
+        supabase
+          .from("clinic_commission_rules")
+          .select("*")
+          .order("clinic_id")
+          .order("priority", { ascending: true }),
+      ]);
 
-      const rulesData: Rule[] = rulesRes.ok ? await rulesRes.json() : [];
+      if (clinicsRes.error) throw clinicsRes.error;
+      if (rulesRes.error) throw rulesRes.error;
 
-      setClinics(clinicsData);
-      setRules(rulesData);
+      setClinics((clinicsRes.data ?? []) as Clinic[]);
+      setRules((rulesRes.data ?? []) as Rule[]);
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     loadData();
@@ -139,38 +132,51 @@ export default function CommissionsPage() {
     : [];
 
   const selectedClinic = clinics.find((c) => c.id === selectedClinicId);
-
-  // Clinics with custom rules count
   const clinicsWithRules = new Set(rules.map((r) => r.clinic_id));
 
-  // Simulation result
   const simResult = selectedClinicId
     ? simulateCommission(clinicRules, simCost)
     : null;
 
-  // ── CRUD ──
+  // ── CRUD via Supabase directly ──
   const saveRule = async (draft: RuleDraft) => {
     setSaving(true);
     setError(null);
     setSuccessMsg(null);
     try {
       const isNew = !draft.id;
-      const res = await fetch("/api/admin/commission-rules", {
-        method: isNew ? "POST" : "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to save");
+      const payload = {
+        clinic_id: draft.clinic_id,
+        rule_type: draft.rule_type,
+        threshold_min: draft.threshold_min,
+        threshold_max: draft.threshold_max,
+        rate_pct: draft.rule_type === "percentage" ? draft.rate_pct : null,
+        fixed_amount: draft.rule_type === "fixed" ? draft.fixed_amount : null,
+        currency: draft.currency,
+        priority: draft.priority,
+        is_active: draft.is_active,
+      };
+
+      if (isNew) {
+        const { error } = await supabase
+          .from("clinic_commission_rules")
+          .insert(payload);
+        if (error) throw error;
+        setSuccessMsg("Rule created");
+      } else {
+        const { error } = await supabase
+          .from("clinic_commission_rules")
+          .update(payload)
+          .eq("id", draft.id!);
+        if (error) throw error;
+        setSuccessMsg("Rule updated");
       }
 
-      setSuccessMsg(isNew ? "Rule created" : "Rule updated");
       setEditingRule(null);
       await loadData();
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -180,15 +186,15 @@ export default function CommissionsPage() {
     if (!confirm("Delete this commission rule?")) return;
     setError(null);
     try {
-      const res = await fetch(
-        `/api/admin/commission-rules?id=${ruleId}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("Failed to delete");
+      const { error } = await supabase
+        .from("clinic_commission_rules")
+        .delete()
+        .eq("id", ruleId);
+      if (error) throw error;
       setSuccessMsg("Rule deleted");
       await loadData();
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "Failed to delete");
     }
   };
 
@@ -196,7 +202,7 @@ export default function CommissionsPage() {
     await saveRule({ ...rule, is_active: !rule.is_active });
   };
 
-  // Auto-clear success message
+  // Auto-clear success
   useEffect(() => {
     if (successMsg) {
       const t = setTimeout(() => setSuccessMsg(null), 3000);
@@ -207,7 +213,7 @@ export default function CommissionsPage() {
   if (loading) {
     return (
       <div className="space-y-6 pt-6">
-        <h1 className="text-xl sm:text-2xl font-bold">Commissions</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Commission Rules</h1>
         <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
       </div>
     );
@@ -216,16 +222,14 @@ export default function CommissionsPage() {
   return (
     <div className="space-y-6 pt-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            Commission Rules
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Set per-clinic commission rates. Clinics without custom rules use the
-            default 10%.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          Commission Rules
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Set per-clinic commission rates. Clinics without custom rules use the
+          default 10%.
+        </p>
       </div>
 
       {/* Alerts */}
@@ -293,7 +297,7 @@ export default function CommissionsPage() {
             })}
             {clinics.length === 0 && (
               <div className="px-4 py-8 text-center text-sm text-gray-500">
-                No clinics found
+                No clinics with owners found
               </div>
             )}
           </div>
@@ -327,7 +331,7 @@ export default function CommissionsPage() {
                     onClick={() =>
                       setEditingRule({
                         ...EMPTY_RULE,
-                        clinic_id: selectedClinicId,
+                        clinic_id: selectedClinicId!,
                         priority: clinicRules.length,
                       })
                     }
@@ -486,10 +490,8 @@ function RuleForm({
             onChange={(e) =>
               update({
                 rule_type: e.target.value as "percentage" | "fixed",
-                rate_pct:
-                  e.target.value === "percentage" ? 10 : null,
-                fixed_amount:
-                  e.target.value === "fixed" ? 250 : null,
+                rate_pct: e.target.value === "percentage" ? 10 : null,
+                fixed_amount: e.target.value === "fixed" ? 250 : null,
               })
             }
             className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
