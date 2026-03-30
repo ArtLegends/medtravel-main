@@ -27,6 +27,32 @@ type NotificationRow = {
 
 const BELL_LIMIT = 5;
 
+// ── Inline copy button ──
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="inline-flex items-center ml-1 text-default-400 hover:text-primary transition"
+      title="Copy to clipboard"
+    >
+      <Icon
+        icon={copied ? "solar:check-circle-bold" : "solar:copy-linear"}
+        width={13}
+      />
+    </button>
+  );
+}
+
 function renderNotification(n: NotificationRow) {
   const d = n.data ?? {};
 
@@ -43,14 +69,17 @@ function renderNotification(n: NotificationRow) {
             program has been approved.
           </div>
           {code && (
-            <div className="text-xs text-default-500">
-              Your referral code:{" "}
-              <span className="font-mono font-semibold">{code}</span>
+            <div className="text-xs text-default-500 flex items-center">
+              Referral code:{" "}
+              <span className="font-mono font-semibold ml-1">{code}</span>
+              <CopyButton text={code} />
             </div>
           )}
           {url && (
-            <div className="text-xs text-default-500 break-all">
-              Referral link: {url}
+            <div className="text-xs text-default-500 flex items-start">
+              <span className="shrink-0">Referral link:&nbsp;</span>
+              <span className="break-all">{url}</span>
+              <CopyButton text={url} />
             </div>
           )}
         </div>
@@ -91,13 +120,11 @@ function renderNotification(n: NotificationRow) {
 
     case "clinic_rejected":
       return (
-        <div className="space-y-1 text-left">
-          <div className="text-sm font-medium">
-            Unfortunately, your clinic{" "}
-            <span className="font-semibold">{d.name ?? "your clinic"}</span>{" "}
-            application was not approved at this time. Please contact our
-            support team for further details.
-          </div>
+        <div className="text-sm font-medium text-left">
+          Unfortunately, your clinic{" "}
+          <span className="font-semibold">{d.name ?? "your clinic"}</span>{" "}
+          application was not approved at this time. Please contact our
+          support team for further details.
         </div>
       );
 
@@ -227,20 +254,15 @@ export default function NotificationsBell() {
     setLoading(false);
   }, [supabase, session]);
 
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+  useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
   const unreadCount = items.filter((n) => !n.is_read).length;
 
   const markAllRead = useCallback(async () => {
     if (!supabase || !session || unreadCount === 0) return;
     setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("user_id", session.user.id)
-      .eq("is_read", false);
+    await supabase.from("notifications").update({ is_read: true })
+      .eq("user_id", session.user.id).eq("is_read", false);
   }, [supabase, session, unreadCount]);
 
   return (
@@ -268,22 +290,28 @@ export default function NotificationsBell() {
       <DropdownMenu
         aria-label="Notifications"
         className="max-w-xs"
-        disabledKeys={["title", "empty"]}
+        disabledKeys={["title", "empty", "close-btn"]}
         itemClasses={{
           base: "data-[hover=true]:bg-default-100/50",
         }}
       >
-        <DropdownItem key="title" className="cursor-default opacity-100" textValue="Notifications">
+        {/* Header with close button */}
+        <DropdownItem key="title" className="cursor-default opacity-100" isReadOnly textValue="Notifications">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase text-default-500">
               Notifications
             </span>
-            <span className="text-[10px] text-default-400">
-              {loading ? "Loading…" : `${items.length}`}
-            </span>
+            {/* Close button — DropdownMenu closes via HeroUI's onAction, but we use a visual X */}
+            <button
+              className="p-0.5 rounded text-default-400 hover:text-default-600 transition"
+              aria-label="Close"
+            >
+              <Icon icon="solar:close-circle-linear" width={16} />
+            </button>
           </div>
         </DropdownItem>
 
+        {/* Empty state */}
         {items.length === 0 && !loading ? (
           <DropdownItem key="empty" className="cursor-default opacity-100" textValue="empty">
             <span className="text-xs text-default-500">No notifications yet.</span>
@@ -292,6 +320,7 @@ export default function NotificationsBell() {
           <DropdownItem key="empty-ph" className="hidden" textValue="h"><span /></DropdownItem>
         )}
 
+        {/* Items */}
         {items.length > 0 ? (
           <>
             {items.map((n) => (
@@ -304,6 +333,7 @@ export default function NotificationsBell() {
           <DropdownItem key="items-ph" className="hidden" textValue="h"><span /></DropdownItem>
         )}
 
+        {/* View all */}
         <DropdownItem
           key="view-all"
           className="text-center"

@@ -6,8 +6,7 @@ import { Icon } from "@iconify/react";
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 
-// ── Notification types & helpers ──
-
+// ── Types ──
 type NotificationRow = {
   id: string;
   type: string;
@@ -16,6 +15,24 @@ type NotificationRow = {
   created_at: string;
 };
 
+// ── Copy button ──
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button onClick={handle} className="inline-flex ml-1 text-default-400 hover:text-primary transition" title="Copy">
+      <Icon icon={copied ? "solar:check-circle-bold" : "solar:copy-linear"} width={13} />
+    </button>
+  );
+}
+
+// ── Notification title ──
 function notifTitle(type: string): string {
   switch (type) {
     case "booking_confirmed":        return "Booking confirmed";
@@ -34,38 +51,160 @@ function notifTitle(type: string): string {
   }
 }
 
-function notifBody(type: string, d: any): string {
+// ── Full notification body (rendered as JSX for links/copy) ──
+function NotifBody({ type, d }: { type: string; d: any }) {
+  switch (type) {
+    case "partner_program_approved": {
+      const program = d.program_key ?? "affiliate";
+      const code = d.ref_code as string | undefined;
+      const url = d.referral_url as string | undefined;
+      return (
+        <div className="space-y-1">
+          <div>
+            Your request for the <span className="font-semibold">{program}</span> affiliate
+            program has been approved.
+          </div>
+          {code && (
+            <div className="flex items-center">
+              Referral code: <span className="font-mono font-semibold ml-1">{code}</span>
+              <CopyBtn text={code} />
+            </div>
+          )}
+          {url && (
+            <div className="flex items-start">
+              <span className="shrink-0">Referral link:&nbsp;</span>
+              <span className="break-all text-primary">{url}</span>
+              <CopyBtn text={url} />
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    case "clinic_approved":
+      return (
+        <div>
+          Congratulations! Your clinic <span className="font-semibold">{d.name || "Your clinic"}</span> has
+          been approved and is now published on MedTravel.
+        </div>
+      );
+
+    case "clinic_rejected":
+      return (
+        <div>
+          Unfortunately, your clinic <span className="font-semibold">{d.name || "your clinic"}</span> application
+          was not approved at this time. Please contact our support team for further details.
+        </div>
+      );
+
+    case "booking_confirmed":
+      return (
+        <div>
+          Your booking for <span className="font-semibold">{d.service_name || "your appointment"}</span> at{" "}
+          <span className="font-semibold">{d.clinic_name || "the clinic"}</span> has been confirmed by the clinic.
+          {d.scheduled_at && <> Scheduled for: {d.scheduled_at}.</>}
+        </div>
+      );
+
+    case "booking_completed":
+      return (
+        <div>
+          Your treatment at <span className="font-semibold">{d.clinic_name || "the clinic"}</span> has been
+          successfully completed. We hope everything went well!
+        </div>
+      );
+
+    case "booking_canceled":
+      return (
+        <div>
+          Your booking at <span className="font-semibold">{d.clinic_name || "the clinic"}</span> has been
+          canceled. If you have any questions, please contact the clinic directly.
+        </div>
+      );
+
+    case "new_booking":
+      return (
+        <div>
+          <span className="font-semibold">{d.patient_name || "A new patient"}</span> has submitted a booking
+          request for <span className="font-semibold">{d.service_name || "a service"}</span>. Please review it
+          in your clinic dashboard.
+        </div>
+      );
+
+    case "new_review":
+      return (
+        <div>
+          <span className="font-semibold">{d.reviewer_name || "A patient"}</span> has left a new review
+          (rated {d.rating || "—"}/10) for <span className="font-semibold">{d.clinic_name || "your clinic"}</span>.
+        </div>
+      );
+
+    case "new_referral":
+      return (
+        <div>
+          Great news! A new patient has registered through your{" "}
+          <span className="font-semibold">{d.program_key || "referral"}</span> program.
+          Keep sharing your link!
+        </div>
+      );
+
+    case "new_partner_recruited":
+      return (
+        <div>
+          A new affiliate partner has joined your network through your recruitment link.
+          You will earn commissions from their future referrals.
+        </div>
+      );
+
+    case "new_inquiry":
+      return (
+        <div>
+          <span className="font-semibold">{d.sender_name || "A potential patient"}</span> has sent a new
+          inquiry about <span className="font-semibold">{d.clinic_name || "your clinic"}</span>.
+          Please respond as soon as possible.
+        </div>
+      );
+
+    case "set_password":
+      return (
+        <div>
+          Set a password for your account to enable faster sign-in.
+          You signed in via email link.
+        </div>
+      );
+
+    default:
+      return <div>{d?.message || "You have a new notification."}</div>;
+  }
+}
+
+// ── Action link per notification type ──
+function notifActionLink(type: string, d: any): { label: string; href: string } | null {
   switch (type) {
     case "booking_confirmed":
-      return `Your booking for ${d.service_name || "an appointment"} at ${d.clinic_name || "the clinic"} has been confirmed by the clinic.${d.scheduled_at ? ` Scheduled for: ${d.scheduled_at}.` : ""}`;
     case "booking_completed":
-      return `Your treatment at ${d.clinic_name || "the clinic"} has been successfully completed. We hope everything went well!`;
     case "booking_canceled":
-      return `Your booking at ${d.clinic_name || "the clinic"} has been canceled. If you have any questions, please contact the clinic directly.`;
+      return { label: "View my bookings", href: "/patient/bookings" };
     case "new_booking":
-      return `${d.patient_name || "A new patient"} has submitted a booking request for ${d.service_name || "a service"}. Please review it in your clinic dashboard.`;
+      return { label: "Review in dashboard", href: "/customer" };
     case "new_review":
-      return `${d.reviewer_name || "A patient"} has left a new review (rated ${d.rating || "—"}/10) for ${d.clinic_name || "your clinic"}.`;
+      return { label: "View reviews", href: "/customer" };
     case "new_referral":
-      return `Great news! A new patient has registered through your ${d.program_key || "referral"} program. Keep sharing your link!`;
+      return { label: "View referrals", href: "/partner" };
     case "new_partner_recruited":
-      return "A new affiliate partner has joined your network through your recruitment link. You will earn commissions from their future referrals.";
+      return { label: "View partners", href: "/supervisor/partners" };
     case "new_inquiry":
-      return `${d.sender_name || "A potential patient"} has sent a new inquiry about ${d.clinic_name || "your clinic"}. Please respond as soon as possible.`;
+      return { label: "View inquiries", href: "/customer" };
     case "clinic_approved":
-      return `Congratulations! ${d.name || "Your clinic"} has been approved and is now published on MedTravel.`;
+      return d.slug ? { label: "Open clinic page", href: `/clinic/${d.slug}` } : null;
     case "clinic_rejected":
-      return `Unfortunately, ${d.name || "your clinic"} application was not approved at this time. Please contact our support team for further details.`;
-    case "partner_program_approved": {
-      let text = `Your request for the ${d.program_key || "affiliate"} program has been approved.`;
-      if (d.ref_code) text += ` Your referral code: ${d.ref_code}.`;
-      if (d.referral_url) text += ` Referral link: ${d.referral_url}`;
-      return text;
-    }
+      return { label: "Contact support", href: "/contact" };
+    case "partner_program_approved":
+      return { label: "Go to partner dashboard", href: "/partner" };
     case "set_password":
-      return "Set a password for your account to enable faster sign-in. You signed in via email link.";
+      return { label: "Go to Settings", href: d.action_url ?? "/settings" };
     default:
-      return d?.message || "You have a new notification.";
+      return null;
   }
 }
 
@@ -165,7 +304,7 @@ export default function ProfilePage() {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        {/* ── Left: Profile form (original) ── */}
+        {/* ── Left: Profile form ── */}
         <form onSubmit={handleSubmit} className="space-y-8">
           <section className="rounded-xl border bg-white p-6 space-y-4">
             <h2 className="text-lg font-semibold">Account</h2>
@@ -266,12 +405,6 @@ function NotificationsSidebar() {
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
   };
 
-  const deleteOne = async (id: string) => {
-    if (!supabase) return;
-    setItems((prev) => prev.filter((n) => n.id !== id));
-    await supabase.from("notifications").delete().eq("id", id);
-  };
-
   const unreadCount = items.filter((n) => !n.is_read).length;
 
   return (
@@ -294,7 +427,6 @@ function NotificationsSidebar() {
               </button>
             )}
           </div>
-          {/* Filter tabs */}
           <div className="flex gap-1 mt-2">
             {(["all", "unread"] as const).map((f) => (
               <button
@@ -315,57 +447,58 @@ function NotificationsSidebar() {
           {loading && items.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-gray-400">Loading…</div>
           )}
-
           {!loading && items.length === 0 && (
             <div className="px-4 py-10 text-center text-sm text-gray-500">
               {filter === "unread" ? "No unread notifications" : "No notifications yet"}
             </div>
           )}
 
-          {items.map((n) => (
-            <div
-              key={n.id}
-              className={`group px-4 py-3 transition ${!n.is_read ? "bg-blue-50/30" : ""}`}
-            >
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
+          {items.map((n) => {
+            const action = notifActionLink(n.type, n.data);
+            return (
+              <div
+                key={n.id}
+                onClick={() => !n.is_read && markOneRead(n.id)}
+                className={`px-4 py-3 transition cursor-pointer ${
+                  !n.is_read ? "bg-blue-50/30 hover:bg-blue-50/50" : "hover:bg-gray-50"
+                }`}
+              >
+                {/* Title row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     {!n.is_read && (
                       <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
                     )}
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-semibold text-gray-900 truncate">
                       {notifTitle(n.type)}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-xs text-gray-500 break-words line-clamp-3">
-                    {notifBody(n.type, n.data)}
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-400">
+                  <span className="shrink-0 text-[11px] text-gray-400 whitespace-nowrap">
                     {timeAgo(n.created_at)}
-                  </div>
+                  </span>
                 </div>
-                {/* Hover action buttons */}
-                <div className="shrink-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!n.is_read && (
-                    <button
-                      onClick={() => markOneRead(n.id)}
-                      className="rounded p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
-                      title="Mark as read"
+
+                {/* Full body text */}
+                <div className="mt-1 text-xs text-gray-600 break-words">
+                  <NotifBody type={n.type} d={n.data} />
+                </div>
+
+                {/* Action link */}
+                {action && (
+                  <div className="mt-1.5">
+                    <a
+                      href={action.href}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                     >
-                      <Icon icon="solar:check-read-linear" width={14} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteOne(n.id)}
-                    className="rounded p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
-                    title="Remove notification"
-                  >
-                    <Icon icon="solar:trash-bin-minimalistic-linear" width={14} />
-                  </button>
-                </div>
+                      {action.label}
+                      <Icon icon="solar:arrow-right-linear" width={12} />
+                    </a>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Load more */}
