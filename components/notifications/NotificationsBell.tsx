@@ -1,13 +1,21 @@
 // components/notifications/NotificationsBell.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Icon } from "@iconify/react";
-import { Badge, Button } from "@heroui/react";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Badge,
+  Button,
+} from "@heroui/react";
 import { useRouter } from "next/navigation";
 
 import { useSupabase } from "@/lib/supabase/supabase-provider";
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
+import { clinicHref } from "@/lib/clinic-url";
 
 type NotificationRow = {
   id: string;
@@ -17,85 +25,185 @@ type NotificationRow = {
   created_at: string;
 };
 
-// ── Short, clear notification text per type ──
-function notifTitle(type: string, d: any): string {
-  switch (type) {
-    case "booking_confirmed":
-      return "Booking confirmed";
-    case "booking_completed":
-      return "Treatment completed";
-    case "booking_canceled":
-      return "Booking canceled";
-    case "new_booking":
-      return "New booking received";
-    case "new_review":
-      return "New review received";
-    case "new_referral":
-      return "New referral";
-    case "new_partner_recruited":
-      return "New partner recruited";
-    case "new_inquiry":
-      return "New clinic inquiry";
-    case "clinic_approved":
-      return "Clinic published";
-    case "clinic_rejected":
-      return "Clinic not approved";
-    case "partner_program_approved":
-      return "Program approved";
-    case "set_password":
-      return "Set your password";
-    default:
-      return "Notification";
-  }
-}
-
-function notifBody(type: string, d: any): string {
-  switch (type) {
-    case "booking_confirmed":
-      return `${d.service_name || "Appointment"} at ${d.clinic_name || "clinic"}`;
-    case "booking_completed":
-      return `Treatment at ${d.clinic_name || "clinic"} completed`;
-    case "booking_canceled":
-      return `Booking at ${d.clinic_name || "clinic"} was canceled`;
-    case "new_booking":
-      return `${d.patient_name || "Patient"} — ${d.service_name || "service"}`;
-    case "new_review":
-      return `${d.reviewer_name || "Someone"} rated ${d.clinic_name || "clinic"} ${d.rating || ""}/10`;
-    case "new_referral":
-      return `New patient via ${d.program_key || "referral"} program`;
-    case "new_partner_recruited":
-      return "A new partner joined your network";
-    case "new_inquiry":
-      return `${d.sender_name || "Someone"} — ${d.clinic_name || "clinic"}`;
-    case "clinic_approved":
-      return `${d.name || "Your clinic"} is now live on MedTravel`;
-    case "clinic_rejected":
-      return `${d.name || "Your clinic"} was not approved`;
-    case "partner_program_approved": {
-      let text = `${d.program_key || "Program"} approved`;
-      if (d.ref_code) text += `. Code: ${d.ref_code}`;
-      return text;
-    }
-    case "set_password":
-      return "Set a password for faster sign-in";
-    default:
-      return d?.message || "";
-  }
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Math.max(0, Date.now() - new Date(dateStr).getTime());
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d`;
-  return new Date(dateStr).toLocaleDateString();
-}
-
 const BELL_LIMIT = 5;
+
+function renderNotification(n: NotificationRow) {
+  const d = n.data ?? {};
+
+  switch (n.type) {
+    case "partner_program_approved": {
+      const program = d.program_key ?? "program";
+      const code = d.ref_code as string | undefined;
+      const url = d.referral_url as string | undefined;
+      return (
+        <div className="space-y-1 text-left">
+          <div className="text-sm font-medium">
+            Your request for the{" "}
+            <span className="font-semibold">{program}</span> affiliate
+            program has been approved.
+          </div>
+          {code && (
+            <div className="text-xs text-default-500">
+              Your referral code:{" "}
+              <span className="font-mono font-semibold">{code}</span>
+            </div>
+          )}
+          {url && (
+            <div className="text-xs text-default-500 break-all">
+              Referral link: {url}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    case "clinic_approved": {
+      const clinicName = d.name ?? "your clinic";
+      let clinicUrl: string | null = null;
+      try {
+        if (d.slug) {
+          clinicUrl = clinicHref({
+            slug: d.slug,
+            country: d.country ?? undefined,
+            province: d.province ?? undefined,
+            city: d.city ?? undefined,
+            district: d.district ?? undefined,
+          });
+        }
+      } catch { clinicUrl = null; }
+      return (
+        <div className="space-y-1 text-left">
+          <div className="text-sm font-medium">
+            Congratulations! Your clinic{" "}
+            <span className="font-semibold">{clinicName}</span> has been
+            approved and is now published on MedTravel.
+          </div>
+          {clinicUrl && (
+            <div className="text-xs text-default-500">
+              <a href={clinicUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+                Open clinic page
+              </a>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    case "clinic_rejected":
+      return (
+        <div className="space-y-1 text-left">
+          <div className="text-sm font-medium">
+            Unfortunately, your clinic{" "}
+            <span className="font-semibold">{d.name ?? "your clinic"}</span>{" "}
+            application was not approved at this time. Please contact our
+            support team for further details.
+          </div>
+        </div>
+      );
+
+    case "booking_confirmed":
+      return (
+        <div className="space-y-1 text-left">
+          <div className="text-sm font-medium">
+            Your booking for{" "}
+            <span className="font-semibold">{d.service_name ?? "your appointment"}</span>{" "}
+            at <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span>{" "}
+            has been confirmed by the clinic.
+          </div>
+          {d.scheduled_at && (
+            <div className="text-xs text-default-500">Scheduled for: {d.scheduled_at}</div>
+          )}
+        </div>
+      );
+
+    case "booking_completed":
+      return (
+        <div className="text-sm font-medium text-left">
+          Your treatment at{" "}
+          <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span>{" "}
+          has been successfully completed. We hope everything went well!
+        </div>
+      );
+
+    case "booking_canceled":
+      return (
+        <div className="text-sm font-medium text-left">
+          Your booking at{" "}
+          <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span>{" "}
+          has been canceled. If you have any questions, please contact the
+          clinic directly.
+        </div>
+      );
+
+    case "new_booking":
+      return (
+        <div className="text-sm font-medium text-left">
+          <span className="font-semibold">{d.patient_name ?? "A new patient"}</span>{" "}
+          has submitted a booking request for{" "}
+          <span className="font-semibold">{d.service_name ?? "a service"}</span>.
+          Please review it in your clinic dashboard.
+        </div>
+      );
+
+    case "new_review":
+      return (
+        <div className="text-sm font-medium text-left">
+          <span className="font-semibold">{d.reviewer_name ?? "A patient"}</span>{" "}
+          has left a new review (rated {d.rating ?? "—"}/10) for{" "}
+          <span className="font-semibold">{d.clinic_name ?? "your clinic"}</span>.
+        </div>
+      );
+
+    case "new_referral":
+      return (
+        <div className="text-sm font-medium text-left">
+          Great news! A new patient has registered through your{" "}
+          <span className="font-semibold">{d.program_key ?? "referral"}</span>{" "}
+          program. Keep sharing your link!
+        </div>
+      );
+
+    case "new_partner_recruited":
+      return (
+        <div className="text-sm font-medium text-left">
+          A new affiliate partner has joined your network through your
+          recruitment link. You will earn commissions from their future referrals.
+        </div>
+      );
+
+    case "new_inquiry":
+      return (
+        <div className="text-sm font-medium text-left">
+          <span className="font-semibold">{d.sender_name ?? "A potential patient"}</span>{" "}
+          has sent a new inquiry about{" "}
+          <span className="font-semibold">{d.clinic_name ?? "your clinic"}</span>.
+          Please respond as soon as possible.
+        </div>
+      );
+
+    case "set_password":
+      return (
+        <div className="space-y-2 text-left">
+          <div className="text-sm font-medium">
+            Set a password for your account to enable faster sign-in.
+          </div>
+          <div className="text-xs text-default-500">
+            You signed in via email link.{" "}
+            <a href={d.action_url ?? "/settings"} className="text-primary underline font-medium">
+              Go to Settings
+            </a>
+          </div>
+        </div>
+      );
+
+    default:
+      return (
+        <div className="text-sm text-left">
+          {d.message ?? "You have a new notification."}
+        </div>
+      );
+  }
+}
 
 export default function NotificationsBell() {
   const { supabase, session } = useSupabase() as SupabaseContextType;
@@ -103,8 +211,6 @@ export default function NotificationsBell() {
 
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   if (!session) return null;
 
@@ -125,18 +231,6 @@ export default function NotificationsBell() {
     loadNotifications();
   }, [loadNotifications]);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
   const unreadCount = items.filter((n) => !n.is_read).length;
 
   const markAllRead = useCallback(async () => {
@@ -149,99 +243,78 @@ export default function NotificationsBell() {
       .eq("is_read", false);
   }, [supabase, session, unreadCount]);
 
-  const handleBellClick = () => {
-    setOpen((v) => !v);
-    if (!open && unreadCount > 0) markAllRead();
-  };
-
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Bell button — keeps HeroUI Button with border */}
-      <Button
-        className="h-8 w-8 min-w-0 p-0"
-        size="sm"
-        variant="ghost"
-        onPress={handleBellClick}
-      >
-        <Badge
-          color={unreadCount > 0 ? "danger" : "default"}
-          content={unreadCount > 0 ? String(Math.min(unreadCount, 9)) : ""}
-          isInvisible={unreadCount === 0}
-          placement="top-right"
-          shape="circle"
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button
+          className="h-8 w-8 min-w-0 p-0"
           size="sm"
+          variant="ghost"
+          onPress={() => { if (unreadCount > 0) markAllRead(); }}
         >
-          <Icon className="text-default-500" icon="solar:bell-linear" width={22} />
-        </Badge>
-      </Button>
+          <Badge
+            color={unreadCount > 0 ? "danger" : "default"}
+            content={unreadCount > 0 ? String(Math.min(unreadCount, 9)) : ""}
+            isInvisible={unreadCount === 0}
+            placement="top-right"
+            shape="circle"
+            size="sm"
+          >
+            <Icon className="text-default-500" icon="solar:bell-linear" width={22} />
+          </Badge>
+        </Button>
+      </DropdownTrigger>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-[340px] max-w-[calc(100vw-32px)] rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b px-4 py-2.5">
-            <span className="text-sm font-semibold text-gray-900">
+      <DropdownMenu
+        aria-label="Notifications"
+        className="max-w-xs"
+        disabledKeys={["title", "empty"]}
+        itemClasses={{
+          base: "data-[hover=true]:bg-default-100/50",
+        }}
+      >
+        <DropdownItem key="title" className="cursor-default opacity-100" textValue="Notifications">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase text-default-500">
               Notifications
             </span>
-            <button
-              onClick={() => setOpen(false)}
-              className="rounded-md p-1 text-gray-400 hover:text-gray-600 transition"
-              aria-label="Close"
-            >
-              <Icon icon="solar:close-circle-linear" width={18} />
-            </button>
+            <span className="text-[10px] text-default-400">
+              {loading ? "Loading…" : `${items.length}`}
+            </span>
           </div>
+        </DropdownItem>
 
-          {/* Items */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-100">
-            {loading && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
-                Loading…
-              </div>
-            )}
+        {items.length === 0 && !loading ? (
+          <DropdownItem key="empty" className="cursor-default opacity-100" textValue="empty">
+            <span className="text-xs text-default-500">No notifications yet.</span>
+          </DropdownItem>
+        ) : (
+          <DropdownItem key="empty-ph" className="hidden" textValue="h"><span /></DropdownItem>
+        )}
 
-            {!loading && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-gray-500">
-                No notifications yet
-              </div>
-            )}
-
+        {items.length > 0 ? (
+          <>
             {items.map((n) => (
-              <div
-                key={n.id}
-                className={`px-4 py-3 ${!n.is_read ? "bg-blue-50/30" : ""}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {notifTitle(n.type, n.data)}
-                    </div>
-                    <div className="mt-0.5 text-xs text-gray-500 line-clamp-2 break-words">
-                      {notifBody(n.type, n.data)}
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-gray-400 mt-0.5">
-                    {timeAgo(n.created_at)}
-                  </span>
-                </div>
-              </div>
+              <DropdownItem key={n.id} className="py-2" textValue={n.type}>
+                {renderNotification(n)}
+              </DropdownItem>
             ))}
-          </div>
+          </>
+        ) : (
+          <DropdownItem key="items-ph" className="hidden" textValue="h"><span /></DropdownItem>
+        )}
 
-          {/* Footer */}
-          <div className="border-t px-4 py-2.5">
-            <button
-              onClick={() => {
-                setOpen(false);
-                router.push("/profile?tab=notifications");
-              }}
-              className="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-700 transition"
-            >
-              View all notifications
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+        <DropdownItem
+          key="view-all"
+          className="text-center"
+          textValue="View all notifications"
+          onPress={() => router.push("/profile?tab=notifications")}
+        >
+          <span className="text-sm font-medium text-primary">
+            View all notifications
+          </span>
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
   );
 }
