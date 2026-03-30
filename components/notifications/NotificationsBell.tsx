@@ -27,28 +27,23 @@ type NotificationRow = {
 
 const BELL_LIMIT = 5;
 
-// ── Inline copy button ──
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
-
   return (
     <button
       onClick={handleCopy}
       className="inline-flex items-center ml-1 text-default-400 hover:text-primary transition"
       title="Copy to clipboard"
     >
-      <Icon
-        icon={copied ? "solar:check-circle-bold" : "solar:copy-linear"}
-        width={13}
-      />
+      <Icon icon={copied ? "solar:check-circle-bold" : "solar:copy-linear"} width={13} />
     </button>
   );
 }
@@ -76,9 +71,8 @@ function renderNotification(n: NotificationRow) {
             </div>
           )}
           {url && (
-            <div className="text-xs text-default-500 flex items-start">
-              <span className="shrink-0">Referral link:&nbsp;</span>
-              <span className="break-all">{url}</span>
+            <div className="text-xs text-default-500 flex items-center">
+              Referral link
               <CopyButton text={url} />
             </div>
           )}
@@ -90,28 +84,17 @@ function renderNotification(n: NotificationRow) {
       const clinicName = d.name ?? "your clinic";
       let clinicUrl: string | null = null;
       try {
-        if (d.slug) {
-          clinicUrl = clinicHref({
-            slug: d.slug,
-            country: d.country ?? undefined,
-            province: d.province ?? undefined,
-            city: d.city ?? undefined,
-            district: d.district ?? undefined,
-          });
-        }
+        if (d.slug) clinicUrl = clinicHref({ slug: d.slug, country: d.country, province: d.province, city: d.city, district: d.district });
       } catch { clinicUrl = null; }
       return (
         <div className="space-y-1 text-left">
           <div className="text-sm font-medium">
-            Congratulations! Your clinic{" "}
-            <span className="font-semibold">{clinicName}</span> has been
-            approved and is now published on MedTravel.
+            Congratulations! Your clinic <span className="font-semibold">{clinicName}</span> has
+            been approved and is now published on MedTravel.
           </div>
           {clinicUrl && (
             <div className="text-xs text-default-500">
-              <a href={clinicUrl} target="_blank" rel="noreferrer" className="text-primary underline">
-                Open clinic page
-              </a>
+              <a href={clinicUrl} target="_blank" rel="noreferrer" className="text-primary underline">Open clinic page</a>
             </div>
           )}
         </div>
@@ -121,10 +104,8 @@ function renderNotification(n: NotificationRow) {
     case "clinic_rejected":
       return (
         <div className="text-sm font-medium text-left">
-          Unfortunately, your clinic{" "}
-          <span className="font-semibold">{d.name ?? "your clinic"}</span>{" "}
-          application was not approved at this time. Please contact our
-          support team for further details.
+          Unfortunately, your clinic <span className="font-semibold">{d.name ?? "your clinic"}</span> application
+          was not approved at this time. Please contact our support team for further details.
         </div>
       );
 
@@ -132,103 +113,44 @@ function renderNotification(n: NotificationRow) {
       return (
         <div className="space-y-1 text-left">
           <div className="text-sm font-medium">
-            Your booking for{" "}
-            <span className="font-semibold">{d.service_name ?? "your appointment"}</span>{" "}
-            at <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span>{" "}
-            has been confirmed by the clinic.
+            Your booking for <span className="font-semibold">{d.service_name ?? "your appointment"}</span> at{" "}
+            <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span> has been confirmed.
           </div>
-          {d.scheduled_at && (
-            <div className="text-xs text-default-500">Scheduled for: {d.scheduled_at}</div>
-          )}
+          {d.scheduled_at && <div className="text-xs text-default-500">Scheduled for: {d.scheduled_at}</div>}
         </div>
       );
 
     case "booking_completed":
-      return (
-        <div className="text-sm font-medium text-left">
-          Your treatment at{" "}
-          <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span>{" "}
-          has been successfully completed. We hope everything went well!
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left">Your treatment at <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span> has been successfully completed. We hope everything went well!</div>);
 
     case "booking_canceled":
-      return (
-        <div className="text-sm font-medium text-left">
-          Your booking at{" "}
-          <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span>{" "}
-          has been canceled. If you have any questions, please contact the
-          clinic directly.
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left">Your booking at <span className="font-semibold">{d.clinic_name ?? "the clinic"}</span> has been canceled. If you have any questions, please contact the clinic directly.</div>);
 
     case "new_booking":
-      return (
-        <div className="text-sm font-medium text-left">
-          <span className="font-semibold">{d.patient_name ?? "A new patient"}</span>{" "}
-          has submitted a booking request for{" "}
-          <span className="font-semibold">{d.service_name ?? "a service"}</span>.
-          Please review it in your clinic dashboard.
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left"><span className="font-semibold">{d.patient_name ?? "A new patient"}</span> has submitted a booking request for <span className="font-semibold">{d.service_name ?? "a service"}</span>. Please review it in your clinic dashboard.</div>);
 
     case "new_review":
-      return (
-        <div className="text-sm font-medium text-left">
-          <span className="font-semibold">{d.reviewer_name ?? "A patient"}</span>{" "}
-          has left a new review (rated {d.rating ?? "—"}/10) for{" "}
-          <span className="font-semibold">{d.clinic_name ?? "your clinic"}</span>.
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left"><span className="font-semibold">{d.reviewer_name ?? "A patient"}</span> has left a new review (rated {d.rating ?? "—"}/10) for <span className="font-semibold">{d.clinic_name ?? "your clinic"}</span>.</div>);
 
     case "new_referral":
-      return (
-        <div className="text-sm font-medium text-left">
-          Great news! A new patient has registered through your{" "}
-          <span className="font-semibold">{d.program_key ?? "referral"}</span>{" "}
-          program. Keep sharing your link!
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left">Great news! A new patient has registered through your <span className="font-semibold">{d.program_key ?? "referral"}</span> program. Keep sharing your link!</div>);
 
     case "new_partner_recruited":
-      return (
-        <div className="text-sm font-medium text-left">
-          A new affiliate partner has joined your network through your
-          recruitment link. You will earn commissions from their future referrals.
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left">A new affiliate partner has joined your network through your recruitment link. You will earn commissions from their future referrals.</div>);
 
     case "new_inquiry":
-      return (
-        <div className="text-sm font-medium text-left">
-          <span className="font-semibold">{d.sender_name ?? "A potential patient"}</span>{" "}
-          has sent a new inquiry about{" "}
-          <span className="font-semibold">{d.clinic_name ?? "your clinic"}</span>.
-          Please respond as soon as possible.
-        </div>
-      );
+      return (<div className="text-sm font-medium text-left"><span className="font-semibold">{d.sender_name ?? "A potential patient"}</span> has sent a new inquiry about <span className="font-semibold">{d.clinic_name ?? "your clinic"}</span>. Please respond as soon as possible.</div>);
 
     case "set_password":
       return (
         <div className="space-y-2 text-left">
-          <div className="text-sm font-medium">
-            Set a password for your account to enable faster sign-in.
-          </div>
-          <div className="text-xs text-default-500">
-            You signed in via email link.{" "}
-            <a href={d.action_url ?? "/settings"} className="text-primary underline font-medium">
-              Go to Settings
-            </a>
-          </div>
+          <div className="text-sm font-medium">Set a password for your account to enable faster sign-in.</div>
+          <div className="text-xs text-default-500">You signed in via email link. <a href={d.action_url ?? "/settings"} className="text-primary underline font-medium">Go to Settings</a></div>
         </div>
       );
 
     default:
-      return (
-        <div className="text-sm text-left">
-          {d.message ?? "You have a new notification."}
-        </div>
-      );
+      return (<div className="text-sm text-left">{d.message ?? "You have a new notification."}</div>);
   }
 }
 
@@ -238,6 +160,7 @@ export default function NotificationsBell() {
 
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   if (!session) return null;
 
@@ -245,8 +168,7 @@ export default function NotificationsBell() {
     if (!supabase || !session) return;
     setLoading(true);
     const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
+      .from("notifications").select("*")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false })
       .limit(BELL_LIMIT);
@@ -266,14 +188,16 @@ export default function NotificationsBell() {
   }, [supabase, session, unreadCount]);
 
   return (
-    <Dropdown placement="bottom-end">
+    <Dropdown
+      placement="bottom-end"
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open && unreadCount > 0) markAllRead();
+      }}
+    >
       <DropdownTrigger>
-        <Button
-          className="h-8 w-8 min-w-0 p-0"
-          size="sm"
-          variant="ghost"
-          onPress={() => { if (unreadCount > 0) markAllRead(); }}
-        >
+        <Button className="h-8 w-8 min-w-0 p-0" size="sm" variant="ghost">
           <Badge
             color={unreadCount > 0 ? "danger" : "default"}
             content={unreadCount > 0 ? String(Math.min(unreadCount, 9)) : ""}
@@ -290,28 +214,31 @@ export default function NotificationsBell() {
       <DropdownMenu
         aria-label="Notifications"
         className="max-w-xs"
-        disabledKeys={["title", "empty", "close-btn"]}
+        disabledKeys={["title", "empty"]}
         itemClasses={{
           base: "data-[hover=true]:bg-default-100/50",
         }}
       >
-        {/* Header with close button */}
-        <DropdownItem key="title" className="cursor-default opacity-100" isReadOnly textValue="Notifications">
+        {/* Header — no hover via pointer-events-none on wrapper + close button with pointer-events-auto */}
+        <DropdownItem key="title" className="cursor-default opacity-100 !bg-transparent" isReadOnly textValue="Notifications">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase text-default-500">
               Notifications
             </span>
-            {/* Close button — DropdownMenu closes via HeroUI's onAction, but we use a visual X */}
             <button
-              className="p-0.5 rounded text-default-400 hover:text-default-600 transition"
-              aria-label="Close"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setIsOpen(false);
+              }}
+              className="p-0.5 rounded text-default-400 hover:text-default-600 transition pointer-events-auto"
+              aria-label="Close notifications"
             >
               <Icon icon="solar:close-circle-linear" width={16} />
             </button>
           </div>
         </DropdownItem>
 
-        {/* Empty state */}
         {items.length === 0 && !loading ? (
           <DropdownItem key="empty" className="cursor-default opacity-100" textValue="empty">
             <span className="text-xs text-default-500">No notifications yet.</span>
@@ -320,7 +247,6 @@ export default function NotificationsBell() {
           <DropdownItem key="empty-ph" className="hidden" textValue="h"><span /></DropdownItem>
         )}
 
-        {/* Items */}
         {items.length > 0 ? (
           <>
             {items.map((n) => (
@@ -333,16 +259,13 @@ export default function NotificationsBell() {
           <DropdownItem key="items-ph" className="hidden" textValue="h"><span /></DropdownItem>
         )}
 
-        {/* View all */}
         <DropdownItem
           key="view-all"
           className="text-center"
           textValue="View all notifications"
-          onPress={() => router.push("/profile?tab=notifications")}
+          onPress={() => { setIsOpen(false); router.push("/profile?tab=notifications"); }}
         >
-          <span className="text-sm font-medium text-primary">
-            View all notifications
-          </span>
+          <span className="text-sm font-medium text-primary">View all notifications</span>
         </DropdownItem>
       </DropdownMenu>
     </Dropdown>
