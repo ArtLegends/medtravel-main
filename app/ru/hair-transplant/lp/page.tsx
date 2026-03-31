@@ -305,8 +305,8 @@ hover:border-teal-200/70 hover:ring-teal-100">
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className="rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100
-                transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                        className="shrink-0 rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100
+                          transition-transform duration-300 ease-out group-hover:scale-[1.03]"
                       >
                         <Icon className="h-5 w-5 text-teal-700" />
                       </div>
