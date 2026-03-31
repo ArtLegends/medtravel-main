@@ -106,7 +106,8 @@ function timeAgo(dateStr: string): string {
 
 type FormState = {
   firstName: string; lastName: string; secondaryEmail: string;
-  timeZone: string; phone: string; preferredLanguage: string; marketingEmails: boolean;
+  timeZone: string; phone: string; preferredLanguage: string;
+  marketingEmails: boolean; emailNotifications: boolean;
 };
 
 export default function ProfilePage() {
@@ -114,18 +115,44 @@ export default function ProfilePage() {
   const user = session?.user ?? null;
   const browserTz = useMemo(() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } }, []);
 
-  const [state, setState] = useState<FormState>({ firstName: "", lastName: "", secondaryEmail: "", timeZone: browserTz, phone: "", preferredLanguage: "en", marketingEmails: true });
+  const [state, setState] = useState<FormState>({
+    firstName: "", lastName: "", secondaryEmail: "", timeZone: browserTz,
+    phone: "", preferredLanguage: "en", marketingEmails: true, emailNotifications: true,
+  });
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle"|"saved"|"error">("idle");
   const [errorMsg, setErrorMsg] = useState<string|null>(null);
 
   const timeZones = useMemo(() => { try { if (typeof Intl.supportedValuesOf === "function") return (Intl as any).supportedValuesOf("timeZone") as string[]; } catch {} return ["UTC","Europe/London","Europe/Berlin","Europe/Moscow","Asia/Istanbul","America/New_York","America/Los_Angeles"]; }, []);
 
+  // Load user_metadata fields
   useEffect(() => {
     if (!user) return;
     const meta: any = user.user_metadata ?? {};
-    setState((p) => ({ ...p, firstName: meta.first_name ?? meta.given_name ?? "", lastName: meta.last_name ?? meta.family_name ?? "", secondaryEmail: meta.secondary_email ?? "", timeZone: meta.time_zone ?? p.timeZone ?? browserTz, phone: meta.phone ?? "", preferredLanguage: meta.preferred_language ?? "en", marketingEmails: typeof meta.marketing_emails === "boolean" ? meta.marketing_emails : true }));
+    setState((p) => ({
+      ...p,
+      firstName: meta.first_name ?? meta.given_name ?? "",
+      lastName: meta.last_name ?? meta.family_name ?? "",
+      secondaryEmail: meta.secondary_email ?? "",
+      timeZone: meta.time_zone ?? p.timeZone ?? browserTz,
+      phone: meta.phone ?? "",
+      preferredLanguage: meta.preferred_language ?? "en",
+      marketingEmails: typeof meta.marketing_emails === "boolean" ? meta.marketing_emails : true,
+    }));
   }, [user, browserTz]);
+
+  // Load email_notifications from profiles table
+  useEffect(() => {
+    if (!supabase || !user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("email_notifications")
+        .eq("id", user.id)
+        .single();
+      if (data) setState((p) => ({ ...p, emailNotifications: data.email_notifications ?? true }));
+    })();
+  }, [supabase, user]);
 
   const handleChange = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) => {
     const t = e.target as HTMLInputElement;
@@ -136,8 +163,30 @@ export default function ProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!supabase || !user) return;
     setSaving(true); setStatus("idle"); setErrorMsg(null);
-    const { error } = await supabase.auth.updateUser({ data: { first_name: state.firstName || null, last_name: state.lastName || null, secondary_email: state.secondaryEmail || null, time_zone: state.timeZone || null, phone: state.phone || null, preferred_language: state.preferredLanguage || null, marketing_emails: state.marketingEmails } });
-    if (error) { setStatus("error"); setErrorMsg(error.message); } else setStatus("saved");
+
+    // Update user_metadata via Supabase Auth
+    const { error } = await supabase.auth.updateUser({ data: {
+      first_name: state.firstName || null,
+      last_name: state.lastName || null,
+      secondary_email: state.secondaryEmail || null,
+      time_zone: state.timeZone || null,
+      phone: state.phone || null,
+      preferred_language: state.preferredLanguage || null,
+      marketing_emails: state.marketingEmails,
+    }});
+
+    // Update email_notifications in profiles table
+    const { error: profErr } = await supabase
+      .from("profiles")
+      .update({ email_notifications: state.emailNotifications })
+      .eq("id", user.id);
+
+    if (error || profErr) {
+      setStatus("error");
+      setErrorMsg(error?.message || profErr?.message || "Failed to save");
+    } else {
+      setStatus("saved");
+    }
     setSaving(false);
   };
 
@@ -152,6 +201,7 @@ export default function ProfilePage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Account section */}
           <section className="rounded-xl border bg-white p-6 space-y-4">
             <h2 className="text-lg font-semibold">Account</h2>
             <p className="text-xs text-default-500">Primary email is used for login and security notifications.</p>
@@ -163,14 +213,36 @@ export default function ProfilePage() {
               <div><label className="text-sm text-gray-600">Time zone</label><select className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={state.timeZone} onChange={handleChange("timeZone")}><option value="">Select time zone</option>{timeZones.map((tz) => <option key={tz} value={tz}>{tz}</option>)}</select>{browserTz && <button type="button" onClick={() => setState((p) => ({ ...p, timeZone: browserTz }))} className="mt-1 text-[11px] text-primary hover:underline">Use browser time zone ({browserTz})</button>}</div>
             </div>
           </section>
+
+          {/* Contact & preferences section */}
           <section className="rounded-xl border bg-white p-6 space-y-4">
             <h2 className="text-lg font-semibold">Contact & preferences</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <div><label className="text-sm text-gray-600">Phone / WhatsApp</label><input className="mt-1 w-full rounded-md border px-3 py-2" placeholder="+90 555 000 00 00" value={state.phone} onChange={handleChange("phone")} autoComplete="tel" /></div>
               <div><label className="text-sm text-gray-600">Preferred language</label><select className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={state.preferredLanguage} onChange={handleChange("preferredLanguage")}><option value="en">English</option><option value="ru">Russian</option><option value="pl">Polish</option></select></div>
             </div>
-            <div className="mt-2 flex items-start gap-2"><input id="marketingEmails" type="checkbox" className="mt-1 h-4 w-4 rounded border-gray-400" checked={state.marketingEmails} onChange={handleChange("marketingEmails")} /><label htmlFor="marketingEmails" className="text-sm text-gray-700">Receive product updates and important news about MedTravel<span className="block text-[11px] text-gray-400">No spam — only essential updates a few times per year.</span></label></div>
+
+            {/* Marketing emails */}
+            <div className="mt-2 flex items-start gap-2">
+              <input id="marketingEmails" type="checkbox" className="mt-1 h-4 w-4 rounded border-gray-400" checked={state.marketingEmails} onChange={handleChange("marketingEmails")} />
+              <label htmlFor="marketingEmails" className="text-sm text-gray-700">
+                Receive product updates and important news about MedTravel
+                <span className="block text-[11px] text-gray-400">No spam — only essential updates a few times per year.</span>
+              </label>
+            </div>
+
+            {/* Email notifications toggle — NEW */}
+            <div className="mt-3 flex items-start gap-2">
+              <input id="emailNotifications" type="checkbox" className="mt-1 h-4 w-4 rounded border-gray-400" checked={state.emailNotifications} onChange={handleChange("emailNotifications")} />
+              <label htmlFor="emailNotifications" className="text-sm text-gray-700">
+                Receive email notifications
+                <span className="block text-[11px] text-gray-400">
+                  Get notified by email about booking updates, new reviews, referrals, and other important events.
+                </span>
+              </label>
+            </div>
           </section>
+
           <div className="flex items-center gap-3">
             <button type="submit" disabled={saving} className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{saving ? "Saving…" : "Save changes"}</button>
             {status === "saved" && <span className="text-xs text-emerald-600">Profile updated.</span>}
