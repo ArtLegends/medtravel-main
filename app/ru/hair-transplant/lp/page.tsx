@@ -1,3 +1,4 @@
+// app/ru/hair-transplant/lp/page.tsx
 import type { Metadata } from "next";
 import Script from "next/script";
 import LeadDialog from "./_components/LeadDialog";

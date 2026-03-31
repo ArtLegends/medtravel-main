@@ -1,3 +1,4 @@
+// app/ru/hair-transplant/lp/_components/LeadForm.tsx
 'use client';
 
 import { useMemo, useState } from "react";

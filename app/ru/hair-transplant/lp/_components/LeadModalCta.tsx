@@ -1,3 +1,4 @@
+// app/ru/hair-transplant/lp/_components/LeadModalCta.tsx
 "use client";
 
 import { useState } from "react";
@@ -32,12 +33,10 @@ export default function LeadModalCta({
 
       <DialogContent
         className={[
-          // мобилки: почти на весь экран, но с отступами
           "w-[calc(100vw-24px)] max-w-[520px] sm:max-w-[560px]",
           "rounded-2xl sm:rounded-3xl",
           "p-5 sm:p-6",
           "bg-white/95 backdrop-blur",
-          // чтобы на маленьких экранах не вылезало за высоту
           "max-h-[85vh] overflow-auto",
         ].join(" ")}
       >
@@ -51,12 +50,13 @@ export default function LeadModalCta({
         </DialogHeader>
 
         <div className="mt-4">
+          {/* No onSubmitted — let the user complete the full flow (SMS verification etc.) 
+              inside the modal. The modal stays open until the user closes it manually 
+              or gets redirected to /patient after successful OTP verification. */}
           <LeadForm
             className="space-y-3.5"
             submitText="Отправить"
-            onSubmitted={() => setOpen(false)}
           />
-
         </div>
       </DialogContent>
     </Dialog>
