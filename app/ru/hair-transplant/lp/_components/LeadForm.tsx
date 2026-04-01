@@ -303,7 +303,17 @@ export default function LeadForm({
       }}
     >
       <Input placeholder="ФИО*" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-      <Input placeholder="Телефон* (напр. +705...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <Input
+        placeholder="Телефон* (напр. +705...)"
+        inputMode="tel"
+        value={phone}
+        onChange={(e) => {
+          const raw = e.target.value;
+          // Allow only + (at start) and digits
+          const cleaned = raw.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
+          setPhone(cleaned);
+        }}
+      />
       {/* <Input placeholder="Email (опционально)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Input placeholder="Возраст" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
 
