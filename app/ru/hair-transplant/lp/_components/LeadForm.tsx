@@ -206,6 +206,48 @@ export default function LeadForm({
   }
 
   // ---------- RENDER ----------
+
+  // ── Done stage ──
+  if (stage === "done") {
+    return (
+      <div className={className ?? "space-y-3"}>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="font-semibold">Спасибо за вашу заявку!</div>
+          <div className="mt-1">
+            Мы получили ваши данные и свяжемся с вами в ближайшее время для
+            бесплатной консультации.
+          </div>
+        </div>
+
+        {patientEmailSent && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Мы также отправили на ваш email ссылку для входа в личный кабинет
+            пациента.
+          </div>
+        )}
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            setStage("form");
+            setFullName("");
+            setPhone("");
+            setEmail("");
+            setAge("");
+            setFiles([]);
+            setError(null);
+            setPatientEmailSent(false);
+            resetOtpUi();
+          }}
+        >
+          Отправить новую заявку
+        </Button>
+      </div>
+    );
+  }
+
   if (stage === "sms") {
     return (
       <div className={className ?? "space-y-3"}>

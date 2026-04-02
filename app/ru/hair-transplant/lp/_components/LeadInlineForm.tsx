@@ -1,3 +1,4 @@
+// app/ru/hair-transplant/lp/_components/LeadInlineForm.tsx
 'use client';
 
 import LeadForm from './LeadForm';
