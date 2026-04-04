@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 // ─── Country data ───
@@ -86,6 +87,95 @@ type Props = {
   className?: string;
 };
 
+function PhoneDropdown({
+  anchorRef,
+  search,
+  onSearch,
+  searchRef,
+  filtered,
+  country,
+  onSelect,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  search: string;
+  onSearch: (v: string) => void;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+  filtered: Country[];
+  country: Country;
+  onSelect: (c: Country) => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 300 });
+
+  useEffect(() => {
+    const update = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + window.scrollY + 6,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [anchorRef]);
+
+  return (
+    <div
+      data-phone-dropdown
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        top: pos.top,
+        left: pos.left,
+        width: pos.width,
+        zIndex: 99999,
+      }}
+    >
+      <div className="max-h-56 overflow-auto rounded-xl border bg-white shadow-xl ring-1 ring-black/5">
+        <div className="sticky top-0 bg-white border-b p-2">
+          <input
+            ref={searchRef as React.RefObject<HTMLInputElement>}
+            type="text"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30"
+            placeholder="Поиск страны..."
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+          />
+        </div>
+        {filtered.length === 0 ? (
+          <div className="px-3 py-6 text-center text-sm text-slate-400">Страна не найдена</div>
+        ) : (
+          filtered.map((c) => {
+            const isActive = c.code === country.code && c.dial === country.dial;
+            return (
+              <button
+                key={`${c.code}-${c.dial}`}
+                type="button"
+                onClick={() => onSelect(c)}
+                className={cn(
+                  'flex w-full items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors',
+                  isActive ? 'bg-teal-50 text-teal-900' : 'hover:bg-slate-50 text-slate-700'
+                )}
+              >
+                <Flag code={c.code} size={22} />
+                <span className="flex-1 truncate">{c.name}</span>
+                <span className="text-xs text-slate-400 font-mono tabular-nums">{c.dial}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PhoneInput({
   value,
   onChange,
@@ -104,9 +194,8 @@ export default function PhoneInput({
   const [country, setCountry] = useState<Country>(() => detectCountry(value));
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputWrapperRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
   const localDigits = useMemo(() => {
     if (!value || !value.startsWith(country.dial)) return '';
@@ -131,52 +220,27 @@ export default function PhoneInput({
     onChange(toE164(c.dial, digits));
   };
 
-  // Calculate fixed position for dropdown
-  const updatePosition = useCallback(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setDropdownStyle({
-      position: 'fixed' as const,
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-      zIndex: 999999,
-    });
-  }, []);
-
-  // Update position when open
-  useEffect(() => {
-    if (!open) return;
-    updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
-    };
-  }, [open, updatePosition]);
-
-  // Close on outside click
+  // Close on outside click (portal-aware)
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (wrapperRef.current?.contains(target)) return;
-      // Check if clicking inside the dropdown itself
-      if (target.closest('[data-phone-dropdown]')) return;
+      const target = e.target as Node;
+      // Check if click is inside the input wrapper
+      if (inputWrapperRef.current?.contains(target)) return;
+      // Check if click is inside the portal dropdown (data attribute)
+      const portal = document.querySelector('[data-phone-dropdown]');
+      if (portal?.contains(target)) return;
       setOpen(false);
       setSearch('');
     };
-    // Use capture phase to beat Dialog's handler
-    document.addEventListener('click', handler, true);
-    return () => document.removeEventListener('click', handler, true);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
   // Focus search on open
   useEffect(() => {
     if (open) {
-      setTimeout(() => searchRef.current?.focus(), 50);
+      setTimeout(() => searchRef.current?.focus(), 80);
     }
   }, [open]);
 
@@ -197,12 +261,12 @@ export default function PhoneInput({
   };
 
   return (
-    <div className={cn('relative', className)} ref={wrapperRef}>
+    <div className={cn('relative', className)} ref={inputWrapperRef}>
       <div className="flex h-10 w-full rounded-md border border-input bg-white shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring">
         {/* Country selector */}
         <button
           type="button"
-          onClick={() => { updatePosition(); setOpen((v) => !v); }}
+          onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-1.5 pl-2.5 pr-2 border-r border-input shrink-0 hover:bg-slate-50 rounded-l-md transition-colors"
           aria-label="Выбрать страну"
         >
@@ -226,62 +290,18 @@ export default function PhoneInput({
         />
       </div>
 
-      {/* Dropdown — fixed position, renders inside the component tree (not a portal) */}
-      {open && (
-        <div
-          data-phone-dropdown
-          style={dropdownStyle}
-          onMouseDown={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="max-h-56 overflow-auto rounded-xl border bg-white shadow-xl ring-1 ring-black/5">
-            {/* Search */}
-            <div className="sticky top-0 bg-white border-b p-2">
-              <input
-                ref={searchRef}
-                type="text"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30"
-                placeholder="Поиск страны..."
-                value={search}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            {filtered.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-slate-400">
-                Страна не найдена
-              </div>
-            ) : (
-              filtered.map((c) => {
-                const isActive = c.code === country.code && c.dial === country.dial;
-                return (
-                  <button
-                    key={`${c.code}-${c.dial}`}
-                    type="button"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectCountry(c);
-                    }}
-                    className={cn(
-                      'flex w-full items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors',
-                      isActive ? 'bg-teal-50 text-teal-900' : 'hover:bg-slate-50 text-slate-700'
-                    )}
-                  >
-                    <Flag code={c.code} size={22} />
-                    <span className="flex-1 truncate">{c.name}</span>
-                    <span className="text-xs text-slate-400 font-mono tabular-nums">{c.dial}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
+      {open && typeof document !== 'undefined' && (createPortal(
+        <PhoneDropdown
+          anchorRef={inputWrapperRef}
+          search={search}
+          onSearch={setSearch}
+          searchRef={searchRef}
+          filtered={filtered}
+          country={country}
+          onSelect={selectCountry}
+        />,
+        document.body
+      ) as React.ReactNode)}
     </div>
   );
 }
