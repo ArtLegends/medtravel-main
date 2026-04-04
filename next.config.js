@@ -141,6 +141,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: '*.supabase.in' },
       { protocol: 'https', hostname: 'esteinturkey.com' },
+      { protocol: 'https', hostname: 'flagcdn.com' },
     ],
   },
 }
