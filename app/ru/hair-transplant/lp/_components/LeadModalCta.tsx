@@ -33,7 +33,18 @@ export default function LeadModalCta({
 
       <DialogContent
         onPointerDownOutside={(e) => {
-          // Prevent dialog from closing when clicking phone dropdown portal
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-phone-dropdown]')) {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-phone-dropdown]')) {
+            e.preventDefault();
+          }
+        }}
+        onFocusOutside={(e) => {
           const target = e.target as HTMLElement;
           if (target.closest('[data-phone-dropdown]')) {
             e.preventDefault();
