@@ -32,6 +32,13 @@ export default function LeadModalCta({
       </DialogTrigger>
 
       <DialogContent
+        onPointerDownOutside={(e) => {
+          // Prevent dialog from closing when clicking phone dropdown portal
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-phone-dropdown]')) {
+            e.preventDefault();
+          }
+        }}
         className={[
           "w-[calc(100vw-24px)] max-w-[520px] sm:max-w-[560px]",
           "rounded-2xl sm:rounded-3xl",

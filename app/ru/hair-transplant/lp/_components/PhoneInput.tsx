@@ -129,6 +129,7 @@ function PhoneDropdown({
   return (
     <div
       data-phone-dropdown
+      onMouseDown={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         top: pos.top,
