@@ -4,25 +4,20 @@ import { notFound } from 'next/navigation'
 import ClinicDetailPage from '@/components/clinic/ClinicDetailPage'
 import { fetchClinicBySlug } from '@/lib/db/clinics'
 import { buildClinicMetadata } from '@/lib/seo/meta'
-// import { createServerClient } from '@/lib/supabase/serverClient'
-// import type { SeoClinicMeta } from '@/lib/db/types'
 import { clinicPath } from '@/lib/clinic-url'
-// import { createServiceClient } from '@/lib/supabase/serviceClient'
+import Script from 'next/script';
 
 type Params = { slug: string }
+
+const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://medtravel.me').replace(/\/+$/, '')
 
 export async function generateMetadata(
   { params }: { params: Promise<Params> }
 ): Promise<Metadata> {
   const { slug } = await params
-
-  // 1) та же сущность, которой рендеришь страницу
   const clinic = await fetchClinicBySlug(slug)
-
-  // 2) добираем minPrice и адрес из доступных источников
   const sb = await (await import('@/lib/supabase/serverClient')).createServerClient()
 
-  // 2.1 min(price) из clinic_services
   let minPrice: number | null = null
   let minCurrency: string | null = null
 
@@ -40,7 +35,6 @@ export async function generateMetadata(
     if (minRow?.currency != null) minCurrency = String(minRow.currency)
   }
 
-  // 2.2 адрес: пробуем набор возможных полей + профили
   const pick = (v?: string | null) => (v && v.trim() ? v.trim() : null);
 
   let addr: string | null =
@@ -49,10 +43,9 @@ export async function generateMetadata(
     pick((clinic as any)?.address_en) ??
     pick((clinic as any)?.address_ru) ??
     pick((clinic as any)?.street_address) ??
-    pick((clinic as any)?.location?.address) ?? // <-- берём адрес из JSON location, если есть
+    pick((clinic as any)?.location?.address) ??
     null;
 
-  // живой профиль
   if (!addr && clinic?.id) {
     const { data: prof } = await sb
       .from('clinic_profiles')
@@ -68,7 +61,6 @@ export async function generateMetadata(
       addr;
   }
 
-  // черновик профиля (если есть)
   if (!addr && clinic?.id) {
     const { data: draft } = await sb
       .from('clinic_profile_draft')
@@ -84,7 +76,6 @@ export async function generateMetadata(
       addr;
   }
 
-  // view как запасной вариант
   if (!addr && clinic?.slug) {
     const { data: row } = await sb
       .from('mv_catalog_clinics')
@@ -94,10 +85,9 @@ export async function generateMetadata(
     addr = pick(row?.address) ?? addr;
   }
 
-  // самый последний fallback — только когда реального строки адреса нет
   if (!addr && clinic) {
     const parts = [
-      pick((clinic as any)?.address), // вдруг строкой вернётся
+      pick((clinic as any)?.address),
       pick(clinic.district),
       pick(clinic.city),
       pick(clinic.province),
@@ -106,7 +96,6 @@ export async function generateMetadata(
     if (parts.length) addr = parts.join(', ');
   }
 
-  // 3) каноникал из реальной локации
   const canonical = clinic
     ? clinicPath({
         slug: clinic.slug,
@@ -117,7 +106,6 @@ export async function generateMetadata(
       })
     : `/clinic/${encodeURIComponent(slug)}`
 
-  // 4) SEO
   const meta = buildClinicMetadata(canonical, {
     clinicName: clinic?.name ?? 'Clinic',
     location: {
@@ -130,7 +118,6 @@ export async function generateMetadata(
     currency: minCurrency ?? undefined,
   })
 
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://medtravel.me').replace(/\/+$/, '')
   return { ...meta, alternates: { canonical: `${site}${canonical}` } }
 }
 
@@ -138,5 +125,59 @@ export default async function Page({ params }: { params: Promise<Params> }) {
   const { slug } = await params
   const clinic = await fetchClinicBySlug(slug)
   if (!clinic) return notFound()
-  return <ClinicDetailPage clinic={clinic} />
+
+  // Build canonical for JSON-LD
+  const canonical = clinicPath({
+    slug: clinic.slug,
+    country: clinic.country,
+    province: clinic.province ?? undefined,
+    city: clinic.city ?? undefined,
+    district: clinic.district ?? undefined,
+  }) || `/clinic/${clinic.slug}`
+
+  // Fetch combined rating for JSON-LD
+  let combinedRating: number | null = null;
+  let totalReviewCount: number | null = null;
+
+  try {
+    const sb = await (await import('@/lib/supabase/serverClient')).createServerClient()
+    const { data: ratingRow } = await sb
+      .from('v_clinic_rating')
+      .select('combined_rating, total_review_count')
+      .eq('clinic_id', clinic.id)
+      .maybeSingle();
+
+    combinedRating = ratingRow?.combined_rating ?? null;
+    totalReviewCount = ratingRow?.total_review_count ?? null;
+  } catch {
+    // no-op — rating is optional for SEO
+  }
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "MedicalOrganization",
+    name: clinic.name,
+    url: `${site}${canonical}`,
+    ...(combinedRating && totalReviewCount && totalReviewCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: combinedRating,
+            bestRating: 5,
+            ratingCount: totalReviewCount,
+          },
+        }
+      : {}),
+  };
+
+  return (
+    <>
+      <Script
+        id="clinic-jsonld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ClinicDetailPage clinic={clinic} />
+    </>
+  );
 }

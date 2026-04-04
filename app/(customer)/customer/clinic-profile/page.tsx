@@ -169,7 +169,7 @@ export default function ClinicProfilePage() {
   });
   const [hours, setHours] = useState<HourRow[]>(DEFAULT_HOURS);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
-  const [location, setLocation] = useState({ mapUrl: "", directions: "" });
+  const [location, setLocation] = useState({ mapUrl: "", directions: "", googlePlaceId: "" });
   const [payments, setPayments] = useState<string[]>([]);
 
   const [cats, setCats] = useState<Array<{ id: number; name: string; slug: string }>>([]);
@@ -285,7 +285,7 @@ export default function ClinicProfilePage() {
                 : DEFAULT_HOURS
             );
             setGallery(draft.gallery ?? []);
-            setLocation(draft.location ?? { mapUrl: "", directions: "" });
+            setLocation(draft.location ?? { mapUrl: "", directions: "", googlePlaceId: "" });
 
             const paymentsFromDraft = Array.isArray(draft.pricing)
               ? draft.pricing
@@ -2295,8 +2295,8 @@ function LocationSection({
   value,
   onChange,
 }: {
-  value: { mapUrl: string; directions: string };
-  onChange: (v: { mapUrl: string; directions: string }) => void;
+  value: { mapUrl: string; directions: string; googlePlaceId: string };
+  onChange: (v: { mapUrl: string; directions: string; googlePlaceId: string }) => void;
 }) {
   return (
     <>
@@ -2313,6 +2313,23 @@ function LocationSection({
         onChange={(v) => onChange({ ...value, directions: v })}
         placeholder="Bus #5, Metro line A, etc."
       />
+      <Field
+        label="Google Place ID (optional)"
+        value={value.googlePlaceId ?? ""}
+        onChange={(v) => onChange({ ...value, googlePlaceId: v })}
+        placeholder="ChIJN1t_tDeuEmsR..."
+      />
+      <p className="text-xs text-gray-400">
+        Link your Google Maps listing to display Google reviews on your clinic page.{" "}
+        <a
+          href="https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:underline"
+        >
+          Find your Place ID ↗
+        </a>
+      </p>
     </>
   );
 }

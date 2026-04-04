@@ -15,6 +15,7 @@ import { Icon } from '@iconify/react';
 import { AMENITY_ICON_MAP } from '@/lib/amenityIcons';
 import { PAYMENT_ICON_MAP, normalizePaymentKey } from '@/lib/paymentIcons';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import GoogleReviewsBlock from '@/components/clinic/GoogleReviewsBlock';
 
 type CategoryLite = { id: number; name: string; slug: string };
 
@@ -335,6 +336,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
     if (hasAccreditations) s.push({ id: 'accreditations', label: 'Accreditations' });
     if (hasHours) s.push({ id: 'hours', label: 'Operation Hours' });
     if (hasLocation) s.push({ id: 'location', label: 'Location' });
+    s.push({ id: 'reviews', label: 'Reviews' });
     return s;
   }, [hasAbout, hasTreatments, hasDoctors, hasPhotos, hasAmenities, hasAccreditations, hasHours, hasLocation]);
 
@@ -479,6 +481,10 @@ export default function ClinicDetailPage({ clinic }: Props) {
     items.push({ label: clinic.name });
     return items;
   }, [primaryCategory, categoryLocChain, clinic.name]);
+
+  const googleRating = (clinic as any).google_rating ?? null;
+  const googleReviewsCount = (clinic as any).google_reviews_count ?? null;
+  const hasGoogleReviews = googleRating != null || googleReviewsCount > 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-20 lg:pb-10">
@@ -856,6 +862,17 @@ export default function ClinicDetailPage({ clinic }: Props) {
           {/* ====== Reviews (preview) ====== */}
           <section id="reviews" className="pt-10">
             <h2 className="text-2xl font-semibold mb-3">Reviews</h2>
+
+            {/* Google Reviews */}
+            {hasGoogleReviews && (
+              <div className="mb-6">
+                <GoogleReviewsBlock
+                  clinicId={clinic.id}
+                  googleRating={googleRating}
+                  googleReviewsCount={googleReviewsCount}
+                />
+              </div>
+            )}
 
             {reviews.length === 0 ? (
               <div className="rounded-xl border p-6 text-sm text-gray-500">No reviews yet.</div>

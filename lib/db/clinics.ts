@@ -246,7 +246,7 @@ export async function fetchClinicBySlug(slug: string): Promise<Clinic | null> {
 
   const { data: clinicRow, error: clinicErr } = await sb
     .from('clinics')
-    .select('*')
+    .select('*, google_rating, google_reviews_count')
     .eq('slug', slug)
     .maybeSingle<DBClinic>()
 

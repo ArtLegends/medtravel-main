@@ -37,6 +37,10 @@ type ClinicRow = {
   accreditations?: any;
   map_embed_url?: string | null;
   directions?: string | null;
+  google_place_id?: string | null;
+  google_rating?: number | null;
+  google_reviews_count?: number | null;
+  google_reviews_synced_at?: string | null;
 };
 
 type DraftRow = {
@@ -241,6 +245,7 @@ async function saveClinic(formData: FormData) {
     moderation_status: moderationStatus || "draft",
     is_published: formData.get("clinic_is_published") === "on",
     map_embed_url: location.mapUrl, amenities: amenitiesForClinic, payments: paymentsForClinic,
+    google_place_id: formData.get("clinic_google_place_id") as string || null,
   };
   const { error: clinicError } = await sb.from("clinics").update(clinicUpdate).eq("id", id);
   if (clinicError) throw new Error("Failed to update clinic: " + clinicError.message);
@@ -530,6 +535,35 @@ export default async function ClinicEditorPage({ searchParams }: { searchParams:
           <Field label="District"><input name="clinic_district" defaultValue={basic.district} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
           <Field label="Address"><input name="clinic_address" defaultValue={clinic.address ?? ""} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
           <Field label="Google Maps URL"><input name="clinic_mapUrl" defaultValue={location.mapUrl} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="https://maps.google.com/..." /></Field>
+          <Field label="Google Place ID">
+            <input
+              name="clinic_google_place_id"
+              defaultValue={clinic.google_place_id ?? ""}
+              className="w-full rounded-lg border px-3 py-2 text-sm font-mono"
+              placeholder="ChIJN1t_tDeuEmsR..."
+            />
+          </Field>
+          <div className="md:col-span-2 text-xs text-gray-400">
+            Find Place ID:{" "}
+            <a
+              href="https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              Google Place ID Finder ↗
+            </a>
+            {clinic.google_rating != null && (
+              <span className="ml-4 text-gray-600">
+                Google Rating: <strong>{clinic.google_rating}</strong> ({clinic.google_reviews_count ?? 0} reviews)
+                {clinic.google_reviews_synced_at && (
+                  <span className="ml-2 text-gray-400">
+                    synced {new Date(clinic.google_reviews_synced_at).toLocaleDateString()}
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
           <Field label="Directions"><textarea name="clinic_directions" defaultValue={location.directions} rows={2} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>
           <div className="md:col-span-2">
             <Field label="Description"><textarea name="clinic_description" defaultValue={basic.description} rows={4} className="w-full rounded-lg border px-3 py-2 text-sm" /></Field>

@@ -1,3 +1,4 @@
+// app/api/reviews/route.ts
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/serviceClient';

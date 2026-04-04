@@ -388,6 +388,12 @@ export async function submitForReview() {
 
   if (location_json) {
     clinicUpdate.location = location_json;
+
+    // Save google_place_id from location draft to clinics
+    const googlePlaceId = safe(location.googlePlaceId);
+    if (googlePlaceId) {
+      clinicUpdate.google_place_id = googlePlaceId;
+    }
   }
 
   // если клиника ещё НЕ опубликована – это первый сабмит на модерацию
