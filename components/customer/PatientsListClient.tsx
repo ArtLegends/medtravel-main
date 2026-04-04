@@ -4,7 +4,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browserClient";
 
-type Status = "pending" | "confirmed" | "cancelled" | "completed" | "cancelled_by_patient";
+type Status =
+  | "pending"
+  | "confirmed"
+  | "cancelled"
+  | "completed"
+  | "cancelled_by_patient"
+  | "no_answer"
+  | "interested"
+  | "waiting_for_photo"
+  | "consultation_done"
+  | "not_interested"
+  | "not_available"
+  | "sent_ticket"
+  | "consultation";
 
 type Row = {
   booking_id: string;
@@ -501,13 +514,23 @@ export default function PatientsListClient() {
             className="w-full px-3 py-2 border rounded-md"
           >
             <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled_by_patient" disabled>
-              Cancelled by Patient
-            </option>
+            <optgroup label="Main">
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled_by_patient">Cancelled by Patient</option>
+            </optgroup>
+            <optgroup label="CRM">
+              <option value="no_answer">No answer</option>
+              <option value="interested">Interested</option>
+              <option value="waiting_for_photo">Waiting for photo</option>
+              <option value="consultation">Consultation</option>
+              <option value="consultation_done">Consultation done</option>
+              <option value="not_interested">Not interested</option>
+              <option value="not_available">Not available situation</option>
+              <option value="sent_ticket">Sent ticket</option>
+            </optgroup>
           </select>
 
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
@@ -565,13 +588,17 @@ export default function PatientsListClient() {
                         <span
                           className={[
                             "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
-                            r.status === "confirmed"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : r.status === "completed"
-                                ? "bg-sky-50 text-sky-700"
-                                : r.status === "cancelled" || r.status === "cancelled_by_patient"
-                                  ? "bg-rose-50 text-rose-700"
-                                  : "bg-amber-50 text-amber-700",
+                            r.status === "confirmed" || r.status === "consultation_done" || r.status === "sent_ticket"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : r.status === "completed"
+                              ? "bg-sky-50 text-sky-700"
+                              : r.status === "cancelled" || r.status === "cancelled_by_patient" || r.status === "not_interested" || r.status === "not_available"
+                                ? "bg-rose-50 text-rose-700"
+                                : r.status === "interested" || r.status === "consultation"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : r.status === "waiting_for_photo" || r.status === "no_answer"
+                                    ? "bg-orange-50 text-orange-700"
+                                    : "bg-amber-50 text-amber-700",
                           ].join(" ")}
                         >
                           {r.status}
@@ -858,14 +885,25 @@ export default function PatientsListClient() {
                         onChange={(e) => updateStatus(detailRow.booking_id, e.target.value as any)}
                         className={"rounded-md border px-3 py-2 text-sm " + (locked ? "opacity-60 cursor-not-allowed bg-gray-50" : "")}
                       >
-                        <option value="pending">pending</option>
-                        <option value="confirmed">confirmed</option>
-                        <option value="cancelled">cancelled</option>
-                        <option value="completed">completed</option>
-                        <option value="cancelled_by_patient" disabled>
-                          cancelled_by_patient
-                        </option>
+                        <optgroup label="Main">
+                          <option value="pending">pending</option>
+                          <option value="confirmed">confirmed</option>
+                          <option value="cancelled">cancelled</option>
+                          <option value="completed">completed</option>
+                          <option value="cancelled_by_patient" disabled>cancelled_by_patient</option>
+                        </optgroup>
+                        <optgroup label="CRM">
+                          <option value="no_answer">no_answer</option>
+                          <option value="interested">interested</option>
+                          <option value="waiting_for_photo">waiting_for_photo</option>
+                          <option value="consultation">consultation</option>
+                          <option value="consultation_done">consultation_done</option>
+                          <option value="not_interested">not_interested</option>
+                          <option value="not_available">not_available</option>
+                          <option value="sent_ticket">sent_ticket</option>
+                        </optgroup>
                       </select>
+
                     </div>
 
                     {locked ? (
