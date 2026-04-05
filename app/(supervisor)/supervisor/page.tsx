@@ -15,6 +15,9 @@ type StatsData = {
   total_referrals: number;
   pending_bookings: number;
   completed_bookings: number;
+  total_leads: number;
+  cancelled_leads: number;
+  in_progress_leads: number;
 };
 
 function StatCard({ title, value, color }: { title: string; value: string; color?: string }) {
@@ -73,7 +76,7 @@ export default function SupervisorDashboardPage() {
       {/* Earnings */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Earned (1%)"
+          title="Total Earned (10%)"
           value={loading ? "..." : `$${(balance?.total_earned ?? 0).toFixed(2)}`}
         />
         <StatCard
@@ -102,11 +105,28 @@ export default function SupervisorDashboardPage() {
       )}
 
       {/* Network stats */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           title="Recruited Partners"
           value={loading ? "..." : String(stats?.total_partners ?? 0)}
         />
+        <StatCard
+          title="Total Leads"
+          value={loading ? "..." : String(stats?.total_leads ?? 0)}
+        />
+        <StatCard
+          title="In Progress"
+          value={loading ? "..." : String(stats?.in_progress_leads ?? 0)}
+          color="text-blue-600"
+        />
+        <StatCard
+          title="Completed Bookings"
+          value={loading ? "..." : String(stats?.completed_bookings ?? 0)}
+          color="text-emerald-600"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           title="Their Referrals"
           value={loading ? "..." : String(stats?.total_referrals ?? 0)}
@@ -117,8 +137,19 @@ export default function SupervisorDashboardPage() {
           color="text-amber-600"
         />
         <StatCard
-          title="Completed Bookings"
-          value={loading ? "..." : String(stats?.completed_bookings ?? 0)}
+          title="Cancelled"
+          value={loading ? "..." : String(stats?.cancelled_leads ?? 0)}
+          color="text-rose-600"
+        />
+        <StatCard
+          title="Conversion Rate"
+          value={
+            loading
+              ? "..."
+              : stats && stats.total_leads > 0
+                ? `${Math.round(((stats.completed_bookings) / stats.total_leads) * 100)}%`
+                : "0%"
+          }
           color="text-sky-600"
         />
       </div>
@@ -128,9 +159,10 @@ export default function SupervisorDashboardPage() {
         <h2 className="text-lg font-semibold">How it works</h2>
         <div className="text-sm text-gray-600 space-y-2">
           <p>1. Share your recruitment link with potential affiliate partners</p>
-          <p>2. When they register and get approved, they appear in your "My Partners" section</p>
-          <p>3. When their referred patients complete procedures, you earn 1% of the procedure cost</p>
+          <p>2. When they register and get approved, they appear in your &quot;My Partners&quot; section</p>
+          <p>3. When their referred patients complete procedures, you earn 10% of the platform commission</p>
           <p>4. Your earnings update automatically when bookings are marked as completed</p>
+          <p>5. Visit the <a href="/supervisor/reports" className="text-blue-600 hover:underline font-medium">Reports</a> page for detailed daily breakdowns</p>
         </div>
       </div>
     </div>

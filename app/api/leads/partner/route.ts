@@ -177,15 +177,45 @@ export async function POST(req: NextRequest) {
       image_paths.push(path);
     }
 
+    // --- Extract tracking data from request headers ---
+    const userAgent = req.headers.get("user-agent") || "";
+    const referrer = req.headers.get("referer") || req.headers.get("referrer") || "";
+
+    // Device type detection (simple heuristic)
+    let device_type: string | null = null;
+    if (userAgent) {
+      const ua = userAgent.toLowerCase();
+      if (/tablet|ipad|playbook|silk/i.test(ua)) device_type = "Tablet";
+      else if (/mobile|iphone|ipod|android.*mobile|windows phone|blackberry/i.test(ua)) device_type = "Mobile";
+      else device_type = "Desktop";
+    }
+
+    // Country from Vercel/Cloudflare headers
+    const user_country =
+      req.headers.get("x-vercel-ip-country") ||
+      req.headers.get("cf-ipcountry") ||
+      null;
+
+    // Referrer domain
+    let referrer_domain: string | null = null;
+    if (referrer) {
+      try {
+        referrer_domain = new URL(referrer).hostname.replace(/^www\./, "");
+      } catch {}
+    }
+
     const { error: insErr } = await supabase.from("partner_leads").insert({
       id: leadId,
       source,
       full_name,
       phone,
-      email, // ✅ теперь допустим null (после миграции)
+      email,
       age,
       image_paths,
       status: "new",
+      device_type,
+      user_country,
+      referrer_domain,
     });
 
     if (insErr) {
