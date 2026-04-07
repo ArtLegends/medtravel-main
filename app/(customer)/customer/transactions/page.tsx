@@ -48,6 +48,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [balance, setBalance] = useState<BalanceData | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [commissionTerms, setCommissionTerms] = useState<any[]>([]);
 
   async function loadData() {
     try {
@@ -86,6 +87,10 @@ export default function TransactionsPage() {
       // Load balance
       const { data: balanceData, error: balError } = await supabase.rpc("customer_clinic_balance");
       if (balError) throw balError;
+
+      // Load commission terms
+      const { data: termsData } = await supabase.rpc("customer_commission_terms");
+      setCommissionTerms((termsData ?? []) as any[]);
 
       setTransactions((txRows ?? []) as TransactionRow[]);
 
@@ -149,9 +154,36 @@ export default function TransactionsPage() {
             )}
           </div>
         )}
+        {commissionTerms.length > 0 ? (
+        <div className="mt-3 space-y-1.5">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Your Commission Terms</div>
+          {commissionTerms.map((t: any, i: number) => (
+            <div key={t.rule_id ?? i} className="flex items-center gap-2 text-xs text-gray-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
+              <span>
+                {t.rule_type === 'percentage' ? `${t.rate_pct}%` : `${t.fixed_amount} ${t.currency} fixed`}
+                {t.threshold_min != null || t.threshold_max != null ? (
+                  <span className="text-gray-400">
+                    {' '}(when cost {t.threshold_min != null ? `≥ ${t.threshold_min}` : ''}{t.threshold_min != null && t.threshold_max != null ? ' and ' : ''}{t.threshold_max != null ? `< ${t.threshold_max}` : ''} {t.currency})
+                  </span>
+                ) : null}
+                {t.service_name ? (
+                  <span className="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                    {t.service_name}
+                  </span>
+                ) : (
+                  <span className="ml-1 text-gray-400">(all services)</span>
+                )}
+                {t.label ? <span className="ml-1 text-gray-400">— {t.label}</span> : null}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
         <p className="mt-1 text-xs text-gray-400">
           10% platform commission on completed bookings
         </p>
+      )}
       </div>
 
       {/* Filters */}
