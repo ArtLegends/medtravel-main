@@ -88,11 +88,21 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServiceClient();
     const leadId = globalThis.crypto.randomUUID();
-    const { error: insErr } = await supabase.from("partner_leads").insert({
-      id: leadId, source: parsed.source, full_name: parsed.full_name,
-      phone: parsed.phone || null, email: parsed.email, age: null,
-      image_paths: [], status: "new", device_type, user_country, referrer_domain,
-    });
+    const insertData: Record<string, any> = {
+    id: leadId,
+    source: parsed.source,
+    full_name: parsed.full_name,
+    phone: parsed.phone || null,
+    email: parsed.email,
+    age: null,
+    status: "new",
+    };
+    // Only include tracking fields if they have values
+    if (device_type) insertData.device_type = device_type;
+    if (user_country) insertData.user_country = user_country;
+    if (referrer_domain) insertData.referrer_domain = referrer_domain;
+
+    const { error: insErr } = await supabase.from("partner_leads").insert(insertData);
     if (insErr) { console.error("[webhook] Insert error:", insErr.message); return NextResponse.json({ error: insErr.message }, { status: 500 }); }
 
     const origin = req.nextUrl.origin || "https://medtravel.me";
