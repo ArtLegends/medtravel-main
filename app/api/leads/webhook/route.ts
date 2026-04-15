@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { autoAssignLead } from "@/lib/leads/autoAssign";
-import crypto from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,7 +87,7 @@ export async function POST(req: NextRequest) {
     if (pageUrl) { try { referrer_domain = new URL(pageUrl).hostname.replace(/^www\./, ""); } catch {} }
 
     const supabase = createServiceClient();
-    const leadId = crypto.randomUUID();
+    const leadId = globalThis.crypto.randomUUID();
     const { error: insErr } = await supabase.from("partner_leads").insert({
       id: leadId, source: parsed.source, full_name: parsed.full_name,
       phone: parsed.phone || null, email: parsed.email, age: null,
