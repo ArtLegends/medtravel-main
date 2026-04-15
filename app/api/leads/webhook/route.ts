@@ -52,21 +52,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 403 });
   }
   try {
+    const text = await req.text();
     const ct = req.headers.get("content-type") ?? "";
     let rawBody: any;
-    try {
-      const text = await req.text();
-      console.log("[webhook] RAW BODY:", text);
-      console.log("[webhook] Content-Type:", ct);
-      rawBody = JSON.parse(text);
-    } catch {
-      rawBody = { _raw_parse_failed: true };
-    }
-    console.log("[webhook] PARSED:", JSON.stringify(rawBody));
-    // Return 200 so Flexbe doesn't retry
-    return NextResponse.json({ ok: true, debug: true, received: rawBody }, { status: 200 });
+    try { rawBody = JSON.parse(text); } catch { rawBody = { _raw: text }; }
+
+    // Save to debug table
+    const supabase = createServiceClient();
+    await supabase.from("_webhook_debug").insert({
+      payload: rawBody,
+      headers: {
+        "content-type": ct,
+        "user-agent": req.headers.get("user-agent"),
+      },
+    });
+
+    return NextResponse.json({ ok: true, debug: true }, { status: 200 });
   } catch (e: any) {
-    console.error("[webhook] Error:", e);
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
   }
 }
