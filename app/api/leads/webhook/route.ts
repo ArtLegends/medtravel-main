@@ -52,63 +52,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 403 });
   }
   try {
-    let rawBody: any;
     const ct = req.headers.get("content-type") ?? "";
-    if (ct.includes("application/json")) {
-      rawBody = await req.json().catch(() => ({}));
-    } else if (ct.includes("form")) {
-      const fd = await req.formData().catch(() => new FormData());
-      const obj: Record<string, string> = {};
-      fd.forEach((v, k) => { if (typeof v === "string") obj[k] = v; });
-      rawBody = obj;
-    } else {
-      rawBody = await req.json().catch(() => ({}));
+    let rawBody: any;
+    try {
+      const text = await req.text();
+      console.log("[webhook] RAW BODY:", text);
+      console.log("[webhook] Content-Type:", ct);
+      rawBody = JSON.parse(text);
+    } catch {
+      rawBody = { _raw_parse_failed: true };
     }
-
-    const parsed = parseFlexbePayload(rawBody) ?? parseGenericPayload(rawBody);
-
-    console.log("[webhook] Received:", JSON.stringify({ format: parseFlexbePayload(rawBody) ? "flexbe" : "generic", parsed, raw_keys: Object.keys(rawBody), event: rawBody?.event }));
-
-    if (!parsed.full_name && !parsed.phone) {
-      return NextResponse.json({ error: "At least name or phone is required", received: rawBody }, { status: 400 });
-    }
-
-    const userAgent = req.headers.get("user-agent") || "";
-    let device_type: string | null = null;
-    if (userAgent) {
-      const ua = userAgent.toLowerCase();
-      if (/tablet|ipad/i.test(ua)) device_type = "Tablet";
-      else if (/mobile|iphone|android.*mobile/i.test(ua)) device_type = "Mobile";
-      else device_type = "Desktop";
-    }
-    const user_country = req.headers.get("x-vercel-ip-country") || req.headers.get("cf-ipcountry") || null;
-    let referrer_domain: string | null = null;
-    const pageUrl = rawBody?.data?.page_url || rawBody?.referrer || req.headers.get("referer") || "";
-    if (pageUrl) { try { referrer_domain = new URL(pageUrl).hostname.replace(/^www\./, ""); } catch {} }
-
-    const supabase = createServiceClient();
-    const leadId = globalThis.crypto.randomUUID();
-    const insertData: Record<string, any> = {
-    id: leadId,
-    source: parsed.source,
-    full_name: parsed.full_name,
-    phone: parsed.phone || null,
-    email: parsed.email,
-    age: null,
-    status: "new",
-    };
-    // Only include tracking fields if they have values
-    if (device_type) insertData.device_type = device_type;
-    if (user_country) insertData.user_country = user_country;
-    if (referrer_domain) insertData.referrer_domain = referrer_domain;
-
-    const { error: insErr } = await supabase.from("partner_leads").insert(insertData);
-    if (insErr) { console.error("[webhook] Insert error:", insErr.message); return NextResponse.json({ error: insErr.message }, { status: 500 }); }
-
-    const origin = req.nextUrl.origin || "https://medtravel.me";
-    await autoAssignLead({ leadId, origin });
-    console.log("[webhook] Lead created:", leadId);
-    return NextResponse.json({ ok: true, id: leadId }, { status: 200 });
+    console.log("[webhook] PARSED:", JSON.stringify(rawBody));
+    // Return 200 so Flexbe doesn't retry
+    return NextResponse.json({ ok: true, debug: true, received: rawBody }, { status: 200 });
   } catch (e: any) {
     console.error("[webhook] Error:", e);
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
