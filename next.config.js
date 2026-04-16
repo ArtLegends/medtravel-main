@@ -101,16 +101,6 @@ const nextConfig = {
     const country = `:country((?!${RESERVED})(?:[^/]+))`;
 
     const clinicRewrites = [
-      // Flexbe landing pages — proxy to external domain
-      {
-        source: '/ru/hair-transplant/short/:path*',
-        destination: 'https://lp.medtravel.me/short/:path*',
-      },
-      {
-        source: '/ru/hair-transplant/quiz/:path*',
-        destination: 'https://lp.medtravel.me/quiz/:path*',
-      },
-      
       { source: `/${country}/hair-transplant/lp/:code`, destination: `/ru/hair-transplant/lp/:code` },
       
       { source: `/${country}/:path*/:slug/review`, destination: '/clinic/:slug/review' },
