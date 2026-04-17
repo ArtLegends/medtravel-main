@@ -1,3 +1,4 @@
+// components/admin/PartnerLeadsClient.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

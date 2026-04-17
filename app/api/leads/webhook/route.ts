@@ -17,13 +17,7 @@ function verifyToken(req: NextRequest): boolean {
 
 /**
  * Parse Flexbe form-urlencoded webhook.
- * Flexbe sends: application/x-www-form-urlencoded with nested bracket notation:
- *   event=lead
- *   data[client][name]=John
- *   data[client][phone]=+7 (123) 4567890
- *   data[client][email]=
- *   data[page][url]=https://lp.medtravel.me/short/
- *   data[form_name]=Заявка
+ * Fields use bracket notation: data[client][name], data[form_data][field_id][value], etc.
  */
 function parseFlexbeFormData(fd: FormData) {
   const full_name = (
@@ -32,7 +26,6 @@ function parseFlexbeFormData(fd: FormData) {
     ""
   ).toString().trim();
 
-  // Clean phone: remove formatting like "+7 (123) 4567890" → "+71234567890"
   const rawPhone = (
     fd.get("data[client][phone]") ??
     fd.get("data[form_data][phone][value]") ??
@@ -44,13 +37,44 @@ function parseFlexbeFormData(fd: FormData) {
     fd.get("data[client][email]") ?? ""
   ).toString().trim().toLowerCase() || null;
 
-  // Source from page URL
   const pageUrl = (fd.get("data[page][url]") ?? "").toString();
   let source = "flexbe";
   if (pageUrl.includes("/short")) source = "flexbe-short";
   else if (pageUrl.includes("/quiz")) source = "flexbe-quiz";
 
-  return { full_name, phone, email, source, pageUrl };
+  // Extract quiz answers from form_data fields
+  // Flexbe sends: data[form_data][field_id][orig_name] and data[form_data][field_id][value]
+  const quizAnswers: Array<{ question: string; answer: string }> = [];
+  const seenFields = new Set<string>();
+
+  // Iterate all form data entries to find quiz fields
+  fd.forEach((value, key) => {
+    // Match pattern: data[form_data][FIELD_ID][value]
+    const valueMatch = key.match(/^data\[form_data\]\[([^\]]+)\]\[value\]$/);
+    if (valueMatch) {
+      const fieldId = valueMatch[1];
+      if (fieldId === "name" || fieldId === "phone" || fieldId === "email") return; // skip standard fields
+      if (seenFields.has(fieldId)) return;
+      seenFields.add(fieldId);
+
+      const answer = value.toString().trim();
+      if (!answer) return;
+
+      // Get the question name
+      const origName = (fd.get(`data[form_data][${fieldId}][orig_name]`) ?? "").toString().trim();
+      const fieldName = (fd.get(`data[form_data][${fieldId}][name]`) ?? "").toString().trim();
+
+      quizAnswers.push({
+        question: origName || fieldName || fieldId,
+        answer,
+      });
+    }
+  });
+
+  // Also extract from note field (Flexbe sometimes puts quiz answers there)
+  const note = (fd.get("data[note]") ?? "").toString().trim();
+
+  return { full_name, phone, email, source, pageUrl, quizAnswers, note };
 }
 
 export async function POST(req: NextRequest) {
@@ -65,18 +89,41 @@ export async function POST(req: NextRequest) {
     let email: string | null = null;
     let source = "external-lp";
     let pageUrl = "";
+    let quizAnswers: Array<{ question: string; answer: string }> = [];
+    let note = "";
+
+    const supabase = createServiceClient();
 
     if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
-      // Flexbe sends form-urlencoded
-      const fd = await req.formData();
-      const parsed = parseFlexbeFormData(fd);
+      const rawText = await req.clone().text();
+
+      // Save raw payload to debug table (temporary — remove after debugging)
+      try {
+        await supabase.from("_webhook_debug").insert({
+          payload: { _raw: rawText },
+          headers: { "content-type": ct, "user-agent": req.headers.get("user-agent") },
+        });
+      } catch {}
+
+      // Re-parse as FormData
+      const fd = new URLSearchParams(rawText);
+      // Convert to FormData-like interface
+      const fakeFormData = {
+        get: (key: string) => fd.get(key),
+        forEach: (cb: (value: string, key: string) => void) => {
+          fd.forEach((value, key) => cb(value, key));
+        },
+      } as any;
+
+      const parsed = parseFlexbeFormData(fakeFormData);
       full_name = parsed.full_name;
       phone = parsed.phone;
       email = parsed.email;
       source = parsed.source;
       pageUrl = parsed.pageUrl;
+      quizAnswers = parsed.quizAnswers;
+      note = parsed.note;
     } else {
-      // JSON fallback
       const body = await req.json().catch(() => ({}));
       full_name = String(body.full_name || body.name || body["Имя"] || "").trim();
       phone = String(body.phone || body.Phone || body["Телефон"] || "").trim().replace(/[\s()\-]/g, "");
@@ -84,7 +131,6 @@ export async function POST(req: NextRequest) {
       source = String(body.source || "external-lp").trim();
     }
 
-    // Validate
     if (!full_name && !phone) {
       return NextResponse.json({ error: "No name or phone received" }, { status: 400 });
     }
@@ -106,9 +152,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert lead
-    const supabase = createServiceClient();
     const leadId = globalThis.crypto.randomUUID();
-
     const insertData: Record<string, any> = {
       id: leadId,
       source,
@@ -121,9 +165,11 @@ export async function POST(req: NextRequest) {
     if (device_type) insertData.device_type = device_type;
     if (user_country) insertData.user_country = user_country;
     if (referrer_domain) insertData.referrer_domain = referrer_domain;
+    if (quizAnswers.length > 0) {
+      insertData.quiz_answers = quizAnswers;
+    }
 
     const { error: insErr } = await supabase.from("partner_leads").insert(insertData);
-
     if (insErr) {
       return NextResponse.json({ error: insErr.message }, { status: 500 });
     }

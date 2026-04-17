@@ -132,38 +132,48 @@ export async function autoAssignLead(opts: { leadId: string; origin: string }) {
     patched = data ?? null;
   }
 
-  // 6) создаём booking если есть patientId (иначе booking пока невозможен)
+  // 6) создаём booking (даже без patient_id — как admin assign route)
   const leadMarker = `[lead:${leadId}]`;
   let bookingId: string | null = null;
 
-  if (patientId) {
-    // антидубль
-    const { data: exists, error: exErr } = await admin
+  {
+    // антидубль: ищем booking с этим lead marker в notes
+    let dupeQuery = admin
       .from("patient_bookings")
       .select("id")
       .eq("clinic_id", clinicId)
-      .eq("patient_id", patientId)
       .ilike("notes", `%${leadMarker}%`)
       .order("created_at", { ascending: false })
       .limit(1);
 
+    if (patientId) {
+      dupeQuery = dupeQuery.eq("patient_id", patientId);
+    }
+
+    const { data: exists, error: exErr } = await dupeQuery;
     if (exErr) return { ok: false, reason: "booking_check_error" as const, error: exErr.message };
 
     bookingId = exists?.[0]?.id ?? null;
 
     if (!bookingId) {
+      const insertData: any = {
+        clinic_id: clinicId,
+        service_id: 803, // Hair Transplant
+        booking_method: "automatic",
+        status: "pending",
+        full_name: lead.full_name,
+        phone: lead.phone,
+        notes: `${leadMarker} Landing lead (${lead.source ?? "unknown"})${!patientId ? " [no patient account]" : ""}`,
+      };
+
+      // Only set patient_id if we have one
+      if (patientId) {
+        insertData.patient_id = patientId;
+      }
+
       const { data: booking, error: bookErr } = await admin
         .from("patient_bookings")
-        .insert({
-          patient_id: patientId,
-          clinic_id: clinicId,
-          service_id: 803,
-          booking_method: "automatic",
-          status: "pending",
-          full_name: lead.full_name,
-          phone: lead.phone,
-          notes: `${leadMarker} Landing lead (${lead.source ?? "unknown"})`,
-        })
+        .insert(insertData)
         .select("id")
         .single();
 
