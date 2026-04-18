@@ -97,14 +97,6 @@ export async function POST(req: NextRequest) {
     if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
       const rawText = await req.clone().text();
 
-      // Save raw payload to debug table (temporary — remove after debugging)
-      try {
-        await supabase.from("_webhook_debug").insert({
-          payload: { _raw: rawText },
-          headers: { "content-type": ct, "user-agent": req.headers.get("user-agent") },
-        });
-      } catch {}
-
       // Re-parse as FormData
       const fd = new URLSearchParams(rawText);
       // Convert to FormData-like interface

@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("partner_leads")
     .select(
-      "id,source,full_name,phone,email,age,image_paths,status,admin_note,created_at,assigned_partner_id,assigned_at,assigned_by,assigned_note",
+      "id,source,full_name,phone,email,age,image_paths,status,admin_note,created_at,assigned_partner_id,assigned_at,assigned_by,assigned_note,quiz_answers",
       { count: "exact" }
     )
     .order("created_at", { ascending: false });

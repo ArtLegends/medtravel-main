@@ -44,6 +44,9 @@ type Row = {
   preferred_date: string | null;
   preferred_time: string | null;
   scheduled_at: string | null;
+
+  quiz_answers?: Array<{ question: string; answer: string }> | null;
+  lead_source?: string | null;
 };
 
 const PAGE_SIZE = 15;
@@ -1019,6 +1022,28 @@ export default function PatientsListClient() {
                   </button>
                 </div>
               </div>
+
+              {/* Quiz Answers */}
+              {detailRow.quiz_answers && detailRow.quiz_answers.length > 0 && (
+                <div className="rounded-2xl border p-4">
+                  <div className="text-sm font-semibold text-slate-900 mb-3">
+                    Quiz Answers
+                    {detailRow.lead_source && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                        {detailRow.lead_source}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2.5">
+                    {detailRow.quiz_answers.map((qa: any, i: number) => (
+                      <div key={i} className="rounded-xl bg-slate-50 p-3">
+                        <div className="text-xs font-medium text-slate-500">{qa.question}</div>
+                        <div className="mt-1 text-sm text-slate-900">{qa.answer}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* attachments */}
               <div className="rounded-2xl border p-4">
