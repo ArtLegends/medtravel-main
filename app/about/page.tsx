@@ -1,7 +1,6 @@
 // app/about/page.tsx
 import type { Metadata } from "next";
 import { Icon } from "@iconify/react";
-// если путь другой — поменяй импорт на фактический путь вашей секции формы
 import ContactFormSection from "@/components/ContactFormSection";
 
 export const metadata: Metadata = {
@@ -35,7 +34,6 @@ function Section({
           <div className="mb-3 flex items-center gap-2 text-primary">
             <Icon icon={icon} className="h-6 w-6 shrink-0" />
             <span className="text-sm font-medium tracking-wide">
-              {/* декоративная подпись, можно скрыть, если не нужна */}
             </span>
           </div>
           <h2 className="text-2xl font-bold leading-tight text-foreground sm:text-3xl">
@@ -48,7 +46,6 @@ function Section({
 
         {/* Image */}
         <div className="rounded-2xl border border-default-200 bg-content1 shadow-lg overflow-hidden">
-          {/* Используем <img>, чтобы не настраивать внешние домены в next.config */}
           <img
             src={imageUrl}
             alt={title}
@@ -109,7 +106,6 @@ export default function AboutPage() {
         imageLeft
       />
 
-      {/* CTA с формой бронирования — та же секция, что на главной */}
       <section className="mx-auto max-w-6xl px-4 py-14 sm:py-20">
         <ContactFormSection />
       </section>

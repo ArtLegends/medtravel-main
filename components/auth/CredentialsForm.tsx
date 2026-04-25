@@ -85,10 +85,8 @@ export default function CredentialsForm({
         const roleUpper = role.toUpperCase();
 
         if (roleUpper === "CUSTOMER") {
-          // подтянуть роли (должна появиться только после одобрения админом)
           await refreshRoles();
 
-          // проверим, есть ли CUSTOMER в user_roles
           const { data: ur } = await supabase
             .from("user_roles")
             .select("role")
@@ -97,7 +95,6 @@ export default function CredentialsForm({
             .maybeSingle();
 
           if (!ur) {
-            // читаем статус заявки (разрешено политикой "customer can read own request")
             const { data: reqRow } = await supabase
               .from("customer_registration_requests")
               .select("status")
@@ -116,7 +113,6 @@ export default function CredentialsForm({
             return;
           }
 
-          // роль есть — всё ок
           setActiveRole("CUSTOMER" as any);
           await refreshRoles();
 
@@ -195,7 +191,6 @@ export default function CredentialsForm({
           return;
         }
 
-        // ✅ PATIENT: можно оставить как было
         if (roleUpper === "PATIENT") {
           const roleSlug = "patient";
 
@@ -217,7 +212,6 @@ export default function CredentialsForm({
           return;
         }
 
-        // ❗ PARTNER/CUSTOMER сюда не должны доходить (они обработаны выше)
         setErrorMsg("Invalid role flow.");
         await supabase.auth.signOut();
         return;
@@ -237,7 +231,6 @@ export default function CredentialsForm({
         return;
       }
 
-      // отправляем OTP (теперь user уже существует, send-otp пропустит)
       const res2 = await fetch("/api/auth/email/send-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },

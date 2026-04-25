@@ -6,7 +6,6 @@ import { createServerClient as createSSRClient } from "@supabase/ssr";
 
 export async function createServerClient() {
   const cookieStore = await nextCookies();
-  // headers не обязательны, но пусть будут готовы
   await nextHeaders();
 
   const supabase = createSSRClient(

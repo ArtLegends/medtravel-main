@@ -19,7 +19,6 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
   const [info, setInfo] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // закрытие по ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) =>
@@ -83,7 +82,6 @@ export default function PartnerAuthModal({ open, onClose }: Props) {
     }
   }
 
-  // клик по фону — закрыть
   function onBackdrop(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }

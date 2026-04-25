@@ -6,21 +6,21 @@ const norm = (s?: string | null): string =>
     .toLowerCase()
     .trim()
     .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')   // убрать диакритику
-    .replace(/[^a-z0-9]+/g, '-')       // любые символы → "-"
-    .replace(/^-+|-+$/g, '')           // срезать по краям
-    .replace(/-{2,}/g, '-');           // схлопнуть повторные "-"
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
 
 export type ClinicUrlBits = {
   slug: string;
   country?: string | null;
-  province?: string | null;  // опционально
+  province?: string | null;
   city?: string | null;
-  district?: string | null;  // опционально
+  district?: string | null;
 };
 
 /**
- * Базовый путь к клинике без «хвостов»:
+ * Базовый путь к клинике:
  *  /country/province?/city/district?/slug
  * Если нет минимально нужных данных (country + city + slug), даём фолбэк /clinic/:slug
  */
@@ -58,9 +58,8 @@ export function clinicHref(
 ): string {
   const base = clinicPath(c);
 
-  // если мы ушли в фолбэк /clinic/:slug — всё равно корректно добавим хвост
+  // если ушли в фолбэк /clinic/:slug — всё равно корректно добавим хвост
   return tail ? `${base.replace(/\/$/, '')}/${tail}` : base;
 }
 
-// Экспортируем нормализацию на случай, если понадобится где-то ещё
 export { norm };

@@ -1,5 +1,5 @@
 // lib/mock/db.ts
-// Простейшее in-memory хранилище (живет в памяти dev-сервера)
+// in-memory хранилище (живет в памяти dev-сервера)
 
 export type Contact = {
   id: string;
@@ -35,7 +35,7 @@ function getDB(): DB {
 }
 
 export async function getContacts(): Promise<Contact[]> {
-  return getDB().contacts.slice().reverse(); // последние — первыми
+  return getDB().contacts.slice().reverse();
 }
 
 export async function addContact(input: Omit<Contact, "id" | "createdAt">) {

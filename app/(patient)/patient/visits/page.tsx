@@ -33,7 +33,6 @@ type BookingRow = {
 function buildLocation(c: ClinicMini | null) {
   if (!c) return "—";
   const parts = [c.city, c.country].filter(Boolean);
-  // на твоем скрине достаточно City, Country
   return parts.length ? parts.join(", ") : "—";
 }
 
@@ -41,7 +40,7 @@ function formatVisitDate(preferred_date: string | null, preferred_time: string |
   if (!preferred_date) return "—";
 
   // preferred_date приходит как "YYYY-MM-DD"
-  // preferred_time может быть "10:00" (или пусто)
+  // preferred_time может быть "10:00"
   const time = preferred_time && preferred_time.trim() ? preferred_time.trim() : "00:00";
   const dt = new Date(`${preferred_date}T${time}:00`);
 
@@ -54,7 +53,6 @@ function formatVisitDate(preferred_date: string | null, preferred_time: string |
     day: "numeric",
   }).format(dt);
 
-  // на скрине время не обязательно, но можно добавить если есть
   return preferred_time ? `${dateStr}, ${preferred_time}` : dateStr;
 }
 
@@ -97,8 +95,6 @@ export default async function PatientVisitHistoryPage() {
         async get(name: string) {
           return (await cookieStore).get(name)?.value;
         },
-        // В server component мы не пишем cookies — сделаем no-op,
-        // для чтения сессии этого достаточно.
         set() {},
         remove() {},
       },

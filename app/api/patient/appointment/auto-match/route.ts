@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
   if (error) return new NextResponse(error.message, { status: 400 });
 
-  const row = Array.isArray(data) ? data[0] : data; // supabase иногда возвращает массив
+  const row = Array.isArray(data) ? data[0] : data;
   if (!row) return new NextResponse("No match", { status: 404 });
 
   return NextResponse.json({ item: row });

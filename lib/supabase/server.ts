@@ -1,15 +1,11 @@
 // lib/supabase/server.ts
-// lib/supabase/server.ts
-// lib/supabase/server.ts
 import { createClient as createSb } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Один серверный клиент на процесс (используем service role — ТОЛЬКО на сервере!)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !serviceKey) {
-  // Поможет быстрее понять проблему в проде, чем "undefined key"
   // eslint-disable-next-line no-console
   console.warn('[supabase] Missing env vars: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
 }

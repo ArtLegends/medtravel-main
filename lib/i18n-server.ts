@@ -49,7 +49,7 @@ export async function getServerTranslations(locale: Locale = "en") {
     t: (key: string, fallback?: string): string => {
       const val = translations[key];
       if (val !== undefined && val !== null && val !== "") return val;
-      // необязательная подсветка пропусков
+      // подсветка пропусков
       // console.warn(`i18n: missing key "${key}" for locale "${locale}"`);
       return fallback ?? key;
     },

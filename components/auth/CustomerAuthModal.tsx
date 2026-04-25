@@ -17,7 +17,6 @@ export default function CustomerAuthModal({ open, onClose }: Props) {
   const [info, setInfo] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Закрытие по ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -44,7 +43,7 @@ export default function CustomerAuthModal({ open, onClose }: Props) {
         provider: "google",
         options: {
           redirectTo: callback,
-          queryParams: { prompt: "select_account" }, // всегда показывать выбор аккаунта
+          queryParams: { prompt: "select_account" },
         },
       });
       if (error) setErrorMsg(error.message);
@@ -78,7 +77,6 @@ export default function CustomerAuthModal({ open, onClose }: Props) {
     }
   }
 
-  // клик по фону — закрыть
   function onBackdrop(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose();
   }

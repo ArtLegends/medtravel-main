@@ -14,7 +14,6 @@ export type Row = {
   status: string | null
   created_at: string
   clinics?: { id: string; name: string } | null
-  // сюда кладём имя услуги, которое посчитаем на сервере
   serviceName?: string | null
 }
 

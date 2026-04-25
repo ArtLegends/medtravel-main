@@ -1,6 +1,5 @@
 // components/clinic/GoogleReviewsBlock.tsx
 // Display Google reviews cached in google_reviews table
-// Use alongside existing MedTravel reviews on ClinicDetailPage
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';

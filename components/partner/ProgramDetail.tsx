@@ -9,7 +9,7 @@ import { useSupabase } from "@/lib/supabase/supabase-provider";
 import type { SupabaseContextType } from "@/lib/supabase/supabase-provider";
 
 export type ProgramDetailConfig = {
-  key: string;                 // <--- добавили
+  key: string;
   name: string;
   rewardRate: string;
   cookieLifetime: string;
@@ -197,7 +197,6 @@ export default function ProgramDetail({
         </dl>
       </section>
 
-      {/* Остальные секции без изменений */}
       <SectionCard title="Program details">
         <p>{config.programDetails}</p>
       </SectionCard>

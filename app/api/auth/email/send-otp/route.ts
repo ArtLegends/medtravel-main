@@ -15,7 +15,6 @@ function isValidEmail(email: string) {
 
 function safePurpose(v: any): string {
   const p = String(v || "verify_email").trim();
-  // лучше жёстко разрешить только verify_email, чтобы не плодить мусор:
   return p === "verify_email" ? "verify_email" : "verify_email";
 }
 
@@ -89,14 +88,12 @@ export async function POST(req: NextRequest) {
     if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
 
     if (!profile?.id) {
-      // вариант 1 (как у тебя сейчас): честно говорим что нет юзера
       // return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-      // вариант 2 (безопаснее): не палим существование email
       return NextResponse.json({ ok: true });
     }
 
-    // 1) генерим OTP + hash (как у тебя в verify-otp)
+    // 1) генерим OTP + hash
     const code = generateOtp6();
     const otpSecret = process.env.OTP_SECRET || "dev-secret-change-me";
     const codeHash = sha256(`${email}:${purpose}:${code}:${otpSecret}`);

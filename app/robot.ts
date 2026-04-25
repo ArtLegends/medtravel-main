@@ -2,7 +2,7 @@
 import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
-  // Канонический сайт (один!)
+  // Канонический сайт
   const canonical =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     "https://medtravel.me";
@@ -32,21 +32,19 @@ export default function robots(): MetadataRoute.Robots {
           "/*?*ref=",
           "/*?*session=",
           "/*?*preview=",
-          // поиск/фильтры блога — не индексируем
+          // поиск/фильтры блога
           "/blog?*",
           "/en/blog?*",
           "/ru/blog?*",
           "/pl/blog?*",
           "/*/blog?*",
-          // черновики/превью, если появятся
+          // черновики/превью
           "/*/blog/draft/*",
           "/*/blog/preview/*",
         ],
       },
     ],
-    // Можно вернуть массив, если у тебя реально две карты; но лучше один канон
     sitemap: `${canonical}/sitemap.xml`,
-    // Host — не стандарт, используется в Яндексе. Допускается только один.
     host: new URL(canonical).host,
   };
 }

@@ -10,13 +10,11 @@ function fmtDate(v?: string|null) {
   try { return new Date(v).toLocaleString(); } catch { return v!; }
 }
 
-// ✅ searchParams теперь Promise<...>
 export default async function AdminReviewsPage({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string; start?: string; end?: string }>
 }) {
-  // ✅ ждем перед использованием
   const sp = await searchParams;
   const page  = Number(sp.page  ?? '1') || 1;
   const start = sp.start ?? null;
@@ -25,7 +23,6 @@ export default async function AdminReviewsPage({
   const { rows, count, limit } = await listReviews({ page, start, end });
   const pages = Math.max(1, Math.ceil(count / limit));
 
-  // server actions
   async function doUpdate(formData: FormData) {
     'use server';
     await updateReviewStatus({
@@ -92,11 +89,9 @@ export default async function AdminReviewsPage({
                 <td className="p-3">{r.rating ?? '—'}/10</td>
                 <td className="p-3">{fmtDate(r.created_at)}</td>
                 <td className="p-3">
-                  {/* ✅ Селект статуса — клиентский компонент с form action */}
                   <StatusForm id={r.id} initial={r.status} action={doUpdate} />
                 </td>
                 <td className="p-3 text-right">
-                  {/* ✅ Delete с confirm в клиенте */}
                   <DeleteBtn id={r.id} action={doDelete} />
                 </td>
               </tr>

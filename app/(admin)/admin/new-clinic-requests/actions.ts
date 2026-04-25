@@ -28,7 +28,7 @@ export async function deleteAllNcrAction() {
   const { error } = await supabase
     .from('new_clinic_requests')
     .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000') // чтобы .delete() не ругался на «всё»
+    .neq('id', '00000000-0000-0000-0000-000000000000')
   if (error) throw new Error(error.message)
   revalidatePath('/admin/new-clinic-requests')
 }

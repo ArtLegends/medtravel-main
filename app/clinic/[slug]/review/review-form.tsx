@@ -49,7 +49,7 @@ export default function ReviewForm({ clinicId, clinicSlug, clinicCountry, clinic
         city: clinicCity,
         district: clinicDistrict,
       })
-      router.replace(`${pretty}#reviews`) // красивый путь
+      router.replace(`${pretty}#reviews`)
     } catch (e: any) {
       setError(e?.message || 'Submission failed.')
     } finally {

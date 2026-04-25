@@ -11,7 +11,6 @@ import ru from "./locales/ru.json";
 export const locales = ['en','ru','pl'] as const;
 export const defaultLocale = 'en';
 
-// ключи автоматом возьмутся из /locales/{lng}/common.json
 export const localeConfig = {
   locales,
   defaultLocale,
@@ -36,7 +35,6 @@ if (!i18n.isInitialized) {
       fallbackLng: "en",
       interpolation: { escapeValue: false },
       detection: {
-        // order and from where user language should be detected
         order: ["localStorage", "navigator", "htmlTag"],
         caches: ["localStorage"],
       },

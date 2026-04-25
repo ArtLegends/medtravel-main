@@ -18,7 +18,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ref_code берём из body или cookie
   let bodyCode: string | null = null;
   try {
     const body = await req.json().catch(() => null);
@@ -33,7 +32,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, attached: false });
   }
 
-  // узнаём владельца кода через RPC
   const { data: rows, error: lookupErr } = await supabase.rpc(
     "partner_referral_code_lookup",
     { p_ref_code: refCode },
@@ -61,7 +59,6 @@ export async function POST(req: NextRequest) {
     { onConflict: "patient_user_id" }
   );
 
-  // если уже был реферал — ок
   if (insErr) {
     return NextResponse.json({ error: insErr.message }, { status: 500 });
   }

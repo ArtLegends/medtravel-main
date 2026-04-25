@@ -3,15 +3,15 @@ export type UserRole = "GUEST" | "PATIENT" | "CUSTOMER" | "PARTNER" | "SUPERVISO
 
 export interface NavItem {
   key: string;
-  label: string;          // plain label or i18n key — сейчас можно обычный текст
+  label: string;
   href: string;
   icon?: string;
   description?: string;
   minRole?: UserRole;     // минимальная роль для доступа
-  exactRole?: UserRole[]; // точные роли (если нужно)
+  exactRole?: UserRole[]; // точные роли
 }
 
-// Простая иерархия доступа
+// Иерархия доступа
 const roleHierarchy: Record<UserRole, number> = {
   GUEST: 0,
   PATIENT: 1,
@@ -21,28 +21,16 @@ const roleHierarchy: Record<UserRole, number> = {
   ADMIN: 3,
 };
 
-/**
- * ПУБЛИЧНОЕ МЕНЮ КАТАЛОГА
- * Сейчас убираем всё от шаблона: discover/marketplace/inventory/labs/docs.
- * Оставим пусто — верхнее меню не будет показываться.
- * Когда понадобится, добавим, например: Categories, Clinics, About, Contact.
- */
 export const navigationConfig: NavItem[] = [];
 
-// Мобильное меню — то же самое
 export const mobileNavigationConfig: NavItem[] = navigationConfig;
 
-/**
- * ПРОФИЛЬНОЕ МЕНЮ
- * - Settings (любой залогиненный)
- * - Admin (только ADMIN)
- */
 export const profileMenuConfig: NavItem[] = [
   {
     key: "settings",
     label: "My settings",
     href: "/settings",
-    minRole: "PATIENT", // любой аутентифицированный
+    minRole: "PATIENT",
   },
   {
     key: "admin",
@@ -82,15 +70,11 @@ export function getAccessibleProfileMenuItems(
   return profileMenuConfig.filter((item) => hasAccess(userRole, item));
 }
 
-/**
- * Проверка доступа к маршрутам (минимально)
- * Публичные: главная и всё, что позже сюда добавим.
- */
 export function canAccessRoute(
   userRole: UserRole | null,
   pathname: string
 ): boolean {
-  const publicRoutes = ["/"]; // расширим при необходимости
+  const publicRoutes = ["/"];
   if (publicRoutes.includes(pathname)) return true;
 
   const matchingItem = navigationConfig.find(
@@ -102,7 +86,7 @@ export function canAccessRoute(
   return userRole !== null;
 }
 
-// Группа лэйаута (если используешь)
+// Группа лэйаута
 export function getRouteGroup(pathname: string): string {
   if (
     pathname.startsWith("/login") ||

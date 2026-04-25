@@ -19,7 +19,6 @@ type ModerationQueueRow = {
   draft_updated_at: string | null;
 };
 
-// В Next 15 searchParams в пропсах страницы — это Promise
 type ModerationPageProps = {
   searchParams: Promise<{
     [key: string]: string | string[] | undefined;
@@ -36,7 +35,6 @@ export default async function ModerationPage({ searchParams }: ModerationPagePro
     return v;
   };
 
-  // ---- фильтр по статусу ---------------------------------------------------
   const rawStatusParam = getParam("status");
   const rawStatus = (rawStatusParam ?? "all") as
     | "all"
@@ -49,7 +47,6 @@ export default async function ModerationPage({ searchParams }: ModerationPagePro
       ? rawStatus
       : "all";
 
-  // ---- пагинация -----------------------------------------------------------
   const rawPageParam = getParam("page");
   const rawPage = Number(rawPageParam ?? "1");
   const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
@@ -61,7 +58,6 @@ export default async function ModerationPage({ searchParams }: ModerationPagePro
     .select("*", { count: "exact" })
     .not("slug", "ilike", "dev-%")
     .not("name", "ilike", "dev%")
-    // ✅ показываем только отправленные на модерацию / уже обработанные
     .in("moderation_status", ["pending", "approved", "rejected"]);
 
   if (statusFilter !== "all") {
@@ -87,7 +83,7 @@ export default async function ModerationPage({ searchParams }: ModerationPagePro
   const makeStatusHref = (status: "all" | "pending" | "approved" | "rejected") => {
     const query: Record<string, string> = {};
     if (status !== "all") query.status = status;
-    query.page = "1"; // при смене статуса всегда на первую страницу
+    query.page = "1";
 
     return {
       pathname: "/admin/moderation",

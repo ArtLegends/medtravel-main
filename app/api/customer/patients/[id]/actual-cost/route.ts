@@ -12,7 +12,6 @@ export async function PATCH(req: NextRequest, ctx: any) {
   const actual_cost_raw = (body as any)?.actual_cost;
   const currency = String((body as any)?.currency ?? "").trim() || null;
 
-  // allow null (clear) if you want — сейчас сделаем строго number
   const actual_cost = actual_cost_raw === null ? null : Number(actual_cost_raw);
 
   if (actual_cost === null || !Number.isFinite(actual_cost)) {

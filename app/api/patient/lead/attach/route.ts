@@ -103,7 +103,6 @@ export async function POST(req: Request) {
 
   if (updLeadErr) return NextResponse.json({ error: updLeadErr.message }, { status: 500 });
 
-  // ✅ now we can create booking (patient_id exists) and ensure lead is assigned
   if (origin) {
     await autoAssignLead({ leadId, origin });
   }

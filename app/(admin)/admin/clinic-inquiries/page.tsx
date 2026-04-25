@@ -19,9 +19,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
 
   const sb = supabaseServer;
 
-  // Читаем из MATERIALIZED VIEW с точным count
+  // из MATERIALIZED VIEW с точным count
   let sel = sb
-    .from('v_admin_clinic_inquiries' as any) // cast, т.к. типы ещё не знают про view
+    .from('v_admin_clinic_inquiries' as any)
     .select('*', { count: 'exact', head: false });
 
   if (startISO) sel = sel.gte('created_at', startISO);

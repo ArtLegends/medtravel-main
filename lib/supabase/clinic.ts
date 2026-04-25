@@ -132,11 +132,11 @@ export async function getClinicViewBySlug(slug: string): Promise<ClinicView | nu
     accreditations,
     additionalServices: {
       premises,
-      clinic_services: [], // при необходимости завести отдельный справочник
+      clinic_services: [],
       travel_services: travel,
-      languages_spoken: [], // при необходимости завести связь
+      languages_spoken: [],
     },
-    payments: [], // если будет таблица payments — подхватим
+    payments: [],
     verifiedByMedtravel: !!data.verified_by_medtravel,
     isOfficialPartner: !!data.is_official_partner,
   };

@@ -13,7 +13,7 @@ function addDays(d: Date, days: number) {
   return dd
 }
 function toISODateOnly(d: Date) {
-  // 00:00 UTC — для gte/lt хватает ISO строки
+  // 00:00 UTC
   return d.toISOString()
 }
 
@@ -25,7 +25,7 @@ export default async function Page({
   const sp = (await searchParams) ?? {}
   const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1)
 
-  // Фильтры по датам (created_at). Конец — включительно.
+  // Фильтры по датам (created_at)
   const startParam = sp.start?.trim()
   const endParam = sp.end?.trim()
 
@@ -39,7 +39,6 @@ export default async function Page({
   if (endParam) {
     const e = new Date(`${endParam}T00:00:00`)
     if (!isNaN(e.getTime())) {
-      // делаем < (end + 1 день), чтобы «конец» был включительно
       endISOExclusive = toISODateOnly(addDays(e, 1))
     }
   }
@@ -62,7 +61,6 @@ export default async function Page({
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  // удобная функция для сборки ссылок с сохранением фильтров
   const mkHref = (p: number) => {
     const params = new URLSearchParams()
     if (startParam) params.set('start', startParam)

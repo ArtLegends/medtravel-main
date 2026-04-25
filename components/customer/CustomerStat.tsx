@@ -13,7 +13,6 @@ export default function CustomerStat({ title, value, loading }: Props) {
 
       <div className="mt-2 text-2xl font-semibold">
         {loading ? (
-          // небольшой skeleton вместо значения, пока грузится
           <span className="inline-block h-7 w-12 animate-pulse rounded bg-gray-200" />
         ) : (
           value

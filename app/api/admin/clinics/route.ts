@@ -220,7 +220,6 @@ export async function POST(req: Request) {
 
     // ---- 1) create clinic ----
     // Для клиник, созданных из админки: по умолчанию публикуем.
-    // Единственный вариант сделать её непубличной при создании — выбрать Hidden.
     let isPublished = true;
     let status: 'published' | 'hidden' = 'published';
     if (parsed.clinic.status === 'Hidden') {
@@ -241,7 +240,6 @@ export async function POST(req: Request) {
           province: parsed.clinic.region ?? null,
           district: parsed.clinic.district ?? null,
 
-          // lat/lng – если ты их не используешь, можно потом выпилить
           lat: parsed.clinic.lat ? Number(parsed.clinic.lat) : null,
           lng: parsed.clinic.lng ? Number(parsed.clinic.lng) : null,
 
@@ -479,7 +477,6 @@ export async function POST(req: Request) {
         if (existingAcc?.id) {
           accreditationId = existingAcc.id as number;
 
-          // можем мягко обновить logo/description (ошибки игнорим)
           await sb
             .from('accreditations')
             .update({
@@ -502,7 +499,6 @@ export async function POST(req: Request) {
             .single();
 
           if (accInsErr || !createdAcc) {
-            // если вдруг поймали unique по slug — считаем, что запись уже есть и ищем ещё раз
             if (
               accInsErr?.code === '23505' &&
               String(accInsErr?.message ?? '').includes('accts_slug_uq')

@@ -7,7 +7,7 @@ export function StatusForm({
 }: {
   id: string;
   initial: 'new' | 'published' | 'rejected';
-  action: (formData: FormData) => void; // server action
+  action: (formData: FormData) => void;
 }) {
   return (
     <form action={action} className="inline-flex">

@@ -33,7 +33,6 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     }
   );
 
-  // железобетонно проверяем, что есть user (иначе auth.uid() будет null)
   const { data: auth } = await sb.auth.getUser();
   if (!auth?.user) redirect(`/login?as=CUSTOMER&next=${encodeURIComponent("/customer/inquiries")}`);
 

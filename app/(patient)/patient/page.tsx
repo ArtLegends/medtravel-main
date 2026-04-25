@@ -20,7 +20,7 @@ type Stats = {
   upcomingAppointments: number; // confirmed
   totalVisits: number; // completed
   activeBookings: number; // pending
-  notifications: number; // пока не трогаем
+  notifications: number; 
 };
 
 function normalizeStatus(s: string | null | undefined) {
@@ -30,7 +30,7 @@ function normalizeStatus(s: string | null | undefined) {
 function formatDate(d: string | null | undefined) {
   if (!d) return "—";
   const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return d; // если это date строка без TZ и не парсится нормально — покажем как есть
+  if (Number.isNaN(dt.getTime())) return d;
   return dt.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
@@ -56,7 +56,7 @@ function StatusBadge({ status }: { status: string | null }) {
 }
 
 async function fetchBookingsLite(supabase: any): Promise<BookingLite[]> {
-  // 1) Пытаемся взять из patient_bookings + join clinics/services (идеальный вариант)
+  // 1) Пытаемся взять из patient_bookings + join clinics/services
   const pb = await supabase
     .from("patient_bookings")
     .select(
@@ -98,7 +98,7 @@ async function fetchBookingsLite(supabase: any): Promise<BookingLite[]> {
     });
   }
 
-  // 2) Фолбек: v_customer_patients (у тебя точно есть схема)
+  // 2) Фолбек: v_customer_patients
   const vcp = await supabase
     .from("v_customer_patients")
     .select("booking_id, clinic_id, clinic_name, service_name, preferred_date, created_at, status")
@@ -106,7 +106,6 @@ async function fetchBookingsLite(supabase: any): Promise<BookingLite[]> {
     .limit(50);
 
   if (vcp.error || !Array.isArray(vcp.data)) {
-    // возвращаем пусто, но не валим весь дашборд
     return [];
   }
 
@@ -121,7 +120,7 @@ async function fetchBookingsLite(supabase: any): Promise<BookingLite[]> {
     location: null as string | null,
   }));
 
-  // добираем location пачкой по clinic_id (если получится)
+  // добираем location пачкой по clinic_id
   const clinicIds = Array.from(new Set(rows.map((x) => x.clinic_id).filter(Boolean))) as string[];
   if (clinicIds.length === 0) return rows;
 
@@ -153,7 +152,7 @@ export default function PatientDashboardPage() {
     upcomingAppointments: 0,
     totalVisits: 0,
     activeBookings: 0,
-    notifications: 0, // пока не трогаем
+    notifications: 0,
   });
 
   useEffect(() => {
@@ -164,7 +163,6 @@ export default function PatientDashboardPage() {
         setLoading(true);
         setError(null);
 
-        // проверим, что пользователь авторизован (иначе RLS может вернуть 401/0)
         const {
           data: { user },
           error: userErr,
@@ -302,7 +300,7 @@ export default function PatientDashboardPage() {
           )}
         </section>
 
-        {/* Quick Actions — НЕ ТРОГАЕМ */}
+        {/* Quick Actions */}
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
           <p className="mt-1 text-xs text-gray-500">Common tasks and shortcuts</p>

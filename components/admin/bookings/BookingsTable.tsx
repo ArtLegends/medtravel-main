@@ -4,7 +4,7 @@ import { useOptimistic, useTransition, startTransition } from 'react'
 import { deleteBookingAction, updateBookingStatusAction } from '@/app/(admin)/admin/bookings/actions'
 
 export type BookingRow = {
-  id: string            // ⬅️ было uuid
+  id: string
   name: string | null
   phone: string | null
   contact_method: string | null

@@ -4,20 +4,12 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/adminClient";
 
-/**
- * APPROVE:
- * 1) вызываем RPC publish_clinic_from_draft(p_clinic_id uuid),
- *    чтобы синхронизировать все зависимые таблицы (services, staff, images, hours и т.д.)
- * 2) дополнительно дочитываем pricing из драфта и собираем payments для clinics
- * 3) помечаем драфт как published
- */
 export async function approveClinic(formData: FormData) {
   const clinicId = String(formData.get("clinicId") ?? "");
   if (!clinicId) return;
 
   const supabase = createAdminClient();
 
-  // 1) на всякий случай ещё раз синкнем связи (если уже синкалось — должно быть безопасно)
   const { error: syncErr } = await supabase.rpc("sync_clinic_relations_from_draft", {
     p_clinic_id: clinicId,
   });
@@ -26,7 +18,6 @@ export async function approveClinic(formData: FormData) {
     throw syncErr;
   }
 
-  // 2) pricing -> payments (как у тебя)
   const { data: draft, error: draftError } = await supabase
     .from("clinic_profile_drafts")
     .select("pricing")
@@ -54,7 +45,6 @@ export async function approveClinic(formData: FormData) {
     payments = uniq.length ? uniq.map((method) => ({ method })) : null;
   }
 
-  // 3) финальные статусы клиники
   const updatePayload: Record<string, unknown> = {
     is_published: true,
     moderation_status: "approved",
@@ -72,7 +62,6 @@ export async function approveClinic(formData: FormData) {
     throw clinicsUpdateError;
   }
 
-  // 4) уведомление владельцу
   try {
     const { data: clinicRow } = await supabase
       .from("clinics")
@@ -100,7 +89,6 @@ export async function approveClinic(formData: FormData) {
     console.warn("clinic_approved notification insert error:", e);
   }
 
-  // 5) драфт -> published
   await supabase
     .from("clinic_profile_drafts")
     .update({ status: "published" })
@@ -110,10 +98,6 @@ export async function approveClinic(formData: FormData) {
   revalidatePath(`/admin/moderation/detail?id=${clinicId}`);
 }
 
-/**
- * REJECT:
- * - напрямую обновляем статус клиники и драфта через сервис-клиент
- */
 export async function rejectClinic(formData: FormData) {
   const clinicId = String(formData.get("clinicId") ?? "");
   const reason = String(formData.get("reason") ?? "");
@@ -121,14 +105,12 @@ export async function rejectClinic(formData: FormData) {
 
   const supabase = createAdminClient();
 
-  // 1) обновляем клинику
   const { error: clinicsError } = await supabase
     .from("clinics")
     .update({
       is_published: false,
       moderation_status: "rejected",
       status: "draft",
-      // reason сейчас нигде не сохраняем (нет колонки)
     })
     .eq("id", clinicId);
 
@@ -137,13 +119,11 @@ export async function rejectClinic(formData: FormData) {
     throw clinicsError;
   }
 
-  // 2) возвращаем драфт в статус draft
   try {
     await supabase
       .from("clinic_profile_drafts")
       .update({
         status: "draft",
-        // сюда потом можно добавить колонку для причины
       })
       .eq("clinic_id", clinicId);
   } catch (e) {

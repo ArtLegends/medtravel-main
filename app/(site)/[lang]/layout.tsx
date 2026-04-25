@@ -13,7 +13,6 @@
 //   const { lang } = await params;
 //   const locale = isLocale(lang) ? lang : DEFAULT_LOCALE;
 
-//   // Можно дописать alternates.languages для SEO
 //   return {
 //     alternates: {
 //       languages: {
@@ -22,7 +21,6 @@
 //         pl: `/pl`,
 //       },
 //     },
-//     // html lang поставим в JSX (ниже)
 //   };
 // }
 
@@ -37,9 +35,8 @@
 //   const locale: Locale = isLocale(lang) ? lang : DEFAULT_LOCALE;
 
 //   return (
-//     <html lang={locale} className="light"> {/* форсим светлую по умолчанию */}
+//     <html lang={locale} className="light">
 //       <body>
-//         {/* Передаём в провайдеры текущий язык */}
 //         <Providers initialLang={locale}>{children}</Providers>
 //       </body>
 //     </html>

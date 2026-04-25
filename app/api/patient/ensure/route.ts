@@ -44,7 +44,6 @@ export async function POST(req: Request) {
     .from("user_roles")
     .upsert({ user_id: user.id, role: "patient" } as any, { onConflict: "user_id,role" } as any);
 
-  // optional: метадата (удобно для UI)
   await sb.auth.admin.updateUserById(user.id, {
     user_metadata: {
       ...(user.user_metadata ?? {}),

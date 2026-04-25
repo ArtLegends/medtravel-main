@@ -195,14 +195,12 @@ export default function CategoryGridClient({
     });
   }
 
-  // последний пункт без href
   if (items.length > 0) items[items.length - 1].href = undefined;
 
   return items;
 }, [categorySlug, categoryName, activeLoc, activeSub]);
 
 
-  // keep initial facets? мы теперь не используем RPC facets, но оставим как было для cover
   const initialLoadedRef = useRef(false);
 
   // load services labels
@@ -265,7 +263,6 @@ export default function CategoryGridClient({
           idx += 1;
           k += 1;
         } else {
-          // допускаем пропуски уровней: не съедаем сегмент, просто пробуем следующий kind
           k += 1;
         }
       }
@@ -288,11 +285,10 @@ export default function CategoryGridClient({
         const { data } = await q.maybeSingle();
         if (cancelled) return;
 
-        if (!data) break; // остаток игнорируем (никаких 404)
+        if (!data) break;
         nextSub.push(data as any);
         subParent = (data as any).id;
         idx += 1;
-        // если хочешь жёстко ограничить до 3 — поставь if(nextSub.length>=3) break;
       }
 
       setActiveLoc(nextLoc);
@@ -526,7 +522,7 @@ export default function CategoryGridClient({
       p_province: province,
       p_city: city,
       p_district: district,
-      p_service_slugs: null, // мы больше не хотим строгий service slug из URL
+      p_service_slugs: null,
 
       p_sort: sort,
       p_limit: PAGE_SIZE,
@@ -687,7 +683,7 @@ export default function CategoryGridClient({
   const hrefSelectSub = (node: SubNode) => {
     const last = activeSub[activeSub.length - 1] ?? null;
 
-    // 0) клик по уже выбранному — ничего не меняем (не плодим /x/x)
+    // 0) клик по уже выбранному
     if (last?.slug === node.slug) {
       return joinCategoryPath(categorySlug, [...currentLocSlugs, ...currentSubSlugs]);
     }

@@ -13,7 +13,6 @@ img, iframe, video, svg, canvas {
   max-width: 100% !important;
 }
 
-/* скрыть полосы прокрутки */
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
@@ -36,14 +35,11 @@ img, iframe, video, svg, canvas {
   --divider: 38 38 42;               /* бордеры */
 }
 
-/* утилки на основе токенов (Tailwind уже есть — подхватим классами) */
 body {
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
 }
 
-/* если используешь классы bg-background / text-foreground из Tailwind —
-   добавим простые кастомные классы на всякий случай */
 .bg-background { background-color: rgb(var(--background)) !important; }
 .text-foreground { color: rgb(var(--foreground)) !important; }
 .text-muted-foreground { color: rgb(var(--muted)) !important; }
@@ -51,7 +47,6 @@ body {
 .border-divider { border-color: rgb(var(--divider)) !important; }
 .bg-content1 { background-color: rgb(var(--content1)) !important; }
 
-/* карточки/меню/дропдауны (приглушить фон в тёмной теме) */
 .dark .heroui-card,
 .dark .heroui-dropdown,
 .dark .heroui-popover,
@@ -61,6 +56,5 @@ body {
   border-color: rgb(var(--divider)) !important;
 }
 
-/* мелкие правки ссылок/плейсхолдеров в тёмной теме */
 .dark ::placeholder { color: rgb(156 163 175 / 0.7); }
 a { color: inherit; }

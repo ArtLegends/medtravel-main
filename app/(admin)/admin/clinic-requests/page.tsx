@@ -32,7 +32,6 @@ export default async function Page({
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
-  // основная выборка: заявки + название клиники
   let q = supabaseServer
     .from('clinic_requests')
     .select(
@@ -160,7 +159,7 @@ export default async function Page({
         onDeleteAll={onDeleteAll}
       />
 
-      {/* пагинация как была */}
+      {/* пагинация */}
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-gray-500">
           Total: {total} • Page {page} / {totalPages}

@@ -198,7 +198,6 @@ export default async function BlogPostPage(
           )}
         </div>
 
-        {/* Отладка (при желании можно временно включать) */}
         {/* {error && <pre className="mt-6 text-xs text-red-600">{error.message}</pre>} */}
       </div>
     </main>

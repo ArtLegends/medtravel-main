@@ -22,7 +22,6 @@ export async function PATCH(req: NextRequest, ctx: any) {
 
   const supabase = await createRouteClient();
 
-  // ⚠️ имя функции поставь то, которое ты реально создал в пункте (3)
   const { data, error } = await supabase.rpc("customer_patient_set_schedule", {
     p_booking_id: id,
     p_scheduled_at: dt.toISOString(),
@@ -30,7 +29,6 @@ export async function PATCH(req: NextRequest, ctx: any) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 403 });
 
-  // если твой RPC возвращает строку — удобно отдать её
   const row = Array.isArray(data) ? data[0] : data ?? null;
 
   return NextResponse.json({ booking: row }, { headers: { "Cache-Control": "no-store" } });

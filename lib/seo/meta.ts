@@ -270,7 +270,7 @@ export function buildClinicMetadata(
   return duplicateToOgAndTwitter({ title, description })
 }
 
-// Дублируем Title/Description в OG и Twitter, как просили
+// Дублируем Title/Description в OG и Twitter
 function duplicateToOgAndTwitter(base: { title: string; description: string }): Metadata {
   return {
     title: base.title,

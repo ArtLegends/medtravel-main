@@ -23,9 +23,8 @@ export async function deleteBookingAction(id: string) {
   revalidatePath('/admin/bookings')
 }
 
-/** Удалить ВСЕ заявки (без фильтров). */
+/** Удалить ВСЕ заявки */
 export async function deleteAllBookingsAction() {
-  // Supabase не позволяет .delete() без условия — используем «всегда true»:
   const { error } = await supabaseServer
     .from('bookings')
     .delete()

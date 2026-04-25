@@ -9,7 +9,6 @@ export default function TrendsChart({ months, series }: Props) {
   const barCount = series.length;
   const groupCount = months.length;
 
-  // Use viewBox for responsive SVG
   const svgWidth = 600;
   const svgHeight = 220;
   const padLeft = 10;

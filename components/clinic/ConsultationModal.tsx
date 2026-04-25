@@ -79,7 +79,6 @@ export default function ConsultationModal({
     }
   }, [open, preselectedService]);
 
-  // закрытие по ESC/клик снаружи
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -132,7 +131,6 @@ export default function ConsultationModal({
           doctor_id: null,
           name,
           phone,
-          // ВАЖНО: отправляем ровно как требует CHECK
           contact_method: contact, // 'Email' | 'Phone' | 'WhatsApp' | 'Telegram'
           origin: 'service', // допустимое значение по CHECK
         }),

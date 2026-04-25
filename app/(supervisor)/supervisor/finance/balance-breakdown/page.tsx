@@ -23,8 +23,6 @@ type FilterState = {
   program: "all" | string;
 };
 
-// 👉 пока данных нет, поэтому пустой массив,
-// но тип и логика готовы под реальные записи из Supabase
 const INITIAL_ROWS: BalanceRow[] = [];
 
 const PROGRAM_OPTIONS = [
@@ -72,8 +70,7 @@ export default function BalanceBreakdownPage() {
     }));
   };
 
-  // фильтрация по дате / статусу / программе — сейчас массив пустой,
-  // но логика готова для реальных данных
+  // фильтрация по дате / статусу / программе
   const filteredRows = INITIAL_ROWS.filter((row) => {
     if (filters.program !== "all" && row.programSlug !== filters.program) {
       return false;

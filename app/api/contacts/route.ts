@@ -20,14 +20,14 @@ export async function POST(req: Request) {
 
     const sb = supabaseServer;
     const { error } = await sb
-      .from("contact_messages" as any)      // 👈 cast
+      .from("contact_messages" as any)
       .insert({
         first_name: firstName,
         last_name:  lastName,
         email,
         phone,
         message: message || null,
-      } as any);                            // 👈 cast
+      } as any);
 
     if (error) {
       console.error("contact_messages INSERT error:", error);
@@ -43,8 +43,8 @@ export async function POST(req: Request) {
 export async function GET() {
   const sb = supabaseServer;
   const { data, error } = await sb
-    .from("contact_messages" as any)        // 👈 cast
-    .select("id, first_name, last_name, email, phone, created_at" as any) // 👈 cast
+    .from("contact_messages" as any)
+    .select("id, first_name, last_name, email, phone, created_at" as any)
     .order("created_at", { ascending: false })
     .limit(500);
 

@@ -49,13 +49,11 @@ export async function POST(req: Request) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // ✅ refCode берём либо из body.ref (если ты когда-то начнёшь слать),
-    // ✅ либо из httpOnly cookie mt_ref_code, которую ставит /ref/[code]
     const store = await cookies();
     const refFromCookie = store.get("mt_ref_code")?.value;
     const refCode = normRefCode(body?.ref || refFromCookie);
 
-    // 1) создаём пользователя (НЕ шлём письма)
+    // 1) создаём пользователя
     const { data: created, error: createErr } =
       await supabase.auth.admin.createUser({
         email,
@@ -63,7 +61,6 @@ export async function POST(req: Request) {
         email_confirm: false,
         user_metadata: {
           requested_role: as,
-          // можно сохранить ref в метадате на будущее (не обязательно)
           ...(refCode ? { ref_code: refCode } : {}),
         },
       });
@@ -102,7 +99,6 @@ export async function POST(req: Request) {
           .upsert({ user_id: userId, email, status: "pending" }, { onConflict: "user_id" });
       }
     } else {
-      // PATIENT: как раньше
       await supabase.from("profiles").upsert(
         { id: userId, email, role: "patient", email_verified: false },
         { onConflict: "id" }
@@ -114,7 +110,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3) ✅ если это PATIENT и есть refCode — пишем регистрацию в partner_referrals
     if (as === "PATIENT" && refCode) {
       const { data: rows, error: lookupErr } = await supabase.rpc(
         "partner_referral_code_lookup",
@@ -126,7 +121,6 @@ export async function POST(req: Request) {
       const program_key = owner?.program_key;
 
       if (!lookupErr && partner_user_id && program_key) {
-        // вставляем (если у тебя есть unique constraint — лучше сделать upsert)
         await supabase.from("partner_referrals").upsert(
           {
             ref_code: refCode,
@@ -141,7 +135,6 @@ export async function POST(req: Request) {
 
     const res = NextResponse.json({ ok: true });
 
-    // (опционально) очищаем cookie, чтобы не засчитывать повторно
     res.cookies.set("mt_ref_code", "", { path: "/", maxAge: 0 });
 
     return res;

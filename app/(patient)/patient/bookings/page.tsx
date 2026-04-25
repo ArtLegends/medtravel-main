@@ -72,9 +72,7 @@ async function cancelBooking(formData: FormData) {
 
   const { error } = await supabase.rpc("patient_cancel_booking", { p_booking_id: bookingId });
 
-  // ВАЖНО: не валим рендер 500 в проде без текста — лучше мягко.
   if (error) {
-    // вариант 1: просто редирект с кодом (можно потом красиво вывести)
     redirect(`/patient/bookings?cancel_error=${encodeURIComponent(error.message)}`);
   }
 

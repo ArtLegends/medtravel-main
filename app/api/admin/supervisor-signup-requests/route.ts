@@ -1,6 +1,5 @@
-// ============================================================
-// FILE: app/api/admin/supervisor-signup-requests/route.ts
-// ============================================================
+// app/api/admin/supervisor-signup-requests/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase/routeClient";
 

@@ -20,7 +20,6 @@ export default async function HomePage() {
     <>
       <Hero />
       <WhyChooseUs categories={categories} />
-      {/* Если нужна поисковая секция — раскомментируй */}
       {/* <SearchSection categories={categories} /> */}
       <Process />
       <ReviewsSection />

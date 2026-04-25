@@ -23,7 +23,6 @@ export async function deleteReportAction(id: string) {
   revalidatePath('/admin/reports')
 }
 
-/** Удалить ВСЕ репорты (без фильтров). */
 export async function deleteAllReportsAction() {
   const { error } = await supabaseServer
     .from('reports')

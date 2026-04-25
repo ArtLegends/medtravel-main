@@ -54,7 +54,7 @@ export default function PartnerSidebar() {
           ))}
         </div>
 
-        {/* Finance sub-items (отдельным блоком, можно будет стилизовать как вложенное меню) */}
+        {/* Finance sub-items */}
         <div className="space-y-1">
           {financeSubNav.map((item) => (
             <Link

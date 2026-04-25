@@ -27,8 +27,6 @@ export async function POST(req: Request) {
     // приводим к ожидаемому CHECK-значению
     const contact_method = normalizeContact(body.contact_method);
 
-    // origin должен быть одним из: homepage | service | doctor
-    // т.к. это заявка со страницы клиники/услуг, используем 'service'
     const origin: 'homepage' | 'service' | 'doctor' = 'service';
 
     if (!clinic_id || !name || !phone || !contact_method || !CONTACT_ALLOWED.includes(contact_method)) {
@@ -38,7 +36,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // найти service_id по имени (если указано)
+    // найти service_id по имени
     let service_id: number | null = null;
     const serviceName = String(body.service ?? '').trim();
     if (serviceName) {

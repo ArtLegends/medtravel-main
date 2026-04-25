@@ -237,7 +237,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
 
   // --- Additional services / amenities ---
 
-  // старый формат (как был раньше на клиниках)
+  // старый формат
   const rawAdditional =
     (clinic as any).additionalServices ??
     (clinic as any).servicesExtra ??
@@ -398,7 +398,7 @@ export default function ClinicDetailPage({ clinic }: Props) {
       const clinicCity = norm(clinic.city ?? "");
       const clinicCountry = norm(clinic.country ?? "");
 
-      // 1) пытаемся найти city-node (лучший вариант)
+      // 1) пытаемся найти city-node
       let hit =
         list.find(n => n.kind === "city" && norm(n.name) === clinicCity) ||
         list.find(n => n.kind === "city" && norm(n.slug) === clinicCity) ||

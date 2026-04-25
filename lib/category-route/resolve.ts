@@ -58,8 +58,7 @@ export async function resolveCategoryRouteOnServer(
   if (locErr) console.error("resolveCategoryRouteOnServer: loc nodes error:", locErr);
   if (subErr) console.error("resolveCategoryRouteOnServer: sub nodes error:", subErr);
 
-  // полезный дебаг: покажет, что реально пришло на проде
-  // (можешь временно оставить, потом убрать)
+  // дебаг
   console.log("resolveCategoryRouteOnServer debug:", {
     categoryId,
     segments,
@@ -76,7 +75,7 @@ export async function resolveCategoryRouteOnServer(
 
   let i = 0;
 
-  // --- LOCATION PATH (с начала) ---
+  // --- LOCATION PATH ---
   let curLocParent: number | null = null;
 
   while (i < segments.length) {
@@ -96,7 +95,7 @@ export async function resolveCategoryRouteOnServer(
     i++;
   }
 
-  // --- SUBCATEGORY PATH (остаток) ---
+  // --- SUBCATEGORY PATH ---
   let curSubParent: number | null = null;
 
   while (i < segments.length) {

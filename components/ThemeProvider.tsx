@@ -7,10 +7,6 @@ import {
   type ThemeProviderProps as NextThemesProviderProps,
 } from "next-themes";
 
-/**
- * Обёртка над next-themes с дефолтами для проекта.
- * Пропсы можно переопределять при использовании.
- */
 export type ThemeProviderProps = Omit<NextThemesProviderProps, "children"> & {
   children: React.ReactNode;
 };
@@ -28,7 +24,6 @@ export default function ThemeProvider({
       disableTransitionOnChange
       storageKey="medtravel-theme"
       themes={["light", "dark"]}
-      // позволяют переопределить при необходимости
       {...rest}
     >
       {children}

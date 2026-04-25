@@ -61,7 +61,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
 
   const finalRole: RoleName = fromAs !== "GUEST" ? fromAs : metaRole;
 
-  // ✅ CUSTOMER gating
+  // CUSTOMER gating
   if (finalRole === "CUSTOMER") {
     const sb = createServiceClient();
 
@@ -94,7 +94,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
     return { finalRole, pendingKind: "CUSTOMER" as const };
   }
 
-  // ✅ PARTNER gating (новое)
+  // PARTNER gating
   if (finalRole === "PARTNER") {
     const sb = createServiceClient();
 
@@ -127,7 +127,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
     return { finalRole, pendingKind: "PARTNER" as const };
   }
 
-  // ✅ SUPERVISOR gating
+  // SUPERVISOR gating
   if (finalRole === "SUPERVISOR") {
     const sb = createServiceClient();
 
@@ -163,7 +163,7 @@ async function ensureProfileAndRole(supabase: any, asParam: string | null) {
     return { finalRole, pendingKind: "SUPERVISOR" as const };
   }
 
-  // ✅ остальные роли — как раньше
+  // остальные роли
   await supabase
     .from("profiles")
     .upsert({ id: userId, email, role: finalRole.toLowerCase() }, { onConflict: "id" });

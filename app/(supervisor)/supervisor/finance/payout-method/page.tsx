@@ -27,7 +27,6 @@ const COUNTRIES: Country[] = [
   },
 ];
 
-// 👉 пока методов нет, но тип готов под будущие данные из Supabase
 const METHODS: PayoutMethod[] = [];
 
 function formatCurrency(amount: number, currency: string) {
@@ -84,7 +83,6 @@ export default function PayoutMethodPage() {
                 className="flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
               >
                 <span className="flex items-center gap-2">
-                  {/* простой placeholder-флаг; потом можно заменить реальными флагами */}
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs">
                     {selectedCountry.code}
                   </span>

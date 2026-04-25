@@ -197,7 +197,7 @@ function ProfileDropdownAuth({
           My settings
         </DropdownItem>
 
-        {/* ПАНЕЛИ (вернули) */}
+        {/* ПАНЕЛИ */}
         {portalItems.length ? (
           <>
             <DropdownItem key="portals-title" className="cursor-default text-default-500">

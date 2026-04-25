@@ -42,7 +42,6 @@ export default function ReportModal({ open, onClose, clinicId }: Props) {
     return () => clearTimeout(t);
   }, [open]);
 
-  // закрытие по ESC / клик мимо окна
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

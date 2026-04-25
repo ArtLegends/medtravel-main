@@ -143,7 +143,6 @@ export default function OtpForm({
         return;
       }
 
-      // ✅ остальные роли — как раньше
       setSuccessMsg("Email confirmed. Signing you in...");
 
       if (password) {

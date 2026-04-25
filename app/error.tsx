@@ -11,7 +11,6 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // полезно видеть оригинальную ошибку в консоли
     console.error(error);
   }, [error]);
 

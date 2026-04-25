@@ -14,7 +14,6 @@ type SearchParams = {
 };
 
 type ModerationDetailProps = {
-  // в Next 15 searchParams приходит как Promise
   searchParams: Promise<SearchParams>;
 };
 
@@ -41,7 +40,6 @@ export default async function ModerationDetail({
   if (!clinic) return notFound();
   if (dErr) throw dErr;
 
-  // безопасная распаковка черновика
   const basic = (draft?.basic_info ?? {}) as any;
 
   const services: any[] = Array.isArray(draft?.services)
@@ -69,7 +67,6 @@ export default async function ModerationDetail({
 
   const location = (draft?.location ?? {}) as any;
 
-  // pricing → массив строк (названия методов)
   const payments: string[] = Array.isArray(draft?.pricing)
     ? (draft!.pricing as any[])
         .map((x) => {

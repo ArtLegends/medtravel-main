@@ -5,7 +5,7 @@ export function DeleteBtn({
   action,
 }: {
   id: string;
-  action: (formData: FormData) => void; // server action
+  action: (formData: FormData) => void;
 }) {
   return (
     <form

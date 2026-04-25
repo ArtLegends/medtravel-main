@@ -8,7 +8,6 @@ export async function POST(req: Request) {
 
     const sb = await createServerClient();
 
-    // (опционально) тут можно добавить проверку админ-доступа через sb.auth.getUser()
     // const { data: u } = await sb.auth.getUser(); if (!u?.user) return new NextResponse("Unauthorized", { status: 401 });
 
     const { data, error } = await sb.rpc("admin_patients_delete", { p_booking_id: booking_id });

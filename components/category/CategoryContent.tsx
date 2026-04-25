@@ -16,14 +16,14 @@ interface Props {
 export default function CategoryContent({ categoryId }: Props) {
   const supabase = createClient();
 
-  // 1️⃣ состояния фильтров
+  // состояния фильтров
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<string | null>(null);
   const [service, setService] = useState<string | null>(null);
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 2️⃣ при изменении фильтров — рефетчим список
+  // при изменении фильтров — рефетчим список
   useEffect(() => {
     setLoading(true);
     supabase
@@ -62,10 +62,10 @@ export default function CategoryContent({ categoryId }: Props) {
     <div className="space-y-6">
       <SearchBar value={search} onChangeAction={setSearch} />
       <CategoryFilters
-        facets={undefined} // если у тебя есть локальная переменная с фасетами, иначе передай undefined
+        facets={undefined}
         selected={{
           country: country ?? undefined,
-          province: undefined,   // если у тебя есть состояние для province/city/district — подставь его
+          province: undefined,
           city: undefined,
           district: undefined,
           services: service ? [service] : [],
@@ -85,7 +85,6 @@ export default function CategoryContent({ categoryId }: Props) {
           // setProvince?.(null); setCity?.(null); setDistrict?.(null);
           setService(null);
           setSearch("");
-          // при желании сбрось и сортировку/страницу
         }}
       />
       {loading ? (

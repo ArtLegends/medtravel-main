@@ -8,8 +8,6 @@ function isUuid(v: string) {
 
 /**
  * Выбор клиники/клиентского user_id для лида.
- * Сейчас: берём первого активного customer с membership.
- * Потом: сюда добавим веса/рейтинги и выбор по ним.
  */
 async function pickCustomerUserId(admin: any) {
   // Берём customer user_id, у которого есть membership clinic_id
@@ -42,7 +40,7 @@ async function pickCustomerUserId(admin: any) {
 
   if (!candidates.length) return null;
 
-  // ✅ Сейчас просто первый (пока одна клиника)
+  // пока одна клиника
   return candidates[0].user_id;
 }
 

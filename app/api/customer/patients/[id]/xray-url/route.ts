@@ -20,7 +20,6 @@ export async function GET(_req: Request, ctx: any) {
   const user = au?.user;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ✅ главный гейт: должен быть привязан clinic_id
   const { data: clinicId, error: eClinic } = await supa.rpc("customer_current_clinic_id");
   if (eClinic) return NextResponse.json({ error: eClinic.message }, { status: 500 });
   if (!clinicId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });

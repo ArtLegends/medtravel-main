@@ -16,7 +16,6 @@ module.exports = {
       screens: { "2xl": "1400px" },
     },
     extend: {
-      /* === Маппинг цветов на CSS-переменные с альфой === */
       colors: {
         background: "rgb(var(--background) / <alpha-value>)",
         foreground: "rgb(var(--foreground) / <alpha-value>)",
@@ -24,7 +23,6 @@ module.exports = {
         content1: "rgb(var(--content1) / <alpha-value>)",
         divider: "rgb(var(--divider) / <alpha-value>)",
 
-        /* твои брендовые/утилитарные — оставил без изменений */
         medblue: { light: "#4A90E2", DEFAULT: "#0066CC", dark: "#004C99" },
         medteal: "#20B2AA",
         primary: "hsl(210, 100%, 40%)",
@@ -41,13 +39,11 @@ module.exports = {
         divider: "rgb(var(--divider) / <alpha-value>)",
       },
 
-      /* типографика/шрифты */
       fontFamily: {
         sans: ["var(--font-roboto)", "Inter", "ui-sans-serif", "system-ui"],
         heading: ['"Open Sans"', "sans-serif"],
       },
 
-      /* размеры/радиусы и т.п. */
       spacing: {
         4: "1rem",
         6: "1.5rem",
@@ -67,7 +63,6 @@ module.exports = {
         300: "300ms",
       },
 
-      /* анимации */
       // keyframes: {
       //   fadeIn: { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
       //   slideUp: {
@@ -122,7 +117,6 @@ module.exports = {
             },
           },
           colors: {
-            /* HeroUI палитра как у тебя */
             background: "#FFFFFF",
             foreground: "#11181C",
             card: "#FFFFFF",

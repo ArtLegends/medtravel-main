@@ -13,7 +13,7 @@ function makeSlug(base = "dev-draft-clinic") {
   return `${base}-${rand}`;
 }
 
-/** Возвращает clinic_id «текущего пользователя». */
+/** Возвращает clinic_id текущего пользователя */
 export async function ensureClinicForOwner(): Promise<string> {
   const sb = await createServerClient();
   const { data: userRes } = await sb.auth.getUser();
@@ -400,7 +400,7 @@ export async function submitForReview() {
   if (!alreadyPublished) {
     clinicUpdate.moderation_status = "pending";
     clinicUpdate.is_published = false;
-    clinicUpdate.status = "pending"; // или "draft", но лучше "pending"
+    clinicUpdate.status = "pending";
     clinicUpdate.verified_by_medtravel = false;
     clinicUpdate.is_official_partner = false;
   }
@@ -536,7 +536,7 @@ export async function uploadAccreditationLogo(formData: FormData) {
   return url;
 }
 
-// copyImageFromUrl оставляем почти как было
+// copyImageFromUrl
 export async function copyImageFromUrl(url: string) {
   const supa = await getSupa();
   await supa.auth.getUser();
@@ -581,7 +581,7 @@ export async function copyImageFromUrl(url: string) {
   return pub.publicUrl;
 }
 
-/** Сохранить весь драфт одним апдейтом (без стирания других полей) */
+/** Сохранить весь драфт одним апдейтом */
 export async function saveDraftWhole(payload: {
   basic_info: any;
   services: any[];
@@ -614,7 +614,6 @@ export async function saveDraftWhole(payload: {
     .upsert(nextRow, { onConflict: "clinic_id" });
   if (upErr) throw upErr;
 
-  // переводим клинику в Draft только если она не опубликована
   const { error: sErr } = await client
     .from("clinics")
     .update({ status: "draft" })

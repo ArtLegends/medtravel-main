@@ -86,13 +86,6 @@ const nextConfig = {
     ]
   },
 
-  /**
-   * ВАЖНО:
-   * - clinic rewrites делаем afterFiles, чтобы НЕ перехватывать реальные /api/** роуты
-   * - исключаем зарезервированные префиксы из :country, чтобы даже теоретически не матчить /api, /customer, /patient и т.д.
-   * - используем :path* чтобы поддержать любую глубину country/province/city/district/...
-   * - порядок: review/inquiry ПЕРЕД detail (иначе detail схватит "inquiry" как slug)
-   */
   async rewrites() {
     const RESERVED =
   'api|_next|static|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|customer|patient|partner|admin|login|auth|settings|labs|ref' +

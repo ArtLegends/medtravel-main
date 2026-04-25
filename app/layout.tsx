@@ -86,7 +86,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     {
       cookies: {
         getAll: () => cookieStore.getAll().map(c => ({ name: c.name, value: c.value })),
-        setAll: () => {}, // не меняем куки тут
+        setAll: () => {},
       },
     }
   );
@@ -155,7 +155,6 @@ function gtag(){dataLayer.push(arguments);}
 window.gtag = gtag;
 gtag('js', new Date());
 
-// важно: отключаем авто page_view, потому что в SPA иначе будет криво/дубли
 gtag('config', '${GA_ID}', { send_page_view: false });
           `,
               }}

@@ -32,8 +32,8 @@ export type ClinicMock = {
   services?: Array<{
     name: string;
     price?: string | number;
-    description?: string; // либо duration в старом формате
-    duration?: string;    // на всякий случай — поддержим старое поле
+    description?: string;
+    duration?: string;
   }>;
 
   // аккредитации — поддерживаем оба формата
@@ -51,7 +51,7 @@ export type ClinicMock = {
     mapEmbedUrl?: string;
   };
 
-  // дополнительные сервисы (как в референсе)
+  // дополнительные сервисы
   additionalServices?: {
     premises?: string[];
     clinic_services?: string[];
@@ -76,18 +76,15 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
     about:
       "Dr Çağatay Özyıldırım Care is a dental clinic located in Istanbul, Turkey, offering a comprehensive range of dental services. The clinic provides treatments in general dentistry, cosmetic procedures, and restorative care. Services include routine cleanings, fillings, and preventive care, as well as cosmetic treatments such as teeth whitening, veneers, and orthodontic options like braces and Invisalign. For restorative needs, the clinic offers dental implants, dentures, and fixed prostheses. Advanced diagnostic tools, including 3D dental X-rays, are utilised to support accurate treatment planning.",
 
-    // геро-галерея (1 большой + до 4 превью)
     images: [
       "https://cdn.whatclinic.com/clinics/thumbnails/stockpictures/236910a5efa39582/23.jpg?width=400&height=400&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=8330f15bc95df732ac168471726b0839bfc4f522",
-      // можно добавить дополнительные превью сюда
     ],
 
     categories: ["dentistry"],
 
-    // чтобы попадать в категорию /dentistry
     // tags: ["dentistry", "dentists"],
 
-    // методы оплаты (для сайдбара)
+    // методы оплаты
     payments: ["Cash", "VISA", "Mastercard", "Apple Pay", "Google Pay"],
 
     // услуги
@@ -130,7 +127,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
       },
     ],
 
-    // аккредитации (новый формат с логотипами)
+    // аккредитации
     accreditations: [
       {
         name: "TDB - Turkish Dental Association (Turkey)",
@@ -164,7 +161,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
         "https://www.google.com/maps?q=41.049758,28.990391&z=16&output=embed",
     },
 
-    // Additional Services (1:1 с макетом)
+    // Additional Services
     additionalServices: {
       premises: [
         "Parking",
@@ -203,18 +200,15 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
     about:
       "Pioneer and Leader of The Single Stage Implant Procedure. Experts in All Dental Treatments. Since 2009, Novusklinik is Serving with 100% Satisfaction Guarantee. Combination of Highly Expert Doctors and Best Quality Metarials Results in Absolute Success at Novusklinik. Check Out The Experience Videos of Our Patients at Youtube, Facebook, Instagram, Tik Tok, X and Threads. Search @novusklinikistanbul. And Even Better, Contact With Us And Ask Every Questions You Wonder To Our Lovely Representatives.",
 
-    // геро-галерея (1 большой + до 4 превью)
     images: [
       "https://cdn.whatclinic.com//dentists/turkey/istanbul-province/istanbul/kadikoy/novusklinik-kadikoy/thumbnails/6064b512f2accb21/whatsapp_image_20231116_at_162617.jpg?width=400&height=400&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=78c4fe68b4115c2a26cb8935e502bd3c520d37c6",
-      // можно добавить дополнительные превью сюда
     ],
 
     categories: ["dentistry"],
 
-    // чтобы попадать в категорию /dentistry
     // tags: ["dentistry", "dentists"],
 
-    // методы оплаты (для сайдбара)
+    // методы оплаты
     payments: ["Discounts", "Payment plans", "Free initial consultation", "Cheques", "Credit cards"],
 
     // услуги
@@ -257,7 +251,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
       },
     ],
 
-    // аккредитации (новый формат с логотипами)
+    // аккредитации
     accreditations: [
       {
         name: "ITI - International Team for Implantology (International)",
@@ -291,7 +285,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
         "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3011.7484210256675!2d29.046602099999998!3d40.98698939999999!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14cac7882c213a8f%3A0x6b1873d14425762a!2zTm92dXNrbGluaWsgS2FkxLFrw7Z5!5e0!3m2!1sru!2s!4v1759178459806!5m2!1sru!2s",
     },
 
-    // Additional Services (1:1 с макетом)
+    // Additional Services
     additionalServices: {
       premises: [
         "Parking",
@@ -337,18 +331,15 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
     about:
       "Clinic Prime Istanbul is located in Kartal, Asian Side of Istanbul just 20 minutes away to SAW airport.We offer you aesthetic and top-tier dental services with a high-tech clinic environment near the seaside. We deliver excellence through the gentle hands of our expert staff in Asian Istanbul. All implants and crowns used in our clinic are guaranteed and certified. Additionally, every operation is satisfaction guaranteed.",
 
-    // геро-галерея (1 большой + до 4 превью)
     images: [
       "https://cdn.whatclinic.com//dentists/turkey/istanbul-province/istanbul/kartal/clinic-prime-istanbul/thumbnails/6339804d066c8610/clinicprimewhatclinic.jpg?width=400&height=400&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=b056c08ee3927daf14af8a5c2750b41a380b20d9",
-      // можно добавить дополнительные превью сюда
     ],
 
     categories: ["dentistry"],
 
-    // чтобы попадать в категорию /dentistry
     // tags: ["dentistry", "dentists"],
 
-    // методы оплаты (для сайдбара)
+    // методы оплаты
     payments: ["Discounts", "Payment plans", "Free initial consultation", "Credit cards"],
 
     // услуги
@@ -391,7 +382,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
       },
     ],
 
-    // аккредитации (новый формат с логотипами)
+    // аккредитации
     accreditations: [
       {
         name: "TDB - Turkish Dental Association (Turkey)",
@@ -425,7 +416,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
         "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3016.416187618115!2d29.201750876482414!3d40.884684627025415!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14cac3f34c60c959%3A0xeab00056e9e6e88b!2sClinic%20Prime%20Istanbul!5e0!3m2!1sru!2s!4v1759178736688!5m2!1sru!2s",
     },
 
-    // Additional Services (1:1 с макетом)
+    // Additional Services
     additionalServices: {
       premises: [
         "Parking",
@@ -468,18 +459,15 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
     about:
       "Founded in 2016 in Istanbul, Vanity Cosmetic Surgery Hospital combines 10+ years of experience of its 10 surgeons specializing in different areas, with new methods and technologies and lists 24/7 patient experience as the top priority. Our doctors are the best plastic surgeons in their fields. In addition, they are internationally certified and acknowledged by global core institutions such as ISAPS and EBOPRAS. Vanity Cosmetic Surgery Hospital operations are carried out in which high-quality service and patient satisfaction have the utmost importance.",
 
-    // геро-галерея (1 большой + до 4 превью)
     images: [
       "https://cdn.whatclinic.com//cosmetic-plastic-surgery/turkey/istanbul-province/istanbul/umraniye/vanity-cosmetic-surgery-hospital/thumbnails/1ac1c9933d08fd25/whatsapp_image_20250224_at_083016.jpg?width=400&height=400&background-color=0xeeede8&operation=pad&float-y=0.25&hmac=f82d64fa79bf7ab66cc25c7c0da7b682a6fba9c7",
-      // можно добавить дополнительные превью сюда
     ],
 
     categories: ["plastic-surgery"],
 
-    // чтобы попадать в категорию /dentistry
     // tags: ["dentistry", "dentists"],
 
-    // методы оплаты (для сайдбара)
+    // методы оплаты
     payments: ["Discounts", "Free initial consultation", "Credit cards"],
 
     // услуги
@@ -522,7 +510,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
       },
     ],
 
-    // аккредитации (новый формат с логотипами)
+    // аккредитации
     accreditations: [
       {
         name: "TTB - Turkish Medical Association (Turkey)",
@@ -556,7 +544,7 @@ const MOCK_CLINICS: Record<string, ClinicMock> = {
         "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3008.844170756476!2d29.076765299999998!3d41.0505367!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14cab6e464844fe5%3A0x9960aad8e69aa0!2sVanity%20Estetik%20%2F%20Vanity%20Cosmetic%20Surgery%20Hospital%20Istanbul!5e0!3m2!1sru!2s!4v1759189631297!5m2!1sru!2s",
     },
 
-    // Additional Services (1:1 с макетом)
+    // Additional Services
     additionalServices: {
       premises: [
         "Parking",
@@ -612,7 +600,7 @@ export function getClinicsByCategory(category: string): ClinicMock[] {
   return clinics.filter((c) => {
     const svc = (c.services ?? []).map((s) => (s.name ?? "").toLowerCase());
 
-    // соберём все теги из обоих полей
+    //  все теги из обоих полей
     const tags = ((c as any).tags ?? []) as string[];
     const ctg = ((c as any).ctg ?? []) as string[];
     const allTags = [...tags, ...ctg].map((t) => t.toLowerCase());

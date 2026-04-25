@@ -15,6 +15,5 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // По ТЗ категорий 6 — если больше, оставим первые 6 (можешь убрать лимит)
   return NextResponse.json({ categories: (data ?? []).slice(0, 6) });
 }

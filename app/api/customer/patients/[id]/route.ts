@@ -6,7 +6,6 @@ import { createRouteClient } from "@/lib/supabase/routeClient";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// лучше под твой enum/логику:
 const ALLOWED_STATUSES = new Set([
   "pending", "confirmed", "cancelled", "completed",
   "no_answer", "interested", "waiting_for_photo", "consultation_done",
@@ -48,7 +47,6 @@ export async function PATCH(req: NextRequest, ctx: any) {
   return handleUpdate(req, id);
 }
 
-// можно оставить алиас, не мешает
 export async function POST(req: NextRequest, ctx: any) {
   const id = String(ctx?.params?.id ?? "");
   return handleUpdate(req, id);

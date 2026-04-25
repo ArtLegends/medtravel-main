@@ -226,8 +226,6 @@ export async function generateMetadata(
     if (serviceSlugs.length) {
       const { data: pr } = await sb.rpc("seo_treatment_price_range_v2", {
         p_service_slugs: serviceSlugs,
-        // ВАЖНО: тут лучше передавать именно "name" из nodes (а не slug),
-        // потому что мета и UI у тебя на человекочитаемых названиях.
         p_country: locationForMeta?.country ?? null,
         p_province: locationForMeta?.province ?? null,
         p_city: locationForMeta?.city ?? null,
@@ -241,7 +239,7 @@ export async function generateMetadata(
     }
   }
 
-  // 6) строим meta по твоим правилам
+  // 6) строим meta
   const catLabelBase = getCatLabelBase(cat, slug);
   const catLabelRu = getCatLabelRu(cat, catLabelBase);
   const catLabelPl = getCatLabelPl(cat, catLabelBase);
@@ -255,16 +253,15 @@ export async function generateMetadata(
       })
     : buildTreatmentMetadata(canonicalPath, {
         treatmentLabel: String(treatmentLabel ?? catLabelBase),
-        location: locationForMeta, // если нет, meta.ts покажет "Popular Destinations"
+        location: locationForMeta,
         minPrice,
         maxPrice,
-        currency: currency ?? "USD", // можешь убрать, если не хочешь форсить
+        currency: currency ?? "USD",
       });
 
   return {
     ...base,
     alternates: { canonical: canonicalPath },
-    // если есть мусорные сегменты — noindex,follow (чтобы не плодить дубли)
     robots: hasExtra ? { index: false, follow: true } : undefined,
     openGraph: { ...(base.openGraph as any), url: canonicalPath },
 

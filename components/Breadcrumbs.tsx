@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export type BreadcrumbItem = {
   label: string;
-  href?: string; // у последнего обычно href нет
+  href?: string;
 };
 
 export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {

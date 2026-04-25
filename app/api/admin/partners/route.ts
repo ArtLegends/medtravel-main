@@ -24,7 +24,6 @@ export async function GET() {
   // 2) service client for data
   const admin = createServiceClient();
 
-  // ✅ берём всех user_id у кого есть роль customer
   const { data: roles, error: rErr } = await admin
     .from("user_roles")
     .select("user_id")
@@ -35,7 +34,6 @@ export async function GET() {
   const ids = Array.from(new Set((roles ?? []).map((x: any) => x.user_id).filter(Boolean)));
   if (!ids.length) return NextResponse.json({ items: [] });
 
-  // ✅ оставляем только approved заявки (не обязательно, но правильно)
   const { data: approved, error: aErr } = await admin
     .from("customer_registration_requests")
     .select("user_id")
@@ -48,7 +46,6 @@ export async function GET() {
   const filtered = ids.filter((id) => approvedIds.has(id));
   if (!filtered.length) return NextResponse.json({ items: [] });
 
-  // ✅ оставляем только тех, у кого есть customer_clinic_membership
   const { data: mem, error: mErr } = await admin
     .from("customer_clinic_membership")
     .select("user_id, clinic_id")
@@ -64,7 +61,6 @@ export async function GET() {
   const finalIds = filtered.filter((id) => memMap.has(id));
   if (!finalIds.length) return NextResponse.json({ items: [] });
 
-  // профили этих пользователей
   const { data: prof, error: pErr } = await admin
     .from("profiles")
     .select("id,first_name,last_name,email")
@@ -73,7 +69,6 @@ export async function GET() {
 
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
 
-  // (опционально) подтянем название клиники
   const clinicIds = Array.from(new Set(Array.from(memMap.values())));
   const { data: clinics } = await admin
     .from("clinics")
@@ -89,8 +84,8 @@ export async function GET() {
     const clinicName = clinicId ? (clinicNameById.get(clinicId) ?? "") : "";
 
     return {
-      id: p.id,              // customer user_id (то что кладём в partner_leads.assigned_partner_id)
-      clinic_id: clinicId,   // удобно на будущее
+      id: p.id,
+      clinic_id: clinicId,
       name: clinicName || personName || p.email || p.id,
       email: p.email ?? "",
     };

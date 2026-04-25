@@ -72,7 +72,7 @@ export type Clinic = {
   location?: { address?: string; mapEmbedUrl?: string }
 }
 
-/* ===== «сырые» строки из БД ===== */
+/* ===== сырые строки из БД ===== */
 type DBClinic = {
   id: string
   slug: string
@@ -101,14 +101,14 @@ type DBServiceLink = {
   currency: string | null
 } | null
 
-// каталог услуг (таблица services)
+// каталог услуг таблица services
 type DBServiceCatalog = {
   id: number
   name: string
   description: string | null
 } | null
 
-// «готовый» элемент сервисов, который передаём в toClinic
+// готовый элемент сервисов, который передаём в toClinic
 type DBService = {
   name: string
   price: number | null
@@ -124,7 +124,7 @@ type DBAccr = { id: number; name: string; logo_url: string | null; description: 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const hhmm = (v: string | null | undefined) => (v ? v.slice(0, 5) : undefined)
 
-/** формируем объект Clinic из «сырых» данных */
+/** формируем объект Clinic из сырых данных */
 function toClinic(row: DBClinic, parts: {
   images: DBImage[] | null
   services: DBService[] | null

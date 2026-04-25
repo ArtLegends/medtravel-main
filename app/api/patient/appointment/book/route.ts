@@ -35,8 +35,6 @@ export async function POST(req: Request) {
 
   const method = bookingMethod === "automatic" ? "automatic" : "manual";
 
-  // preferredDate обязателен только для manual,
-  // и для automatic, когда autoWhen != "Unknown"
   const preferredDateRequired = !(method === "automatic" && autoWhen === "Unknown");
   if (preferredDateRequired && !preferredDate) {
     return NextResponse.json({ error: "Preferred date is required" }, { status: 400 });
@@ -59,7 +57,6 @@ export async function POST(req: Request) {
     status: "pending",
   };
 
-  // эти поля добавляй только если колонки существуют в patient_bookings
   insertPayload.auto_when = method === "automatic" ? (autoWhen ?? null) : null;
   insertPayload.auto_has_xray = method === "automatic" ? (autoHasXray ?? null) : null;
 

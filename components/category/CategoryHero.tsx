@@ -2,13 +2,11 @@
 'use client';
 
 import { useState } from 'react';
-// Если ты положил модалку в components/admin/bookings — оставь этот импорт,
-// если перенёс в components/bookings — измени путь на '@/components/bookings/BookingsModal'
 import BookingsModal from '@/components/admin/bookings/BookingsModal';
 
 export default function CategoryHero({
   title,
-  categoryName,                           // ← имя категории для автоподстановки
+  categoryName,
   ctaText = 'Receive a Personalized Offer on Us',
 }: {
   title: string;
@@ -35,11 +33,10 @@ export default function CategoryHero({
         </div>
       </section>
 
-      {/* компактная модалка, как на странице клиники */}
       <BookingsModal
         open={open}
         onClose={() => setOpen(false)}
-        preselectedService={categoryName}   // ← подставляем текущую категорию
+        preselectedService={categoryName}
       />
     </>
   );

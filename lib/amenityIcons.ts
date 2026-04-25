@@ -12,7 +12,7 @@ export type AmenityIconKey =
 export type AmenityIconDef = {
   value: '' | AmenityIconKey;
   label: string;
-  icon: string; // Iconify id
+  icon: string;
 };
 
 export const AMENITY_ICON_DEFS: AmenityIconDef[] = [

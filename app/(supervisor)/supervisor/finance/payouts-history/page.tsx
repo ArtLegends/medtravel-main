@@ -36,7 +36,6 @@ export default function PayoutsHistoryPage() {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
 
-  // 👉 сюда позже подставим реальные выплаты из Supabase
   const months: MonthPayout[] = useMemo(
     () => [
       {
@@ -74,7 +73,7 @@ export default function PayoutsHistoryPage() {
       });
     }
 
-    // сортируем годы по убыванию (на будущее)
+    // сортируем годы по убыванию
     return Array.from(map.values()).sort((a, b) => b.year - a.year);
   }, [months]);
 

@@ -61,7 +61,6 @@ function simulateCommission(
 ): { amount: number; rule: Rule | RuleDraft | null; isDefault: boolean } {
   const activeRules = rules.filter((r) => r.is_active);
 
-  // First try service-specific rules
   if (serviceId) {
     for (const rule of activeRules.filter((r) => r.service_id === serviceId)) {
       const minOk = rule.threshold_min == null || cost >= rule.threshold_min;
@@ -75,7 +74,6 @@ function simulateCommission(
     }
   }
 
-  // Then try clinic-wide rules (service_id IS NULL)
   for (const rule of activeRules.filter((r) => r.service_id == null)) {
     const minOk = rule.threshold_min == null || cost >= rule.threshold_min;
     const maxOk = rule.threshold_max == null || cost < rule.threshold_max;
@@ -107,7 +105,6 @@ export default function CommissionsPage() {
   const [simCost, setSimCost] = useState<number>(1500);
   const [simServiceId, setSimServiceId] = useState<number | null>(null);
 
-  // Tab: "all" (clinic-wide) or "services"
   const [tab, setTab] = useState<"all" | "services">("all");
 
   const loadData = useCallback(async () => {
@@ -129,7 +126,6 @@ export default function CommissionsPage() {
     }
   }, [supabase]);
 
-  // Load services for selected clinic
   const loadClinicServices = useCallback(async (clinicId: string) => {
     const { data } = await supabase
       .from("clinic_services")
@@ -156,7 +152,6 @@ export default function CommissionsPage() {
     }
   }, [selectedClinicId, loadClinicServices]);
 
-  // Filter rules
   const clinicWideRules = selectedClinicId
     ? rules.filter((r) => r.clinic_id === selectedClinicId && r.service_id == null).sort((a, b) => a.priority - b.priority)
     : [];
@@ -255,7 +250,6 @@ export default function CommissionsPage() {
       {successMsg && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMsg}</div>}
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Left: Clinic List */}
         <div className="rounded-xl border bg-white">
           <div className="border-b px-4 py-3">
             <h2 className="text-sm font-semibold text-gray-900">Clinics ({clinics.length})</h2>
@@ -293,7 +287,6 @@ export default function CommissionsPage() {
           </div>
         </div>
 
-        {/* Right: Rules Editor */}
         <div className="space-y-4">
           {!selectedClinicId ? (
             <div className="rounded-xl border bg-white px-6 py-16 text-center">
@@ -302,7 +295,6 @@ export default function CommissionsPage() {
             </div>
           ) : (
             <>
-              {/* Clinic header + tabs */}
               <div className="rounded-xl border bg-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -328,7 +320,6 @@ export default function CommissionsPage() {
                   </button>
                 </div>
 
-                {/* Tabs */}
                 <div className="mt-4 flex gap-1 rounded-lg bg-gray-100 p-1">
                   <button
                     onClick={() => setTab("all")}
@@ -349,7 +340,6 @@ export default function CommissionsPage() {
                 </div>
               </div>
 
-              {/* Rules list */}
               {tab === "all" && clinicWideRules.length > 0 && (
                 <RulesList rules={clinicWideRules} services={clinicServices} onEdit={setEditingRule} onDelete={deleteRule} onToggle={toggleRule} />
               )}
@@ -361,7 +351,6 @@ export default function CommissionsPage() {
 
               {tab === "services" && (
                 <div className="space-y-4">
-                  {/* Services overview */}
                   <div className="rounded-xl border bg-white">
                     <div className="border-b px-4 py-3">
                       <h3 className="text-sm font-semibold text-gray-900">
@@ -413,14 +402,12 @@ export default function CommissionsPage() {
                     )}
                   </div>
 
-                  {/* Service-specific rules */}
                   {serviceRules.length > 0 && (
                     <RulesList rules={serviceRules} services={clinicServices} onEdit={setEditingRule} onDelete={deleteRule} onToggle={toggleRule} />
                   )}
                 </div>
               )}
 
-              {/* Commission Simulator */}
               <div className="rounded-xl border bg-white p-4">
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Commission Simulator</h3>
                 <div className="flex flex-wrap items-end gap-4">
@@ -451,7 +438,6 @@ export default function CommissionsPage() {
                 </div>
               </div>
 
-              {/* Edit/Create form */}
               {editingRule && (
                 <RuleForm draft={editingRule} services={clinicServices} onSave={saveRule} onCancel={() => setEditingRule(null)} saving={saving} />
               )}
@@ -554,7 +540,6 @@ function RuleForm({
       <h3 className="text-sm font-semibold text-gray-900 mb-4">{isNew ? "Add New Rule" : "Edit Rule"}</h3>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Service selector */}
         <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-gray-700 mb-1">Applies to</label>
           <select value={form.service_id ?? ""} onChange={(e) => update({ service_id: e.target.value ? Number(e.target.value) : null })}

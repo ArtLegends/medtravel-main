@@ -5,7 +5,7 @@ import type { Category } from '@/lib/supabase/requests'
 import CategoryCard from './category/CategoryCard'
 
 interface Props {
-  categories: Category[]  // передадим сверху список категорий
+  categories: Category[]
 }
 
 export default function WhyChooseUs({ categories }: Props) {

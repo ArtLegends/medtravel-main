@@ -20,14 +20,11 @@ type ClinicState = {
   district?: string | null;
   address: string;
 
-  // NEW: вместо lat/lng
   mapUrl: string;
   directions: string;
 
-  // платежи – как строки, но отправим в JSON [{method: ...}]
   payments: string[];
 
-  // NEW: amenities -> clinics.amenities jsonb
   amenities: {
     premises: AmenityItem[];
     clinic_services: AmenityItem[];
@@ -59,7 +56,6 @@ export default function AdminClinicNewPage() {
 
   const [tab, setTab] = useState<TabKey>('basic');
 
-  // единое состояние
   const [clinic, setClinic] = useState<ClinicState>({
     name: '',
     about: '',
@@ -138,9 +134,8 @@ export default function AdminClinicNewPage() {
         district: clinic.district?.trim() || null,
         address: clinic.address.trim(),
     
-        // вместо lat/lng
         map_embed_url: clinic.mapUrl.trim() || null,
-        directions: clinic.directions.trim() || null, // если будешь хранить
+        directions: clinic.directions.trim() || null,
     
         // JSONB [{ method: "..." }]
         payments: clinic.payments.map((p) => ({ method: p })),
@@ -397,15 +392,15 @@ function AmenityGroup({
   onChange: (next: AmenityItem[]) => void;
 }) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState(''); // '' = No icon по умолчанию
+  const [icon, setIcon] = useState('');
 
   const add = () => {
     const v = name.trim();
     if (!v) return;
-    const normalizedIcon = icon || undefined; // в БД храним undefined/пусто
+    const normalizedIcon = icon || undefined;
     onChange([...items, { label: v, icon: normalizedIcon }]);
     setName('');
-    setIcon(''); // снова No icon
+    setIcon('');
   };
 
   const remove = (index: number) => {
@@ -655,7 +650,7 @@ function Services({
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState('USD'); // дефолт
+  const [currency, setCurrency] = useState('USD');
 
   return (
     <div className="space-y-4">

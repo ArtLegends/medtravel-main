@@ -39,7 +39,6 @@ export default function MagicAuthPage() {
         body: JSON.stringify({ access_token, refresh_token, as, next }),
       });
 
-      // сервер уже сделает redirect, но на всякий:
       if (res.ok) {
         router.replace(next);
         router.refresh();

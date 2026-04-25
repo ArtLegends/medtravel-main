@@ -42,7 +42,7 @@ export async function getCurrentClinicId(): Promise<string | null> {
     console.error('getCurrentClinicId: auth branch failed', e);
   }
 
-  // 2) Fallback по куке (для legacy/dev, можно потом убрать совсем)
+  // 2) Fallback по куке (для legacy/dev)
   try {
     const jar = await cookies();
     const fromCookie = jar.get('mt_customer_clinic_id')?.value ?? null;

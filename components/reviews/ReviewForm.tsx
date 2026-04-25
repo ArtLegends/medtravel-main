@@ -98,7 +98,6 @@ export default function ReviewForm({
         throw new Error(txt || `Request failed (${res.status})`);
       }
 
-      // красивый путь до клиники (если есть данные)
       const pretty =
         clinicPath({
           slug: clinicSlug ?? '',

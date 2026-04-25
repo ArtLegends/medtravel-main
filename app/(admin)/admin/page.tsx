@@ -5,7 +5,6 @@ import ClinicStatusPie from "@/components/dashboard/ClinicStatusPie";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import { createServerClient } from "@/lib/supabase/serverClient";
 
-// поправь под свои значения, если они отличаются в БД
 const BOOKING_NEW = ["new"];
 const BOOKING_DONE = ["processed", "done"];
 const BOOKING_REJECTED = ["rejected"];
@@ -14,12 +13,10 @@ const CLINIC_PUBLISHED = { is_published: true, moderation_status: "approved" };
 const CLINIC_PENDING = { moderation_status: "pending" };
 const CLINIC_REJECTED = { moderation_status: "rejected" };
 
-// у "старых" запросов клиник
 const REQUEST_PENDING = ["pending", "new"];
 const REQUEST_APPROVED = ["approved"];
 const REQUEST_REJECTED = ["rejected"];
 
-// для recent activity возьмём по нескольку последних записей из разных таблиц
 const RECENT_LIMIT = 5;
 
 export const metadata = {
@@ -43,7 +40,7 @@ export default async function Page() {
     clPending,
     clRejected,
 
-    // clinic requests (старые)
+    // clinic requests
     crTotal,
     crPending,
     crApproved,
@@ -54,7 +51,7 @@ export default async function Page() {
     cntNew,
     cntProcessed,
 
-    // reviews (и средняя оценка)
+    // reviews
     rvTotal,
     rvPending,
     rvPublished,
@@ -88,7 +85,7 @@ export default async function Page() {
     sb.from("clinics").select("*", { count: "exact", head: true })
       .eq("moderation_status", CLINIC_REJECTED.moderation_status),
 
-    // clinic_requests (legacy)
+    // clinic_requests
     sb.from("clinic_requests").select("*", { count: "exact", head: true }),
     sb.from("clinic_requests").select("*", { count: "exact", head: true }).in("status", REQUEST_PENDING),
     sb.from("clinic_requests").select("*", { count: "exact", head: true }).in("status", REQUEST_APPROVED),
@@ -99,7 +96,7 @@ export default async function Page() {
     sb.from("contact_messages").select("*", { count: "exact", head: true }).eq("status", "new"),
     sb.from("contact_messages").select("*", { count: "exact", head: true }).eq("status", "processed"),
 
-    // reviews (+ ratings для среднего)
+    // reviews
     sb.from("reviews").select("*", { count: "exact", head: true }),
     sb.from("reviews").select("*", { count: "exact", head: true }).eq("status", "pending"),
     sb.from("reviews").select("*", { count: "exact", head: true }).eq("status", "published"),
@@ -168,7 +165,7 @@ export default async function Page() {
     },
   };
 
-  /** ====== Trends: бронирования за 6 месяцев по статусам ====== */
+  /** ====== Trends ====== */
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth() - 5, 1); // включительно, 6 месяцев
   const { data: lastBookings } = await sb
@@ -202,14 +199,14 @@ export default async function Page() {
     { label: "Rejected",  color: "#ef4444", values: monthsKeys.map((k) => bucket[k].rejected) },
   ];
 
-  /** ====== Pie: статусы клиник ====== */
+  /** ====== Pie ====== */
   const statusPie = [
     { label: "Published", color: "#16a34a", value: stats.clinics.published },
     { label: "Pending",   color: "#f59e0b", value: stats.clinics.pending },
     { label: "Rejected",  color: "#ef4444", value: stats.clinics.rejected },
   ];
 
-  /** ====== Recent activity: небольшая лента ====== */
+  /** ====== Recent activity ====== */
   const [
     recentBookings,
     recentClinics,
@@ -259,7 +256,7 @@ export default async function Page() {
     })),
   ]
     .sort((a, b) => +new Date(b.time) - +new Date(a.time))
-    .slice(0, RECENT_LIMIT); // ограничим общую ленту
+    .slice(0, RECENT_LIMIT);
 
   return (
     <div className="space-y-6">

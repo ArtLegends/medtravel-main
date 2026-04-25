@@ -47,7 +47,7 @@ export default async function ModerationDetail({
     );
   }
 
-  // если клиника не найдена — покажем сообщение, но НЕ 404
+  // если клиника не найдена — покажем сообщение
   if (!clinic) {
     return (
       <div className="p-6 space-y-4">
